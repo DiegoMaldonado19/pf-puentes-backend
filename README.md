@@ -1,1 +1,135 @@
 # pf-puentes-backend
+
+API REST del Sistema de Gestión de Puentes (SGP).
+
+## Desarrollo local
+
+Requisitos: Docker con Compose 2.32 o superior. En Windows, Docker Desktop con la integración de WSL activada.
+
+```bash
+cp .env.example .env   # completar las contraseñas: openssl rand -hex 24
+docker compose -f compose.local.yaml up --watch
+```
+
+| Servicio | Dirección | Credenciales |
+|---|---|---|
+| API | http://localhost:8080 | — |
+| PostgreSQL | `localhost:5432`, base `puentes` | `puentes_migrador` / `DB_MIGRATION_PASSWORD` · `puentes_app` / `DB_APP_PASSWORD` |
+| Consola de MinIO | http://localhost:9001 | `MINIO_ROOT_USER` / `MINIO_ROOT_PASSWORD` |
+
+**Hot reload:** al guardar en `src/`, la app se recompila y devtools la reinicia (unos 5 s). Si cambias `pom.xml`, se reconstruye la imagen.
+
+**Comandos útiles**
+- Salud: `docker compose -f compose.local.yaml exec backend curl -s localhost:8081/actuator/health`. El actuator escucha en el puerto 8081, que no se publica (DT-DEP-10).
+- Consola SQL: `docker compose -f compose.local.yaml exec postgres psql -U puentes_migrador -d puentes`
+- Apagar: `docker compose -f compose.local.yaml down`. Con `-v` también se borran la base y los archivos.
+
+### Usuarios de base de datos
+
+| Usuario | Lo usa | Permisos |
+|---|---|---|
+| `puentes_migrador` | Flyway | Dueño del esquema y superusuario, porque `CREATE EXTENSION postgis` lo exige |
+| `puentes_app` | La aplicación | Solo `SELECT`, `INSERT`, `UPDATE` y `DELETE`: no puede crear ni alterar tablas |
+
+El script `docker/postgres/01-usuario-app.sh` crea `puentes_app` solo cuando el volumen es nuevo. Si cambias su contraseña en el `.env`, recrea el volumen local (`down -v`) o haz `ALTER ROLE`. Detalle en el [ADR 0007](docs/adr/0007-usuarios-de-base-de-datos.md).
+
+## Antes de abrir un PR
+
+Son los mismos chequeos que corre el CI:
+
+| Etapa | Comando |
+|---|---|
+| Formato | `./mvnw spotless:apply` (el CI corre `spotless:check`) |
+| Build | `./mvnw -B spotless:check package -DskipTests` |
+| Pruebas y cobertura | `./mvnw -B verify` |
+
+- `verify` necesita Docker: Testcontainers levanta PostgreSQL + PostGIS reales.
+- El reporte de JaCoCo queda en `target/site/jacoco/index.html`.
+- El CI falla si las clases `*Service` bajan de 70 % de líneas cubiertas (DT-CAL-01).
+
+## Despliegue
+
+GitHub Actions (`.github/workflows/ci-cd.yml`) corre cuatro etapas: build → test → push → deploy.
+
+| Evento | Entorno | Carpeta en la EC2 |
+|---|---|---|
+| PR hacia `develop` | dev | `~/puentes/dev/pf-puentes-backend` |
+| push a `develop` | stage | `~/puentes/stage/pf-puentes-backend` |
+| push a `main` | prod | `~/puentes/prod/pf-puentes-backend` |
+
+- **Imagen:** `<DOCKERHUB_USERNAME>/pf-puentes-backend:<número de build>`, más el tag `:tree-<hash>` que la identifica por contenido.
+- **Promoción:** si ese código ya tiene imagen, se promueve la misma sin reconstruirla. Prod solo acepta imágenes que pasaron por stage.
+- **Deploy:** el job escribe el `.env` del entorno desde su GitHub Environment y corre `docker compose up --wait`. Si un contenedor no queda sano, el job falla.
+- **Acceso:** el backend, postgres y minio no publican puertos. La API se alcanza por el nginx del frontend en `http://<EC2>:<puerto>/api`.
+- **Revisar un entorno:** `cd ~/puentes/<entorno>/pf-puentes-backend && docker compose ps`
+
+Las decisiones están en [docs/adr](docs/adr/). Los secretos y variables por configurar están en el [ADR 0004](docs/adr/0004-configuracion-por-entorno-con-github-environments.md).
+
+## Problemas conocidos
+
+**Maven falla en WSL con `bad_record_mac` o `Tag mismatch`**
+
+En algunas instalaciones, la red de WSL corrompe las descargas HTTPS grandes. Dentro de Docker no pasa, así que `compose.local.yaml` funciona igual.
+
+Para Maven en el host, baja las dependencias desde un contenedor y luego usa `./mvnw` normal:
+
+```bash
+docker run --rm -u "$(id -u):$(id -g)" -v "$PWD":/app -v "$HOME/.m2":/var/maven/.m2 \
+  -e MAVEN_CONFIG=/var/maven/.m2 -w /app maven:3.9.16-eclipse-temurin-25 \
+  mvn -B -Duser.home=/var/maven dependency:go-offline
+```
+
+## Tecnologías y versiones
+
+**Lenguaje y build**
+
+| Tecnología | Versión |
+|---|---|
+| Java (Eclipse Temurin) | 25.0.4 |
+| Maven (wrapper) | 3.9.16 |
+
+**Framework y dependencias**
+
+| Dependencia | Versión |
+|---|---|
+| Spring Boot (actuator, data-jpa, flyway, security, validation, webmvc, devtools) | 4.1.1 |
+| Spring Framework | 7.0.9 |
+| Tomcat embebido | 11.0.24 |
+| Hibernate ORM + hibernate-spatial | 7.4.5.Final |
+| hypersistence-utils-hibernate-73 | 3.16.0 |
+| Jackson | 3.1.5 |
+| Flyway (+ flyway-database-postgresql) | 12.4.0 |
+| PostgreSQL JDBC | 42.7.13 |
+| springdoc-openapi-starter-webmvc-ui | 3.1.0 |
+| MapStruct | 1.6.3 |
+| JJWT (api, impl, jackson) | 0.13.0 |
+
+**Pruebas y calidad**
+
+| Herramienta | Versión |
+|---|---|
+| JUnit Jupiter | 6.0.3 |
+| Mockito | 5.23.0 |
+| Testcontainers | 2.0.5 |
+| JaCoCo | 0.8.15 |
+| Spotless (google-java-format 1.36.1) | 3.10.3 |
+
+**Imágenes Docker**
+
+| Imagen | Uso |
+|---|---|
+| `maven:3.9.16-eclipse-temurin-25` | Compilación y desarrollo local |
+| `eclipse-temurin:25.0.4_7-jre-alpine` | Runtime del backend |
+| `postgis/postgis:17-3.6-alpine` | PostgreSQL 17 + PostGIS 3.6 (también en Testcontainers) |
+| `pgsty/minio:RELEASE.2026-08-04T00-00-00Z` | Almacenamiento de objetos ([ADR 0008](docs/adr/0008-imagenes-base-con-version-fija.md)) |
+
+**GitHub Actions**
+
+| Action | Versión |
+|---|---|
+| `actions/checkout` | v7.0.1 |
+| `actions/setup-java` | v6.0.1 |
+| `actions/upload-artifact` | v7.0.1 |
+| `docker/login-action` | v4.6.0 |
+| `docker/setup-buildx-action` | v4.4.1 |
+| `docker/build-push-action` | v7.4.0 |

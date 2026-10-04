@@ -1,0 +1,54 @@
+# Entornos dev, stage y prod en la EC2. Los valores vienen del .env que escribe el pipeline.
+name: puentes-${APP_ENV}-backend
+
+services:
+  postgres:
+    image: postgis/postgis:17-3.6-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: puentes
+      POSTGRES_USER: puentes_migrador
+      POSTGRES_PASSWORD: ${DB_MIGRATION_PASSWORD}
+      DB_APP_PASSWORD: ${DB_APP_PASSWORD}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./docker/postgres:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "puentes_migrador", "-d", "puentes"]
+      interval: 5s
+      retries: 10
+
+  minio:
+    image: pgsty/minio:RELEASE.2026-08-04T00-00-00Z
+    restart: unless-stopped
+    command: server /data --console-address :9001
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+    volumes:
+      - minio-data:/data
+
+  backend:
+    image: ${DOCKERHUB_USERNAME}/pf-puentes-backend:${IMAGE_TAG}
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DB_URL: jdbc:postgresql://postgres:5432/puentes
+      DB_APP_USER: puentes_app
+      DB_APP_PASSWORD: ${DB_APP_PASSWORD}
+      DB_MIGRATION_USER: puentes_migrador
+      DB_MIGRATION_PASSWORD: ${DB_MIGRATION_PASSWORD}
+      JWT_SECRET: ${JWT_SECRET}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS}
+
+volumes:
+  postgres-data:
+  minio-data:
+
+# Compartida con el frontend del mismo entorno; la crea el pipeline
+networks:
+  default:
+    name: puentes-${APP_ENV}
+    external: true
