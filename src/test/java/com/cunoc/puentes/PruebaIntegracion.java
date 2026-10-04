@@ -36,6 +36,7 @@ public abstract class PruebaIntegracion {
     registry.add("spring.flyway.user", POSTGRES::getUsername);
     registry.add("spring.flyway.password", POSTGRES::getPassword);
     registry.add("sgp.minio.url", MINIO::getS3URL);
+    registry.add("sgp.minio.url-publica", MINIO::getS3URL);
     registry.add("sgp.minio.usuario", MINIO::getUserName);
     registry.add("sgp.minio.clave", MINIO::getPassword);
   }
