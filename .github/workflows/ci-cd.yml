@@ -28,7 +28,7 @@ jobs:
           distribution: temurin
           java-version: 25.0.4
           cache: maven
-      - run: ./mvnw -B -ntp spotless:check package -DskipTests
+      - run: ./mvnw -B -ntp spotless:check package pmd:check -DskipTests
 
   test:
     needs: build
