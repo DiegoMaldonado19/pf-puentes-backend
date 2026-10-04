@@ -9,6 +9,7 @@ La configuración va en un `.env` fuera de git, documentado en `.env.example`. C
 
 ## Decisión
 - Se crean los GitHub Environments `dev`, `stage` y `prod`, con **los mismos nombres** de secreto en los tres.
+- Reglas de rama de cada Environment (Deployment branches and tags): `dev` sin restricción, `stage` solo `develop` y `prod` solo `main`.
 - El job `deploy` declara su Environment, así que GitHub le entrega los valores de ese entorno.
 - El job genera el `.env` y lo copia al clon del entorno en la EC2 (`umask 077`).
 - Los valores van entre comillas simples para que Compose no interprete un `$`.
@@ -31,3 +32,4 @@ La configuración va en un `.env` fuera de git, documentado en `.env.example`. C
 - Un solo workflow para los tres entornos, y ningún secreto en el repo ni en la imagen.
 - Las contraseñas de postgres solo se aplican al crear el volumen. Para cambiarlas después hay que hacer `ALTER ROLE` ([0007](0007-usuarios-de-base-de-datos.md)).
 - Agregar una variable implica tocar `.env.example`, `compose.yaml`, el heredoc del workflow y los tres Environments.
+- dev no puede limitarse a `develop`: sus deploys corren en `refs/pull/<n>/merge` y GitHub los rechaza (`Branch "refs/pull/1/merge" is not allowed to deploy to dev`). El workflow ya filtra qué PR despliega a dev (`github.base_ref == 'develop'`).
