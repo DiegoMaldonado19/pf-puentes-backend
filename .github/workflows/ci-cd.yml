@@ -1,0 +1,130 @@
+name: CI/CD
+
+on:
+  pull_request:
+    branches: [develop, main]
+  push:
+    branches: [develop, main]
+
+permissions:
+  contents: read
+
+env:
+  IMAGEN: ${{ secrets.DOCKERHUB_USERNAME }}/${{ github.event.repository.name }}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    outputs:
+      # PR hacia develop → dev · push a develop → stage · push a main → prod · otro caso → sin deploy
+      entorno: ${{ github.event_name == 'push' && (github.ref_name == 'main' && 'prod' || 'stage') || github.base_ref == 'develop' && 'dev' || '' }}
+      arbol: ${{ steps.arbol.outputs.hash }}
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - id: arbol
+        run: echo "hash=$(git rev-parse 'HEAD^{tree}')" >> "$GITHUB_OUTPUT"
+      - uses: actions/setup-java@v6.0.1
+        with:
+          distribution: temurin
+          java-version: 25.0.4
+          cache: maven
+      - run: ./mvnw -B -ntp spotless:check package -DskipTests
+
+  test:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/setup-java@v6.0.1
+        with:
+          distribution: temurin
+          java-version: 25.0.4
+          cache: maven
+      - run: ./mvnw -B -ntp verify
+      - uses: actions/upload-artifact@v7.0.1
+        with:
+          name: jacoco
+          path: target/site/jacoco
+
+  push:
+    needs: [build, test]
+    if: needs.build.outputs.entorno != ''
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.imagen.outputs.version }}
+    env:
+      ARBOL: ${{ needs.build.outputs.arbol }}
+      ENTORNO: ${{ needs.build.outputs.entorno }}
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: docker/login-action@v4.6.0
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - uses: docker/setup-buildx-action@v4.4.1
+      # Una imagen por contenido: si este árbol git ya tiene imagen, se promueve esa misma
+      - id: imagen
+        run: |
+          if VERSION=$(docker buildx imagetools inspect "$IMAGEN:tree-$ARBOL" --format '{{ index .Image.Config.Labels "org.opencontainers.image.version" }}' 2>/dev/null) && [ -n "$VERSION" ]; then
+            echo "Se promueve la imagen $VERSION"
+          elif [ "$ENTORNO" = prod ]; then
+            echo "::error::El árbol $ARBOL no pasó por stage: prod solo recibe imágenes promovidas"
+            exit 1
+          else
+            VERSION=${{ github.run_number }}
+            echo "construir=true" >> "$GITHUB_OUTPUT"
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+      - if: steps.imagen.outputs.construir
+        uses: docker/build-push-action@v7.4.0
+        with:
+          context: .
+          push: true
+          provenance: false
+          tags: |
+            ${{ env.IMAGEN }}:${{ steps.imagen.outputs.version }}
+            ${{ env.IMAGEN }}:tree-${{ env.ARBOL }}
+          labels: org.opencontainers.image.version=${{ steps.imagen.outputs.version }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  deploy:
+    needs: [build, push]
+    runs-on: ubuntu-latest
+    environment: ${{ needs.build.outputs.entorno }}
+    concurrency: deploy-${{ needs.build.outputs.entorno }}
+    env:
+      ENTORNO: ${{ needs.build.outputs.entorno }}
+      DIR: puentes/${{ needs.build.outputs.entorno }}/${{ github.event.repository.name }}
+    steps:
+      - name: Configurar SSH
+        env:
+          EC2_HOST: ${{ secrets.EC2_HOST }}
+          EC2_USER: ${{ secrets.EC2_USER }}
+          EC2_SSH_KEY: ${{ secrets.EC2_SSH_KEY }}
+        run: |
+          mkdir -p ~/.ssh
+          echo "$EC2_SSH_KEY" > ~/.ssh/ec2 && chmod 600 ~/.ssh/ec2
+          printf 'Host ec2\n  HostName %s\n  User %s\n  IdentityFile ~/.ssh/ec2\n  StrictHostKeyChecking accept-new\n' "$EC2_HOST" "$EC2_USER" > ~/.ssh/config
+      # Comillas simples: compose no interpreta un $ dentro del valor
+      - name: Generar .env
+        run: |
+          cat > .env <<'EOF'
+          APP_ENV='${{ needs.build.outputs.entorno }}'
+          DOCKERHUB_USERNAME='${{ secrets.DOCKERHUB_USERNAME }}'
+          IMAGE_TAG='${{ needs.push.outputs.version }}'
+          DB_MIGRATION_PASSWORD='${{ secrets.DB_MIGRATION_PASSWORD }}'
+          DB_APP_PASSWORD='${{ secrets.DB_APP_PASSWORD }}'
+          MINIO_ROOT_USER='${{ secrets.MINIO_ROOT_USER }}'
+          MINIO_ROOT_PASSWORD='${{ secrets.MINIO_ROOT_PASSWORD }}'
+          JWT_SECRET='${{ secrets.JWT_SECRET }}'
+          CORS_ALLOWED_ORIGINS='${{ vars.CORS_ALLOWED_ORIGINS }}'
+          EOF
+      - name: Desplegar en la EC2
+        run: |
+          # shellcheck disable=SC2029 # las variables se expanden en el runner a propósito
+          {
+            ssh ec2 "set -e; [ -d $DIR/.git ] || git clone -q https://github.com/$GITHUB_REPOSITORY.git $DIR; cd $DIR; git fetch -q origin $GITHUB_REF; git checkout -qf FETCH_HEAD"
+            ssh ec2 "umask 077; cat > $DIR/.env" < .env
+            ssh ec2 "set -e; cd $DIR; docker network create puentes-$ENTORNO 2>/dev/null || true; docker compose pull -q; docker compose up -d --remove-orphans --wait; docker image prune -f"
+          }

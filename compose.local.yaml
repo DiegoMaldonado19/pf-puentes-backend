@@ -1,0 +1,31 @@
+# Desarrollo local con hot reload: docker compose -f compose.local.yaml up --watch
+name: puentes-local-backend
+
+services:
+  postgres:
+    extends: { file: compose.yaml, service: postgres }
+    ports: ["5432:5432"]
+
+  minio:
+    extends: { file: compose.yaml, service: minio }
+    ports: ["9000:9000", "9001:9001"]
+
+  backend:
+    extends: { file: compose.yaml, service: backend }
+    image: pf-puentes-backend:local
+    build: { context: ., target: dev }
+    ports: ["8080:8080"]
+    develop:
+      watch:
+        # devtools reinicia la app al cambiar target/classes
+        - action: sync+exec
+          path: ./src
+          target: /app/src
+          exec:
+            command: mvn -q compile
+        - action: rebuild
+          path: pom.xml
+
+volumes:
+  postgres-data:
+  minio-data:
