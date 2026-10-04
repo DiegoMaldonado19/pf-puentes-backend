@@ -5,14 +5,14 @@
 - Directriz o regla relacionada: DT-CAL-05, DT-CAL-06, DT-CAL-07
 
 ## Contexto
-Cada PR debe compilar, probarse y revisar el formato. Solo hay dos ramas, `develop` y `main`, y tres entornos a los que desplegar.
+Cada PR debe compilar, probarse, revisar el formato y pasar el análisis estático. Solo hay dos ramas, `develop` y `main`, y tres entornos a los que desplegar.
 
 ## Decisión
 El workflow `.github/workflows/ci-cd.yml` tiene cuatro jobs encadenados:
 
 | Job | Qué hace |
 |---|---|
-| `build` | `spotless:check` + compilación y empaquetado |
+| `build` | `spotless:check` + compilación y empaquetado + `pmd:check` (PMD 7 con sus reglas por defecto) |
 | `test` | `mvn verify`: JUnit, Testcontainers y la regla de JaCoCo. Sube el reporte como artefacto |
 | `push` | Publica o promueve la imagen en Docker Hub ([0003](0003-version-y-promocion-de-imagenes.md)) |
 | `deploy` | Por SSH: actualiza el clon del entorno, escribe su `.env` y ejecuta `docker compose up --wait` |
