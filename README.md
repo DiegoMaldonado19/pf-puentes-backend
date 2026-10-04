@@ -17,6 +17,8 @@ docker compose -f compose.local.yaml up --watch
 | PostgreSQL | `localhost:5432`, base `puentes` | `puentes_migrador` / `DB_MIGRATION_PASSWORD` · `puentes_app` / `DB_APP_PASSWORD` |
 | Consola de MinIO | http://localhost:9001 | `MINIO_ROOT_USER` / `MINIO_ROOT_PASSWORD` |
 
+El backend crea el bucket `puentes` de MinIO al arrancar.
+
 **Hot reload:** al guardar en `src/`, la app se recompila y devtools la reinicia (unos 5 s). Si cambias `pom.xml`, se reconstruye la imagen.
 
 **Comandos útiles**
@@ -40,10 +42,11 @@ Son los mismos chequeos que corre el CI:
 | Etapa | Comando |
 |---|---|
 | Formato | `./mvnw spotless:apply` (el CI corre `spotless:check`) |
-| Build | `./mvnw -B spotless:check package -DskipTests` |
+| Build y análisis estático | `./mvnw -B spotless:check package pmd:check -DskipTests` |
 | Pruebas y cobertura | `./mvnw -B verify` |
 
-- `verify` necesita Docker: Testcontainers levanta PostgreSQL + PostGIS reales.
+- PMD usa sus reglas por defecto; cada violación sale en la consola y en `target/pmd.xml`.
+- `verify` necesita Docker: Testcontainers levanta PostgreSQL + PostGIS y MinIO reales. Las pruebas de integración extienden `PruebaIntegracion`, que comparte un solo contenedor de cada uno en toda la suite.
 - El reporte de JaCoCo queda en `target/site/jacoco/index.html`.
 - El CI falla si las clases `*Service` bajan de 70 % de líneas cubiertas (DT-CAL-01).
 
@@ -103,6 +106,7 @@ docker run --rm -u "$(id -u):$(id -g)" -v "$PWD":/app -v "$HOME/.m2":/var/maven/
 | springdoc-openapi-starter-webmvc-ui | 3.1.0 |
 | MapStruct | 1.6.3 |
 | JJWT (api, impl, jackson) | 0.13.0 |
+| AWS SDK for Java v2 (s3), cliente de MinIO | 2.55.11 |
 
 **Pruebas y calidad**
 
@@ -110,9 +114,10 @@ docker run --rm -u "$(id -u):$(id -g)" -v "$PWD":/app -v "$HOME/.m2":/var/maven/
 |---|---|
 | JUnit Jupiter | 6.0.3 |
 | Mockito | 5.23.0 |
-| Testcontainers | 2.0.5 |
+| Testcontainers (postgresql, minio) | 2.0.5 |
 | JaCoCo | 0.8.15 |
 | Spotless (google-java-format 1.36.1) | 3.10.3 |
+| maven-pmd-plugin (PMD 7.17.0) | 3.28.0 |
 
 **Imágenes Docker**
 
