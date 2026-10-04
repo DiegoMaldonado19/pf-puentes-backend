@@ -35,6 +35,13 @@ El backend crea el bucket `puentes` de MinIO al arrancar.
 
 El script `docker/postgres/01-usuario-app.sh` crea `puentes_app` solo cuando el volumen es nuevo. Si cambias su contraseña en el `.env`, recrea el volumen local (`down -v`) o haz `ALTER ROLE`. Detalle en el [ADR 0007](docs/adr/0007-usuarios-de-base-de-datos.md).
 
+### Modelo de datos
+
+- Cada módulo tiene su migración en `src/main/resources/db/migration` y sus entidades en su paquete ([ADR 0010](docs/adr/0010-modelo-de-datos-base.md)).
+- **Nunca edites una migración fusionada:** un cambio de esquema es una migración nueva, con fecha y hora en el nombre.
+- La app arranca con `ddl-auto=validate`: si tu entidad no coincide con tu tabla, falla al iniciar y te dice qué columna está mal.
+- Las entidades usan Lombok (`@Getter`, `@Setter`, constructor protegido), nunca `@Data` ([ADR 0012](docs/adr/0012-lombok-en-las-entidades.md)).
+
 ## Antes de abrir un PR
 
 Son los mismos chequeos que corre el CI:
@@ -107,6 +114,7 @@ docker run --rm -u "$(id -u):$(id -g)" -v "$PWD":/app -v "$HOME/.m2":/var/maven/
 | MapStruct | 1.6.3 |
 | JJWT (api, impl, jackson) | 0.13.0 |
 | AWS SDK for Java v2 (s3), cliente de MinIO | 2.55.11 |
+| Lombok (+ lombok-mapstruct-binding 0.2.0) | 1.18.46 |
 
 **Pruebas y calidad**
 
