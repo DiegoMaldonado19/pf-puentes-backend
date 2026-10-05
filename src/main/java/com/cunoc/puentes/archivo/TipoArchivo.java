@@ -5,7 +5,7 @@ import java.util.Arrays;
 import java.util.Optional;
 
 /** Formatos aceptados (RN-ARC-02, RN-ARC-04), reconocidos por su firma binaria (DT-SEC-08). */
-enum TipoArchivo {
+public enum TipoArchivo {
   JPEG("image/jpeg", "jpg"),
   WEBP("image/webp", "webp"),
   PDF("application/pdf", "pdf");
@@ -21,10 +21,6 @@ enum TipoArchivo {
   TipoArchivo(String mime, String extension) {
     this.mime = mime;
     this.extension = extension;
-  }
-
-  boolean esFoto() {
-    return this != PDF;
   }
 
   static Optional<TipoArchivo> detectar(byte[] contenido) {
