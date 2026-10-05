@@ -2,6 +2,17 @@
 
 API REST del Sistema de Gestión de Puentes (SGP).
 
+## Estado (04/10/2026)
+
+| Paquete | Qué hay | Responsable |
+|---|---|---|
+| `common/` | Errores RFC 7807 (`NegocioException`), CORS, OpenAPI en `/api/docs`, ShedLock | P1 |
+| `archivo/` | Subida de fotos y PDF, borrado en borradores, URL firmadas y purga de 210 días (RN-ARC) | P1 |
+| Los demás módulos | Tabla, migración y entidad del modelo base ([ADR 0010](docs/adr/0010-modelo-de-datos-base.md)); todavía sin servicios ni endpoints | Cada responsable |
+
+- La seguridad (login JWT, `@EnableMethodSecurity`) es de P2 y todavía no existe: hoy Spring Security protege todo con su configuración por defecto.
+- Los contratos entre módulos y las fechas están en `docs-analisis/Equipo`.
+
 ## Desarrollo local
 
 Requisitos: Docker con Compose 2.32 o superior. En Windows, Docker Desktop con la integración de WSL activada.
@@ -20,6 +31,7 @@ docker compose -f compose.local.yaml up --watch
 El backend crea el bucket `archivos` de MinIO al arrancar.
 
 **Documentación de la API:** http://localhost:8080/api/docs/swagger-ui.html (el JSON está en `/api/docs`). Todo endpoint nuevo lleva `@Tag`, `@Operation` y un `@ApiResponse` por código.
+- Mientras no exista la seguridad de P2, Spring pide iniciar sesión con el usuario `user` y la contraseña que imprime al arrancar: `docker compose -f compose.local.yaml logs backend | grep "generated security password"`.
 
 **Hot reload:** al guardar en `src/`, la app se recompila y devtools la reinicia (unos 5 s). Si cambias `pom.xml`, se reconstruye la imagen.
 
@@ -60,6 +72,7 @@ Son los mismos chequeos que corre el CI:
 
 - PMD usa sus reglas por defecto; cada violación sale en la consola y en `target/pmd.xml`.
 - `verify` necesita Docker: Testcontainers levanta PostgreSQL + PostGIS y MinIO reales. Las pruebas de integración extienden `PruebaIntegracion`, que comparte un solo contenedor de cada uno en toda la suite.
+- Pruebas de rol por endpoint (DT-CAL-03): hasta que P2 entregue su helper de JWT, sigue el ejemplo de `archivo/ArchivoControllerTest` (`@EnableMethodSecurity` de prueba y `user("<uuid>").roles(...)`).
 - El reporte de JaCoCo queda en `target/site/jacoco/index.html`.
 - El CI falla si las clases `*Service` bajan de 70 % de líneas cubiertas (DT-CAL-01).
 
@@ -82,6 +95,10 @@ GitHub Actions (`.github/workflows/ci-cd.yml`) corre cuatro etapas: build → te
 Las decisiones están en [docs/adr](docs/adr/). Los secretos y variables por configurar están en el [ADR 0004](docs/adr/0004-configuracion-por-entorno-con-github-environments.md).
 
 ## Problemas conocidos
+
+**La app no arranca: `Could not resolve placeholder '...'`**
+
+A tu `.env` le falta una variable que se agregó después de que lo creaste. Copia la línea que falta desde `.env.example`.
 
 **Maven falla en WSL con `bad_record_mac` o `Tag mismatch`**
 
