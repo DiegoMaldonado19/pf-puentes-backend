@@ -41,6 +41,8 @@ jobs:
           java-version: 25.0.4
           cache: maven
       - run: ./mvnw -B -ntp verify
+      # DiccionarioDeDatosTest lo regenera: si cambió, falta versionarlo
+      - run: git diff --exit-code -- docs/diccionario-de-datos.md
       - uses: actions/upload-artifact@v7.0.1
         with:
           name: jacoco

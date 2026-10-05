@@ -15,6 +15,13 @@ interface ArchivoRepository extends JpaRepository<Archivo, UUID> {
 
   List<Archivo> findByInspeccionIdOrderByCreadoEn(UUID inspeccionId);
 
+  long countByInspeccionIdAndTipoInAndPurgadoEnIsNull(
+      UUID inspeccionId, Collection<TipoArchivo> tipos);
+
+  List<Archivo> findByOrdenMantenimientoIdOrderByCreadoEn(UUID ordenId);
+
+  long countByOrdenMantenimientoId(UUID ordenId);
+
   // ADR 0010: otro módulo se lee por SQL, sin importar su entidad
   @Query(
       value =
@@ -25,6 +32,9 @@ interface ArchivoRepository extends JpaRepository<Archivo, UUID> {
           """,
       nativeQuery = true)
   Optional<InspeccionDelArchivo> buscarInspeccion(UUID id);
+
+  @Query(value = "SELECT puente_id FROM orden_mantenimiento WHERE id = :id", nativeQuery = true)
+  Optional<UUID> buscarPuenteDeOrden(UUID id);
 
   // RN-ARC-06: la última modificación del borrador es su última actividad
   @Query(
