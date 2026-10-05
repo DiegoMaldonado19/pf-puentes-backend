@@ -23,5 +23,5 @@ El mismo `compose.yaml` sirve a los tres entornos; solo cambia el `.env`. Ni el 
   - Docker con el compose plugin, y git;
   - el usuario de SSH en el grupo `docker`;
   - una Elastic IP, porque `EC2_HOST` no debe cambiar;
-  - el security group abierto en 22, 80, 8081 y 8082.
+  - el security group abierto en 22, 80, 443, 8081 y 8082.
 - Para separar entornos en instancias distintas basta con definir `EC2_HOST` dentro de cada Environment de GitHub, porque un secreto del Environment sobreescribe al del repositorio.

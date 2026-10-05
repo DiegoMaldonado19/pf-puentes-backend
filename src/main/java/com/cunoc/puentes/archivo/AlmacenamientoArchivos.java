@@ -7,5 +7,8 @@ public interface AlmacenamientoArchivos {
   // concurrentes de PDF aprietan el heap
   void guardar(String clave, byte[] contenido, String tipoMime);
 
+  /** DT-SEC-09: el navegador descarga el objeto sin token, solo mientras la URL esté vigente. */
+  String obtenerUrlFirmada(String clave);
+
   void eliminar(String clave);
 }

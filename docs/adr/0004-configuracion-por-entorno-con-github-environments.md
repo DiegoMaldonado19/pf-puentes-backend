@@ -26,7 +26,8 @@ La configuración va en un `.env` fuera de git, documentado en `.env.example`. C
 | Environment | `MINIO_ROOT_USER` | secreto | `puentes-<entorno>` |
 | Environment | `MINIO_ROOT_PASSWORD` | secreto | `openssl rand -hex 24` |
 | Environment | `JWT_SECRET` | secreto | `openssl rand -hex 32` |
-| Environment | `CORS_ALLOWED_ORIGINS` | secreto | `http://<EC2_HOST>:8082` (dev), `:8081` (stage), sin puerto (prod) |
+| Environment | `MINIO_URL_PUBLICA` | secreto | `https://pf-puentes.duckdns.org:8082` (dev), `:8081` (stage), sin puerto (prod) ([0013](0013-url-firmadas-de-minio-servidas-por-nginx.md)) |
+| Environment | `CORS_ALLOWED_ORIGINS` | secreto | `https://pf-puentes.duckdns.org:8082` (dev), `:8081` (stage), sin puerto (prod) |
 
 ## Consecuencias
 - Un solo workflow para los tres entornos, y ningún secreto en el repo ni en la imagen.

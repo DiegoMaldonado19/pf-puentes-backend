@@ -17,7 +17,9 @@ docker compose -f compose.local.yaml up --watch
 | PostgreSQL | `localhost:5432`, base `puentes` | `puentes_migrador` / `DB_MIGRATION_PASSWORD` · `puentes_app` / `DB_APP_PASSWORD` |
 | Consola de MinIO | http://localhost:9001 | `MINIO_ROOT_USER` / `MINIO_ROOT_PASSWORD` |
 
-El backend crea el bucket `puentes` de MinIO al arrancar.
+El backend crea el bucket `archivos` de MinIO al arrancar.
+
+**Documentación de la API:** http://localhost:8080/api/docs/swagger-ui.html (el JSON está en `/api/docs`). Todo endpoint nuevo lleva `@Tag`, `@Operation` y un `@ApiResponse` por código.
 
 **Hot reload:** al guardar en `src/`, la app se recompila y devtools la reinicia (unos 5 s). Si cambias `pom.xml`, se reconstruye la imagen.
 
@@ -41,6 +43,10 @@ El script `docker/postgres/01-usuario-app.sh` crea `puentes_app` solo cuando el 
 - **Nunca edites una migración fusionada:** un cambio de esquema es una migración nueva, con fecha y hora en el nombre.
 - La app arranca con `ddl-auto=validate`: si tu entidad no coincide con tu tabla, falla al iniciar y te dice qué columna está mal.
 - Las entidades usan Lombok (`@Getter`, `@Setter`, constructor protegido), nunca `@Data` ([ADR 0012](docs/adr/0012-lombok-en-las-entidades.md)).
+
+### Procesos programados
+
+Cada `@Scheduled` lleva `@SchedulerLock(name = "...")`: así una sola réplica lo ejecuta (DT-BE-14). La configuración está en `common/ProcesosProgramadosConfig` y la tabla `shedlock` ya existe ([ADR 0014](docs/adr/0014-tabla-shedlock-con-el-esquema-de-la-libreria.md)).
 
 ## Antes de abrir un PR
 
@@ -70,7 +76,7 @@ GitHub Actions (`.github/workflows/ci-cd.yml`) corre cuatro etapas: build → te
 - **Imagen:** `<DOCKERHUB_USERNAME>/pf-puentes-backend:<número de build>`, más el tag `:tree-<hash>` que la identifica por contenido.
 - **Promoción:** si ese código ya tiene imagen, se promueve la misma sin reconstruirla. Prod solo acepta imágenes que pasaron por stage.
 - **Deploy:** el job escribe el `.env` del entorno desde su GitHub Environment y corre `docker compose up --wait`. Si un contenedor no queda sano, el job falla.
-- **Acceso:** el backend, postgres y minio no publican puertos. La API se alcanza por el nginx del frontend en `http://<EC2>:<puerto>/api`.
+- **Acceso:** el backend, postgres y minio no publican puertos. La API se alcanza por el nginx del frontend en `https://pf-puentes.duckdns.org[:puerto]/api`, y las fotos por las URL firmadas de `/archivos/` ([ADR 0013](docs/adr/0013-url-firmadas-de-minio-servidas-por-nginx.md)).
 - **Revisar un entorno:** `cd ~/puentes/<entorno>/pf-puentes-backend && docker compose ps`
 
 Las decisiones están en [docs/adr](docs/adr/). Los secretos y variables por configurar están en el [ADR 0004](docs/adr/0004-configuracion-por-entorno-con-github-environments.md).
@@ -114,6 +120,7 @@ docker run --rm -u "$(id -u):$(id -g)" -v "$PWD":/app -v "$HOME/.m2":/var/maven/
 | MapStruct | 1.6.3 |
 | JJWT (api, impl, jackson) | 0.13.0 |
 | AWS SDK for Java v2 (s3), cliente de MinIO | 2.55.11 |
+| ShedLock (spring, provider-jdbc-template) | 7.10.1 |
 | Lombok (+ lombok-mapstruct-binding 0.2.0) | 1.18.46 |
 
 **Pruebas y calidad**
