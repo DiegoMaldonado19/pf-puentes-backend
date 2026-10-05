@@ -55,6 +55,7 @@ El script `docker/postgres/01-usuario-app.sh` crea `puentes_app` solo cuando el 
 - **Nunca edites una migración fusionada:** un cambio de esquema es una migración nueva, con fecha y hora en el nombre.
 - La app arranca con `ddl-auto=validate`: si tu entidad no coincide con tu tabla, falla al iniciar y te dice qué columna está mal.
 - Las entidades usan Lombok (`@Getter`, `@Setter`, constructor protegido), nunca `@Data` ([ADR 0012](docs/adr/0012-lombok-en-las-entidades.md)).
+- Toda tabla y columna lleva `COMMENT ON`. Con ellos, `./mvnw verify` regenera el [diccionario de datos](docs/diccionario-de-datos.md): versiónalo con tu migración, porque el CI falla si quedó desactualizado.
 
 ### Procesos programados
 
