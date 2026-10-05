@@ -18,17 +18,17 @@ API REST del Sistema de Gestión de Puentes (SGP).
 Requisitos: Docker con Compose 2.32 o superior. En Windows, Docker Desktop con la integración de WSL activada.
 
 ```bash
-cp .env.example .env   # completar las contraseñas: openssl rand -hex 24
+cp .env.local .env   # valores locales compartidos; .env.example documenta los de la EC2
 docker compose -f compose.local.yaml up --watch
 ```
 
 | Servicio | Dirección | Credenciales |
 |---|---|---|
 | API | http://localhost:8080 | — |
-| PostgreSQL | `localhost:5432`, base `puentes` | `puentes_migrador` / `DB_MIGRATION_PASSWORD` · `puentes_app` / `DB_APP_PASSWORD` |
-| Consola de MinIO | http://localhost:9001 | `MINIO_ROOT_USER` / `MINIO_ROOT_PASSWORD` |
+| PostgreSQL | `localhost:5432`, base `puentes` | `puentes_migrador` / `password` · `puentes_app` / `password` |
+| Consola de MinIO | http://localhost:9001 | `puentes-local` / `password` |
 
-El backend crea el bucket `archivos` de MinIO al arrancar.
+El backend crea el bucket `archivos` de MinIO al arrancar. Si tu volumen local se creó con otras contraseñas, recréalo: `docker compose -f compose.local.yaml down -v`.
 
 **Documentación de la API:** http://localhost:8080/api/docs/swagger-ui.html (el JSON está en `/api/docs`). Todo endpoint nuevo lleva `@Tag`, `@Operation` y un `@ApiResponse` por código.
 - Mientras no exista la seguridad de P2, Spring pide iniciar sesión con el usuario `user` y la contraseña que imprime al arrancar: `docker compose -f compose.local.yaml logs backend | grep "generated security password"`.
@@ -99,7 +99,7 @@ Las decisiones están en [docs/adr](docs/adr/). Los secretos y variables por con
 
 **La app no arranca: `Could not resolve placeholder '...'`**
 
-A tu `.env` le falta una variable que se agregó después de que lo creaste. Copia la línea que falta desde `.env.example`.
+A tu `.env` le falta una variable que se agregó después de que lo creaste. Copia la línea que falta desde `.env.local`.
 
 **Maven falla en WSL con `bad_record_mac` o `Tag mismatch`**
 
