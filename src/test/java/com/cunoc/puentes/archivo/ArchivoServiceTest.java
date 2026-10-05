@@ -22,6 +22,7 @@ import com.cunoc.puentes.common.NegocioException;
 import com.cunoc.puentes.inspeccion.EstadoInspeccion;
 import java.time.Instant;
 import java.util.Arrays;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -40,6 +41,7 @@ class ArchivoServiceTest {
   private static final UUID PUENTE = UUID.randomUUID();
   private static final UUID INSPECCION = UUID.randomUUID();
   private static final UUID AUTOR = UUID.randomUUID();
+  private static final UUID ORDEN = UUID.randomUUID();
   private static final Instant CAPTURADA = Instant.parse("2026-10-04T15:30:00Z");
 
   private final AlmacenamientoArchivos almacenamiento = mock(AlmacenamientoArchivos.class);
@@ -223,6 +225,65 @@ class ArchivoServiceTest {
         .singleElement()
         .satisfies(dto -> assertThat(dto.url()).isNull());
     verify(almacenamiento, never()).obtenerUrlFirmada(anyString());
+  }
+
+  @Test
+  void contarFotosNoCuentaLasPurgadas() {
+    when(repositorio.countByInspeccionIdAndTipoInAndPurgadoEnIsNull(
+            INSPECCION, EnumSet.of(TipoArchivo.JPEG, TipoArchivo.WEBP)))
+        .thenReturn(4L);
+
+    assertThat(servicio.contarFotos(INSPECCION)).isEqualTo(4);
+  }
+
+  @Test
+  void guardaLaEvidenciaEnLaCarpetaDeLaOrden() {
+    when(repositorio.buscarPuenteDeOrden(ORDEN)).thenReturn(Optional.of(PUENTE));
+
+    ArchivoDTO dto = servicio.guardarEvidencia(ORDEN, foto());
+
+    Archivo archivo = guardado();
+    assertThat(archivo.getClave())
+        .matches("\\d{4}/\\d{2}/" + PUENTE + "/" + ORDEN + "/[0-9a-f-]{36}\\.webp");
+    assertThat(archivo.getOrdenMantenimientoId()).isEqualTo(ORDEN);
+    assertThat(archivo.getInspeccionId()).isNull();
+    assertThat(dto.urlMiniatura()).isEqualTo("https://firmada/" + archivo.getClaveMiniatura());
+  }
+
+  @Test
+  void laEvidenciaDeUnaOrdenQueNoExisteDa404() {
+    assertThatExceptionOfType(NegocioException.class)
+        .isThrownBy(() -> servicio.guardarEvidencia(ORDEN, foto()))
+        .extracting(NegocioException::getStatusCode)
+        .isEqualTo(HttpStatus.NOT_FOUND);
+    verifyNoInteractions(almacenamiento);
+  }
+
+  @Test
+  void unReintentoDeEvidenciaNoLaSubeOtraVez() {
+    UUID id = UUID.randomUUID();
+    Archivo evidencia = archivo(id, null);
+    evidencia.setOrdenMantenimientoId(ORDEN);
+    when(repositorio.buscarPuenteDeOrden(ORDEN)).thenReturn(Optional.of(PUENTE));
+    when(repositorio.findById(id)).thenReturn(Optional.of(evidencia));
+
+    assertThat(servicio.guardarEvidencia(ORDEN, foto(id, WEBP, JPEG)).id()).isEqualTo(id);
+    verify(almacenamiento, never()).guardar(anyString(), any(), anyString());
+    verify(repositorio, never()).save(any());
+  }
+
+  @Test
+  void listaYCuentaLaEvidenciaDeUnaOrden() {
+    Archivo evidencia = archivo(UUID.randomUUID(), null);
+    evidencia.setOrdenMantenimientoId(ORDEN);
+    when(repositorio.findByOrdenMantenimientoIdOrderByCreadoEn(ORDEN))
+        .thenReturn(List.of(evidencia));
+    when(repositorio.countByOrdenMantenimientoId(ORDEN)).thenReturn(1L);
+
+    assertThat(servicio.listarEvidencias(ORDEN))
+        .singleElement()
+        .satisfies(dto -> assertThat(dto.url()).isEqualTo("https://firmada/clave.webp"));
+    assertThat(servicio.contarEvidencias(ORDEN)).isEqualTo(1);
   }
 
   private void enEstado(EstadoInspeccion estado) {

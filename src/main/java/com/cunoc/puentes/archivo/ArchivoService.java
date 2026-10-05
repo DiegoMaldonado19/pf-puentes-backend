@@ -62,21 +62,29 @@ public class ArchivoService {
         usuarioId,
         datos.id(),
         puenteId -> {
-          byte[] foto = bytes(datos.foto());
-          byte[] miniatura = bytes(datos.miniatura());
-          TipoArchivo tipoFoto = tipoDeFoto(foto);
-          TipoArchivo tipoMiniatura = tipoDeFoto(miniatura);
           exigirCupo(inspeccionId, FOTOS, MAX_FOTOS_POR_INSPECCION, "fotos");
-          String nombre = carpeta(puenteId, inspeccionId) + UUID.randomUUID();
-          Archivo archivo =
-              nuevo(
-                  datos.id(), inspeccionId, tipoFoto, guardar(nombre, foto, tipoFoto), foto.length);
-          archivo.setClaveMiniatura(guardar(nombre + "-miniatura", miniatura, tipoMiniatura));
-          archivo.setElementoRef(datos.elementoRef());
-          archivo.setUbicacion(punto(datos.latitud(), datos.longitud()));
-          archivo.setCapturadaEn(datos.capturadaEn());
-          return archivo;
+          return foto(carpeta(puenteId, inspeccionId), datos);
         });
+  }
+
+  /** RN-MTO-05 (contrato 16): P8 ya validó la orden y quién la cierra. */
+  public ArchivoDTO guardarEvidencia(UUID ordenId, SubirFotoDTO datos) {
+    UUID puenteId =
+        repositorio
+            .buscarPuenteDeOrden(ordenId)
+            .orElseThrow(
+                () ->
+                    noEncontrado(
+                        "orden-no-encontrada",
+                        "La orden no existe",
+                        "No hay una orden de mantenimiento con ese id."));
+    return yaGuardado(datos.id(), ordenId, Archivo::getOrdenMantenimientoId)
+        .orElseGet(
+            () -> {
+              Archivo archivo = foto(carpeta(puenteId, ordenId), datos);
+              archivo.setOrdenMantenimientoId(ordenId);
+              return aDTO(repositorio.save(archivo));
+            });
   }
 
   public ArchivoDTO guardarDocumento(UUID inspeccionId, UUID usuarioId, SubirDocumentoDTO datos) {
@@ -99,11 +107,7 @@ public class ArchivoService {
               "documentos");
           String nombre = carpeta(puenteId, inspeccionId) + UUID.randomUUID();
           return nuevo(
-              datos.id(),
-              inspeccionId,
-              TipoArchivo.PDF,
-              guardar(nombre, pdf, TipoArchivo.PDF),
-              pdf.length);
+              datos.id(), TipoArchivo.PDF, guardar(nombre, pdf, TipoArchivo.PDF), pdf.length);
         });
   }
 
@@ -134,6 +138,23 @@ public class ArchivoService {
         .toList();
   }
 
+  /** RN-MTO-05: para el detalle de la orden (P8), que ya autorizó la lectura. */
+  public List<ArchivoDTO> listarEvidencias(UUID ordenId) {
+    return repositorio.findByOrdenMantenimientoIdOrderByCreadoEn(ordenId).stream()
+        .map(this::aDTO)
+        .toList();
+  }
+
+  /** RN-MTO-05: P8 exige al menos una antes de cerrar la orden como EJECUTADA. */
+  public long contarEvidencias(UUID ordenId) {
+    return repositorio.countByOrdenMantenimientoId(ordenId);
+  }
+
+  /** RN-INS-06 (contrato 17): una foto purgada ya no cuenta. */
+  public long contarFotos(UUID inspeccionId) {
+    return repositorio.countByInspeccionIdAndTipoInAndPurgadoEnIsNull(inspeccionId, FOTOS);
+  }
+
   /** RN-ARC-06: borra los objetos de los borradores abandonados y conserva sus registros. */
   @Scheduled(cron = "0 0 3 * * *", zone = "America/Guatemala")
   @SchedulerLock(name = "purga-de-archivos")
@@ -155,25 +176,51 @@ public class ArchivoService {
     log.info("RN-ARC-06: {} de {} archivos purgados", purgados, vencidos.size());
   }
 
-  // DT-OFF-07: reenviar un id ya guardado devuelve ese archivo, sin guardar nada otra vez
   private ArchivoDTO subir(
       UUID inspeccionId, UUID usuarioId, UUID id, Function<UUID, Archivo> guardarObjetos) {
     InspeccionDelArchivo inspeccion = inspeccionPropia(inspeccionId, usuarioId);
-    Optional<Archivo> existente = repositorio.findById(id);
-    if (existente.isPresent()) {
-      if (!inspeccionId.equals(existente.get().getInspeccionId())) {
-        throw new NegocioException(
-            HttpStatus.CONFLICT,
-            "id-en-uso",
-            "El id ya está en uso",
-            "Ese id pertenece a un archivo de otra inspección.");
-      }
-      return aDTO(existente.get());
-    }
-    exigirBorrador(inspeccion);
-    // ponytail: si la BD falla después de MinIO (o MinIO después de borrar la fila, en eliminar),
-    // quedan objetos huérfanos; barrerlos si llega a importar
-    return aDTO(repositorio.save(guardarObjetos.apply(inspeccion.getPuenteId())));
+    return yaGuardado(id, inspeccionId, Archivo::getInspeccionId)
+        .orElseGet(
+            () -> {
+              exigirBorrador(inspeccion);
+              // ponytail: si la BD falla después de MinIO (o MinIO después de borrar la fila, en
+              // eliminar), quedan objetos huérfanos; barrerlos si llega a importar
+              Archivo archivo = guardarObjetos.apply(inspeccion.getPuenteId());
+              archivo.setInspeccionId(inspeccionId);
+              return aDTO(repositorio.save(archivo));
+            });
+  }
+
+  // DT-OFF-07: reenviar un id ya guardado devuelve ese archivo, sin guardar nada otra vez
+  private Optional<ArchivoDTO> yaGuardado(
+      UUID id, UUID padreId, Function<Archivo, UUID> padreDelArchivo) {
+    return repositorio
+        .findById(id)
+        .map(
+            existente -> {
+              if (!padreId.equals(padreDelArchivo.apply(existente))) {
+                throw new NegocioException(
+                    HttpStatus.CONFLICT,
+                    "id-en-uso",
+                    "El id ya está en uso",
+                    "Ese id ya pertenece a otro archivo.");
+              }
+              return aDTO(existente);
+            });
+  }
+
+  private Archivo foto(String carpeta, SubirFotoDTO datos) {
+    byte[] foto = bytes(datos.foto());
+    byte[] miniatura = bytes(datos.miniatura());
+    TipoArchivo tipoFoto = tipoDeFoto(foto);
+    TipoArchivo tipoMiniatura = tipoDeFoto(miniatura);
+    String nombre = carpeta + UUID.randomUUID();
+    Archivo archivo = nuevo(datos.id(), tipoFoto, guardar(nombre, foto, tipoFoto), foto.length);
+    archivo.setClaveMiniatura(guardar(nombre + "-miniatura", miniatura, tipoMiniatura));
+    archivo.setElementoRef(datos.elementoRef());
+    archivo.setUbicacion(punto(datos.latitud(), datos.longitud()));
+    archivo.setCapturadaEn(datos.capturadaEn());
+    return archivo;
   }
 
   // DT-SEC-04 y Backend/02: la inspección de otro autor no existe para quien pregunta
@@ -239,11 +286,9 @@ public class ArchivoService {
         : almacenamiento.obtenerUrlFirmada(clave);
   }
 
-  private static Archivo nuevo(
-      UUID id, UUID inspeccionId, TipoArchivo tipo, String clave, long tamano) {
+  private static Archivo nuevo(UUID id, TipoArchivo tipo, String clave, long tamano) {
     Archivo archivo = new Archivo();
     archivo.setId(id);
-    archivo.setInspeccionId(inspeccionId);
     archivo.setTipo(tipo);
     archivo.setClave(clave);
     archivo.setTamano(tamano);
@@ -264,10 +309,10 @@ public class ArchivoService {
     }
   }
 
-  // DT-ALM-02 + DT-SEC-08: {año}/{mes}/{puente_id}/{inspeccion_id}/, nunca el nombre del cliente
-  private static String carpeta(UUID puenteId, UUID inspeccionId) {
+  // DT-ALM-02 + DT-SEC-08: {año}/{mes}/{puente_id}/{padre_id}/, nunca el nombre del cliente
+  private static String carpeta(UUID puenteId, UUID padreId) {
     YearMonth mes = YearMonth.now(ZoneOffset.UTC);
-    return "%d/%02d/%s/%s/".formatted(mes.getYear(), mes.getMonthValue(), puenteId, inspeccionId);
+    return "%d/%02d/%s/%s/".formatted(mes.getYear(), mes.getMonthValue(), puenteId, padreId);
   }
 
   private static TipoArchivo tipoDeFoto(byte[] contenido) {
