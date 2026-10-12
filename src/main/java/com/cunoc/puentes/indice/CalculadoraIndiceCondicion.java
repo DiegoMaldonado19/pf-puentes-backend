@@ -4,10 +4,26 @@ import java.math.BigDecimal;
 import java.math.MathContext;
 import java.util.List;
 
-/** Núcleo puro del IC (RN-IC-01/02, DT-ARQ-06): recibe solo elementos evaluados y sus pesos. */
+/** Núcleo puro del IC (RN-IC-01/02/04, DT-ARQ-06): cálculo y clasificación sin anulaciones. */
 public final class CalculadoraIndiceCondicion {
 
   private static final BigDecimal CIEN = BigDecimal.valueOf(100);
+  private static final BigDecimal MINIMO_BUENO = BigDecimal.valueOf(75);
+  private static final BigDecimal MINIMO_REGULAR = BigDecimal.valueOf(50);
+
+  /** Clasifica el IC sin aplicar redondeo de presentación ni condiciones de anulación. */
+  public EstadoCondicion clasificar(BigDecimal indice) {
+    if (indice == null || indice.signum() < 0 || indice.compareTo(CIEN) > 0) {
+      throw new IllegalArgumentException("El IC debe estar presente y estar entre 0 y 100.");
+    }
+    if (indice.compareTo(MINIMO_BUENO) >= 0) {
+      return EstadoCondicion.BUENO;
+    }
+    if (indice.compareTo(MINIMO_REGULAR) >= 0) {
+      return EstadoCondicion.REGULAR;
+    }
+    return EstadoCondicion.MALO;
+  }
 
   public BigDecimal calcular(List<CalificacionElemento> elementos) {
     if (elementos == null || elementos.isEmpty()) {

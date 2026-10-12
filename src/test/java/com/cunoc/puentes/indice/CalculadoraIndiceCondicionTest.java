@@ -16,6 +16,75 @@ class CalculadoraIndiceCondicionTest {
 
   private final CalculadoraIndiceCondicion calculadora = new CalculadoraIndiceCondicion();
 
+  @ParameterizedTest
+  @CsvSource({
+    "0, MALO",
+    "0.000, MALO",
+    "25, MALO",
+    "49.99999999999999999999999999999999, MALO",
+    "50, REGULAR",
+    "50.000, REGULAR",
+    "50.00000000000000000000000000000001, REGULAR",
+    "60, REGULAR",
+    "74.99999999999999999999999999999999, REGULAR",
+    "75, BUENO",
+    "75.000, BUENO",
+    "75.00000000000000000000000000000001, BUENO",
+    "90, BUENO",
+    "100, BUENO",
+    "100.000, BUENO"
+  })
+  void clasificaConLimitesInclusivosSinRedondear(String indice, EstadoCondicion esperado) {
+    assertThat(calculadora.clasificar(new BigDecimal(indice))).isEqualTo(esperado);
+  }
+
+  @ParameterizedTest
+  @ValueSource(
+      strings = {
+        "-1",
+        "-0.00000000000000000000000000000001",
+        "100.00000000000000000000000000000001",
+        "101"
+      })
+  void rechazaUnIndiceFueraDeLaEscala(String indice) {
+    assertThatIllegalArgumentException()
+        .isThrownBy(() -> calculadora.clasificar(new BigDecimal(indice)))
+        .withMessage("El IC debe estar presente y estar entre 0 y 100.");
+  }
+
+  @Test
+  void unIndiceAusenteNoSeClasificaComoUnPuenteEvaluado() {
+    assertThatIllegalArgumentException()
+        .isThrownBy(() -> calculadora.clasificar(null))
+        .withMessage("El IC debe estar presente y estar entre 0 y 100.");
+  }
+
+  @ParameterizedTest
+  @CsvSource({"0, BUENO", "1, BUENO", "2, REGULAR", "3, MALO", "4, MALO"})
+  void clasificaElResultadoDelCalculo(int calificacion, EstadoCondicion esperado) {
+    BigDecimal indice = calculadora.calcular(List.of(elemento(calificacion, "1")));
+
+    assertThat(calculadora.clasificar(indice)).isEqualTo(esperado);
+  }
+
+  @ParameterizedTest
+  @CsvSource({
+    "49.999, 50.001, MALO",
+    "50, 50, REGULAR",
+    "50.001, 49.999, REGULAR",
+    "74.999, 25.001, REGULAR",
+    "75, 25, BUENO",
+    "75.001, 24.999, BUENO"
+  })
+  void conservaElIndicePonderadoAlClasificarCercaDeLosUmbrales(
+      String pesoSano, String pesoDanado, EstadoCondicion esperado) {
+    BigDecimal indice =
+        calculadora.calcular(List.of(elemento(0, pesoSano), elemento(4, pesoDanado)));
+
+    assertThat(calculadora.clasificar(indice)).isEqualTo(esperado);
+    assertThat(indice).isEqualByComparingTo(pesoSano);
+  }
+
   @Test
   void todosLosElementosSanosDanCienIndependientementeDeSusPesos() {
     assertThat(calculadora.calcular(List.of(elemento(0, "3"), elemento(0, "0.5"))))
