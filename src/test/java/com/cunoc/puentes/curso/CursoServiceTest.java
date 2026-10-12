@@ -8,6 +8,8 @@ import static org.mockito.Mockito.when;
 
 import com.cunoc.puentes.common.NegocioException;
 import com.cunoc.puentes.curso.dto.InscribirEstudianteDTO;
+import com.cunoc.puentes.usuario.EstadoCuentaService;
+import com.cunoc.puentes.usuario.Rol;
 import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
@@ -26,6 +28,7 @@ class CursoServiceTest {
   @Mock ReferenciasCursoRepository referencias;
   @Mock CursoMapper mapper;
   @Mock ObjectProvider<ActivacionEstudiante> activacion;
+  @Mock EstadoCuentaService cuentas;
   CursoService servicio;
   final UUID docente = UUID.randomUUID();
   final UUID cursoId = UUID.randomUUID();
@@ -34,11 +37,9 @@ class CursoServiceTest {
   @BeforeEach
   void preparar() {
     servicio =
-        new CursoService(cursos, inscripciones, asignaciones, referencias, mapper, activacion);
-    when(referencias.buscarCuenta(docente, false))
-        .thenReturn(
-            Optional.of(
-                new ReferenciasCursoRepository.Cuenta("CATEDRATICO", "ACTIVO", Instant.now())));
+        new CursoService(
+            cursos, inscripciones, asignaciones, referencias, mapper, activacion, cuentas);
+    when(cuentas.rolSiEstaActiva(docente)).thenReturn(Optional.of(Rol.CATEDRATICO));
     when(cursos.bloquearPropio(cursoId, docente)).thenReturn(Optional.of(new Curso()));
   }
 

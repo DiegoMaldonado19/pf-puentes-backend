@@ -8,4 +8,5 @@ public record InscripcionDTO(
     UUID id,
     @JsonProperty("curso_id") UUID cursoId,
     @JsonProperty("estudiante_id") UUID estudianteId,
+    @JsonProperty("estudiante_nombre") String estudianteNombre,
     @JsonProperty("creado_en") Instant creadoEn) {}

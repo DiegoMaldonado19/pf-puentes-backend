@@ -16,7 +16,7 @@ import org.springframework.web.bind.annotation.*;
 @RequestMapping("/api/v1")
 @PreAuthorize("hasRole('CATEDRATICO')")
 @Tag(name = "Cursos", description = "Cursos propios, inscripciones y asignaciones (P7)")
-@ApiResponse(responseCode = "400", description = "DTO, UUID o paginación inválidos")
+@ApiResponse(responseCode = "400", description = "DTO, UUID o búsqueda inválidos")
 @ApiResponse(responseCode = "401", description = "Sin autenticación")
 @ApiResponse(responseCode = "403", description = "Rol o cuenta no habilitados")
 @ApiResponse(responseCode = "404", description = "Recurso inexistente o ajeno")
@@ -123,15 +123,17 @@ class CursoController {
   @Operation(
       summary = "Lista estudiantes no inactivos con correo verificado; sin correo ni credenciales")
   @ApiResponse(responseCode = "200", description = "Página de estudiantes elegibles")
-  PaginaDTO<EstudianteElegibleDTO> estudiantes(Principal usuario, Pageable pagina) {
-    return PaginaDTO.de(servicio.estudiantesElegibles(id(usuario), pagina));
+  PaginaDTO<EstudianteElegibleDTO> estudiantes(
+      Principal usuario, Pageable pagina, @RequestParam(defaultValue = "") String q) {
+    return PaginaDTO.de(servicio.estudiantesElegibles(id(usuario), pagina, q));
   }
 
   @GetMapping("/cursos/puentes-disponibles")
   @Operation(summary = "Lista puentes activos para asignación")
   @ApiResponse(responseCode = "200", description = "Página de puentes activos")
-  PaginaDTO<PuenteDisponibleDTO> puentes(Principal usuario, Pageable pagina) {
-    return PaginaDTO.de(servicio.puentesDisponibles(id(usuario), pagina));
+  PaginaDTO<PuenteDisponibleDTO> puentes(
+      Principal usuario, Pageable pagina, @RequestParam(defaultValue = "") String q) {
+    return PaginaDTO.de(servicio.puentesDisponibles(id(usuario), pagina, q));
   }
 
   private static UUID id(Principal usuario) {

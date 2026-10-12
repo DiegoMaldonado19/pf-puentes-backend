@@ -1,5 +1,6 @@
 package com.cunoc.puentes.curso;
 
+import static com.cunoc.puentes.common.seguridad.AutenticacionDePrueba.como;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
@@ -13,6 +14,12 @@ import com.cunoc.puentes.PruebaIntegracion;
 import com.cunoc.puentes.common.NegocioException;
 import com.cunoc.puentes.curso.dto.GuardarCursoDTO;
 import com.cunoc.puentes.curso.dto.InscribirEstudianteDTO;
+import com.cunoc.puentes.usuario.Rol;
+import io.jsonwebtoken.Jwts;
+import io.jsonwebtoken.security.Keys;
+import java.nio.charset.StandardCharsets;
+import java.time.Instant;
+import java.util.Date;
 import java.util.UUID;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
@@ -22,8 +29,10 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.simple.JdbcClient;
@@ -54,6 +63,9 @@ class CursoIntegracionTest extends PruebaIntegracion {
   @Autowired JdbcClient jdbc;
   @MockitoBean ActivacionEstudiante activacion;
 
+  @Value("${sgp.jwt.secreto}")
+  String secretoJwt;
+
   @Test
   void creaEditaYAuditaSinExponerDatosPersonales() throws Exception {
     String cuerpo =
@@ -62,7 +74,7 @@ class CursoIntegracionTest extends PruebaIntegracion {
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(DATOS)
                     .with(csrf())
-                    .with(user(DOCENTE.toString()).roles("CATEDRATICO")))
+                    .with(como(Rol.CATEDRATICO, DOCENTE)))
             .andExpect(status().isCreated())
             .andExpect(jsonPath("$.nombre").value("Curso nuevo"))
             .andExpect(jsonPath("$.catedratico_id").value(DOCENTE.toString()))
@@ -70,16 +82,37 @@ class CursoIntegracionTest extends PruebaIntegracion {
             .getResponse()
             .getContentAsString();
     assertThat(cuerpo).doesNotContain("contrasena", "correo");
+    assertThat(
+            jdbc.sql(
+                    "select usuario_id from auditoria where entidad = 'curso' and valor_nuevo->>'nombre' = 'Curso nuevo'")
+                .query(UUID.class)
+                .single())
+        .isEqualTo(DOCENTE);
     var curso = servicio.crear(DOCENTE, new GuardarCursoDTO("Editar", 2026, 2, true));
     assertThat(curso.id().version()).isEqualTo(7);
     servicio.actualizar(DOCENTE, curso.id(), new GuardarCursoDTO("Editado", 2026, 2, false));
     var auditoria =
         jdbc.sql(
-                "select valor_anterior::text, valor_nuevo::text from auditoria where entidad_id = :id and accion = 'MODIFICAR_CURSO'")
+                "select valor_anterior::text, valor_nuevo::text from auditoria where entidad_id = :id and accion = 'MODIFICAR'")
             .param("id", curso.id())
             .query((rs, n) -> rs.getString(1) + rs.getString(2))
             .single();
-    assertThat(auditoria).contains("true", "false").doesNotContain("nombre", "correo", "hash");
+    assertThat(auditoria)
+        .contains("true", "false", "Editar", "Editado")
+        .doesNotContain("correo", "hash", "contrasena");
+    assertThat(
+            jdbc.sql("select count(*) from auditoria where entidad_id = :id")
+                .param("id", curso.id())
+                .query(Long.class)
+                .single())
+        .isEqualTo(2);
+    assertThat(
+            jdbc.sql(
+                    "select usuario_id is null from auditoria where entidad_id = :id and accion = 'MODIFICAR'")
+                .param("id", curso.id())
+                .query(Boolean.class)
+                .single())
+        .isTrue();
     assertThat(jdbc.sql("select id from auditoria limit 1").query(UUID.class).single().version())
         .isEqualTo(7);
   }
@@ -241,7 +274,8 @@ class CursoIntegracionTest extends PruebaIntegracion {
                 .estudianteId())
         .isEqualTo(PENDIENTE);
     assertThat(
-            jdbc.sql("select count(*) from auditoria where accion = 'INSCRIBIR_ESTUDIANTE'")
+            jdbc.sql(
+                    "select count(*) from auditoria where accion = 'CREAR' and entidad = 'inscripcion'")
                 .query(Long.class)
                 .single())
         .isEqualTo(1);
@@ -371,7 +405,8 @@ class CursoIntegracionTest extends PruebaIntegracion {
                 .single())
         .isEqualTo(1);
     assertThat(
-            jdbc.sql("select count(*) from auditoria where accion = 'INSCRIBIR_ESTUDIANTE'")
+            jdbc.sql(
+                    "select count(*) from auditoria where accion = 'CREAR' and entidad = 'inscripcion'")
                 .query(Long.class)
                 .single())
         .isEqualTo(1);
@@ -398,6 +433,127 @@ class CursoIntegracionTest extends PruebaIntegracion {
         .andExpect(jsonPath("$.components.schemas.AsignacionDTO.properties.curso_id").exists())
         .andExpect(
             jsonPath("$.components.schemas.AsignacionDTO.properties.inscripcion_id").exists());
+  }
+
+  @Test
+  void filtrosJwtAutorizanCursosConRolDeBaseYRevocanAccesoTrasBaja() throws Exception {
+    String token =
+        Jwts.builder()
+            .subject(DOCENTE.toString())
+            .claim("rol", "ADMINISTRADOR")
+            .issuedAt(Date.from(Instant.now()))
+            .expiration(Date.from(Instant.now().plusSeconds(900)))
+            .signWith(
+                Keys.hmacShaKeyFor(secretoJwt.getBytes(StandardCharsets.UTF_8)), Jwts.SIG.HS256)
+            .compact();
+    mvc.perform(
+            post(BASE)
+                .header("Authorization", "Bearer " + token)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(DATOS))
+        .andExpect(status().isCreated());
+    assertThat(
+            jdbc.sql("select usuario_id from auditoria where entidad = 'curso'")
+                .query(UUID.class)
+                .single())
+        .isEqualTo(DOCENTE);
+    assertThat(
+            jdbc.sql("select correlacion_id from auditoria where entidad = 'curso'")
+                .query(UUID.class)
+                .single())
+        .isNotNull();
+    jdbc.sql(
+            "update usuario set estado = 'INACTIVO', desactivado_en = now(), motivo_baja = 'Baja de prueba' where id = :id")
+        .param("id", DOCENTE)
+        .update();
+    mvc.perform(get(BASE).header("Authorization", "Bearer " + token))
+        .andExpect(status().isUnauthorized())
+        .andExpect(jsonPath("$.status").value(401));
+    mvc.perform(get(BASE).header("Authorization", "Bearer invalido"))
+        .andExpect(status().isUnauthorized());
+  }
+
+  @Test
+  void nombresYCodigosSeDevuelvenSinCredencialesYConContextoAcademico() throws Exception {
+    mvc.perform(get(BASE + "/" + CURSO + "/inscripciones").with(como(Rol.CATEDRATICO, DOCENTE)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.content[0].estudiante_nombre").value("Estudiante activo"))
+        .andExpect(jsonPath("$.content[0].correo").doesNotExist());
+    mvc.perform(get("/api/v1/mis-asignaciones").with(como(Rol.ESTUDIANTE, ESTUDIANTE)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.content[0].puente_codigo").value("GT-99-9901-0201"))
+        .andExpect(jsonPath("$.content[0].puente_nombre").value("Puente activo"))
+        .andExpect(jsonPath("$.content[0].curso_nombre").value("Puentes propio"));
+    // La consulta histórica mantiene etiquetas incluso después de dar de baja al puente.
+    jdbc.sql("update puente set activo = false, motivo_baja = 'Baja de prueba' where id = :id")
+        .param("id", PUENTE)
+        .update();
+    assertThat(
+            servicio
+                .listarAsignaciones(DOCENTE, CURSO, INSCRIPCION, PageRequest.of(0, 20))
+                .getContent()
+                .getFirst()
+                .puenteNombre())
+        .isEqualTo("Puente activo");
+    assertThat(servicio.consultarAsignacionesVigentes(ESTUDIANTE, PageRequest.of(0, 20))).isEmpty();
+  }
+
+  @Test
+  void busquedaDeSelectoresEsPaginadaLiteralYRespetaElegibilidad() throws Exception {
+    mvc.perform(
+            get(BASE + "/estudiantes-elegibles")
+                .param("q", "  ESTUDIANTE AJENO  ")
+                .param("size", "1")
+                .with(como(Rol.CATEDRATICO, DOCENTE)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.total_elements").value(1))
+        .andExpect(jsonPath("$.content[0].id").value(id(104).toString()));
+    mvc.perform(
+            get(BASE + "/estudiantes-elegibles")
+                .param("q", "inactivo")
+                .with(como(Rol.CATEDRATICO, DOCENTE)))
+        .andExpect(jsonPath("$.total_elements").value(0));
+    mvc.perform(
+            get(BASE + "/puentes-disponibles")
+                .param("q", "0201")
+                .with(como(Rol.CATEDRATICO, DOCENTE)))
+        .andExpect(jsonPath("$.total_elements").value(1));
+    for (String q : java.util.List.of("%", "_", "!", "' OR 1=1 --")) {
+      mvc.perform(
+              get(BASE + "/puentes-disponibles").param("q", q).with(como(Rol.CATEDRATICO, DOCENTE)))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.total_elements").value(0));
+    }
+    mvc.perform(
+            get(BASE + "/puentes-disponibles")
+                .param("q", "a".repeat(121))
+                .with(como(Rol.CATEDRATICO, DOCENTE)))
+        .andExpect(status().isBadRequest());
+    assertThat(
+            servicio
+                .estudiantesElegibles(DOCENTE, PageRequest.of(1, 1), "estudiante")
+                .getTotalElements())
+        .isEqualTo(3);
+  }
+
+  @Test
+  void falloDeAuditoriaGeneralRevierteLaCreacionDeCurso() {
+    jdbc.sql(
+            "alter table auditoria add constraint prueba_p7_fallo_check check (entidad <> 'curso') not valid")
+        .update();
+    try {
+      assertThatThrownBy(
+              () -> servicio.crear(DOCENTE, new GuardarCursoDTO("No persiste", 2026, 2, true)))
+          .isInstanceOf(DataIntegrityViolationException.class);
+      assertThat(
+              jdbc.sql("select count(*) from curso where nombre = 'No persiste'")
+                  .query(Long.class)
+                  .single())
+          .isZero();
+      assertThat(jdbc.sql("select count(*) from auditoria").query(Long.class).single()).isZero();
+    } finally {
+      jdbc.sql("alter table auditoria drop constraint prueba_p7_fallo_check").update();
+    }
   }
 
   @Test

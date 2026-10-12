@@ -10,6 +10,7 @@ API REST del Sistema de Gestión de Puentes (SGP).
 | `common/auditoria/` | Bitácora automática con `@Auditable`: valores anterior y posterior, saneamiento, IP y correlación | P2 |
 | `common/seguridad/` | Seguridad stateless con JWT de acceso (15 min), rutas públicas/privadas, BCrypt 12 y 401/403 en RFC 7807 | P2 |
 | `archivo/` | Subida de fotos y PDF, borrado en borradores, URL firmadas y purga de 210 días (RN-ARC) | P1 |
+| `curso/` (11/10) | Cursos, inscripciones, asignaciones y contrato 6; integrado a seguridad/auditoría P2, con búsqueda y etiquetas; [manual](docs/P7/README.md) | P7 |
 | Los demás módulos | Tabla, migración y entidad del modelo base ([ADR 0010](docs/adr/0010-modelo-de-datos-base.md)); todavía sin servicios ni endpoints | Cada responsable |
 
 - La seguridad base (cadena de filtros JWT, `@EnableMethodSecurity`) ya existe; el login, la renovación y el cierre de sesión (US-P2-06 y US-P2-07) todavía no, así que por ahora no hay cómo obtener un token por HTTP. Ver [Seguridad](#seguridad).

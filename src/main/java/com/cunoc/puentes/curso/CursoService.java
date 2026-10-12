@@ -1,8 +1,14 @@
 package com.cunoc.puentes.curso;
 
 import com.cunoc.puentes.common.NegocioException;
+import com.cunoc.puentes.common.auditoria.Acciones;
+import com.cunoc.puentes.common.auditoria.Auditable;
 import com.cunoc.puentes.curso.dto.*;
+import com.cunoc.puentes.usuario.EstadoCuentaService;
+import com.cunoc.puentes.usuario.Rol;
+import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -21,6 +27,7 @@ public class CursoService {
   private final ReferenciasCursoRepository referencias;
   private final CursoMapper mapper;
   private final ObjectProvider<ActivacionEstudiante> activacion;
+  private final EstadoCuentaService cuentas;
 
   CursoService(
       CursoRepository cursos,
@@ -28,13 +35,15 @@ public class CursoService {
       AsignacionRepository asignaciones,
       ReferenciasCursoRepository referencias,
       CursoMapper mapper,
-      ObjectProvider<ActivacionEstudiante> activacion) {
+      ObjectProvider<ActivacionEstudiante> activacion,
+      EstadoCuentaService cuentas) {
     this.cursos = cursos;
     this.inscripciones = inscripciones;
     this.asignaciones = asignaciones;
     this.referencias = referencias;
     this.mapper = mapper;
     this.activacion = activacion;
+    this.cuentas = cuentas;
   }
 
   public Page<CursoDTO> listar(UUID usuarioId, Pageable pagina) {
@@ -48,7 +57,7 @@ public class CursoService {
   }
 
   @Transactional
-  @AuditarCurso("CREAR_CURSO")
+  @Auditable(accion = Acciones.CREAR, entidad = "curso", entidadId = "#result.id")
   public CursoDTO crear(UUID usuarioId, GuardarCursoDTO datos) {
     exigirCuenta(usuarioId, "CATEDRATICO");
     Curso curso = new Curso();
@@ -58,7 +67,7 @@ public class CursoService {
   }
 
   @Transactional
-  @AuditarCurso("MODIFICAR_CURSO")
+  @Auditable(accion = Acciones.MODIFICAR, entidad = "curso", entidadId = "#cursoId")
   public CursoDTO actualizar(UUID usuarioId, UUID cursoId, GuardarCursoDTO datos) {
     exigirCuenta(usuarioId, "CATEDRATICO");
     Curso curso = propio(usuarioId, cursoId, true);
@@ -69,11 +78,15 @@ public class CursoService {
   public Page<InscripcionDTO> listarInscripciones(UUID usuarioId, UUID cursoId, Pageable pagina) {
     exigirCuenta(usuarioId, "CATEDRATICO");
     propio(usuarioId, cursoId, false);
-    return inscripciones.findByCursoId(cursoId, pagina(pagina)).map(mapper::aDTO);
+    var resultado = inscripciones.findByCursoId(cursoId, pagina(pagina));
+    var nombres =
+        referencias.nombresEstudiantes(
+            resultado.stream().map(Inscripcion::getEstudianteId).collect(Collectors.toSet()));
+    return resultado.map(i -> mapper.aDTO(i, nombres.get(i.getEstudianteId())));
   }
 
   @Transactional
-  @AuditarCurso("INSCRIBIR_ESTUDIANTE")
+  @Auditable(accion = Acciones.CREAR, entidad = "inscripcion", entidadId = "#result.id")
   public InscripcionDTO inscribir(UUID usuarioId, UUID cursoId, InscribirEstudianteDTO datos) {
     exigirCuenta(usuarioId, "CATEDRATICO");
     Curso curso = propio(usuarioId, cursoId, true);
@@ -115,7 +128,9 @@ public class CursoService {
     Inscripcion inscripcion = new Inscripcion();
     inscripcion.setCurso(curso);
     inscripcion.setEstudianteId(datos.estudianteId());
-    return mapper.aDTO(inscripciones.saveAndFlush(inscripcion));
+    return mapper.aDTO(
+        inscripciones.saveAndFlush(inscripcion),
+        referencias.nombresEstudiantes(Set.of(datos.estudianteId())).get(datos.estudianteId()));
   }
 
   public Page<AsignacionDTO> listarAsignaciones(
@@ -123,11 +138,11 @@ public class CursoService {
     exigirCuenta(usuarioId, "CATEDRATICO");
     propio(usuarioId, cursoId, false);
     inscripcion(cursoId, inscripcionId);
-    return asignaciones.findByInscripcionId(inscripcionId, pagina(pagina)).map(mapper::aDTO);
+    return conPuentes(asignaciones.findByInscripcionId(inscripcionId, pagina(pagina)));
   }
 
   @Transactional
-  @AuditarCurso("ASIGNAR_PUENTE")
+  @Auditable(accion = Acciones.CREAR, entidad = "asignacion", entidadId = "#result.id")
   public AsignacionDTO asignar(
       UUID usuarioId, UUID cursoId, UUID inscripcionId, AsignarPuenteDTO datos) {
     exigirCuenta(usuarioId, "CATEDRATICO");
@@ -149,7 +164,9 @@ public class CursoService {
     Asignacion asignacion = new Asignacion();
     asignacion.setInscripcion(inscripcion);
     asignacion.setPuenteId(datos.puenteId());
-    return mapper.aDTO(asignaciones.saveAndFlush(asignacion));
+    return mapper.aDTO(
+        asignaciones.saveAndFlush(asignacion),
+        referencias.datosPuentes(Set.of(datos.puenteId())).get(datos.puenteId()));
   }
 
   /**
@@ -157,7 +174,7 @@ public class CursoService {
    */
   public Page<AsignacionDTO> consultarAsignacionesVigentes(UUID estudianteId, Pageable pagina) {
     exigirCuenta(estudianteId, "ESTUDIANTE");
-    return asignaciones.buscarVigentes(estudianteId, pagina(pagina)).map(mapper::aDTO);
+    return conPuentes(asignaciones.buscarVigentes(estudianteId, pagina(pagina)));
   }
 
   /** Contrato 6 para P5: usar el autor autenticado y persistir el contexto académico acordado. */
@@ -177,17 +194,44 @@ public class CursoService {
       throw error(
           HttpStatus.UNPROCESSABLE_CONTENT, "puente-no-disponible", "El puente está inactivo.");
     }
-    return mapper.aDTO(asignacion);
+    return mapper.aDTO(
+        asignacion,
+        referencias.datosPuentes(Set.of(asignacion.getPuenteId())).get(asignacion.getPuenteId()));
   }
 
   public Page<EstudianteElegibleDTO> estudiantesElegibles(UUID usuarioId, Pageable pagina) {
+    return estudiantesElegibles(usuarioId, pagina, "");
+  }
+
+  public Page<EstudianteElegibleDTO> estudiantesElegibles(
+      UUID usuarioId, Pageable pagina, String busqueda) {
     exigirCuenta(usuarioId, "CATEDRATICO");
-    return referencias.estudiantes(pagina(pagina));
+    return referencias.estudiantes(pagina(pagina), busqueda(busqueda));
   }
 
   public Page<PuenteDisponibleDTO> puentesDisponibles(UUID usuarioId, Pageable pagina) {
+    return puentesDisponibles(usuarioId, pagina, "");
+  }
+
+  public Page<PuenteDisponibleDTO> puentesDisponibles(
+      UUID usuarioId, Pageable pagina, String busqueda) {
     exigirCuenta(usuarioId, "CATEDRATICO");
-    return referencias.puentes(pagina(pagina));
+    return referencias.puentes(pagina(pagina), busqueda(busqueda));
+  }
+
+  private Page<AsignacionDTO> conPuentes(Page<Asignacion> resultado) {
+    var puentes =
+        referencias.datosPuentes(
+            resultado.stream().map(Asignacion::getPuenteId).collect(Collectors.toSet()));
+    return resultado.map(a -> mapper.aDTO(a, puentes.get(a.getPuenteId())));
+  }
+
+  private static String busqueda(String texto) {
+    if (texto.length() > 120) {
+      throw error(
+          HttpStatus.BAD_REQUEST, "busqueda-invalida", "La búsqueda admite hasta 120 caracteres.");
+    }
+    return texto.strip();
   }
 
   private Curso propio(UUID usuarioId, UUID cursoId, boolean bloquear) {
@@ -214,10 +258,7 @@ public class CursoService {
   }
 
   private void exigirCuenta(UUID id, String rol) {
-    var cuenta = referencias.buscarCuenta(id, false);
-    if (cuenta.isEmpty()
-        || !rol.equals(cuenta.get().rol())
-        || !"ACTIVO".equals(cuenta.get().estado())) {
+    if (cuentas.rolSiEstaActiva(id).filter(r -> r == Rol.valueOf(rol)).isEmpty()) {
       throw error(
           HttpStatus.FORBIDDEN,
           "cuenta-no-habilitada",
