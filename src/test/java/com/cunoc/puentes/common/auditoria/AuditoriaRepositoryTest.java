@@ -1,4 +1,4 @@
-package com.cunoc.puentes.common;
+package com.cunoc.puentes.common.auditoria;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
