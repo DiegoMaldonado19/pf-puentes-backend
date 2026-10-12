@@ -29,4 +29,12 @@ public class Auditoria extends EntidadBase {
 
   @JdbcTypeCode(SqlTypes.JSON)
   private Map<String, Object> valorNuevo;
+
+  private String motivo;
+
+  /** Nulo si la acción fue del Sistema. */
+  private String origenIp;
+
+  /** Agrupa las filas generadas por una misma operación de negocio. */
+  private UUID correlacionId;
 }

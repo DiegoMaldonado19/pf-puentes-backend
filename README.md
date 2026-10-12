@@ -7,11 +7,11 @@ API REST del Sistema de Gestión de Puentes (SGP).
 | Paquete | Qué hay | Responsable |
 |---|---|---|
 | `common/` | Errores RFC 7807 (`NegocioException`), CORS, OpenAPI en `/api/docs`, ShedLock | P1 |
+| `common/seguridad/` | Seguridad stateless con JWT de acceso (15 min), rutas públicas/privadas, BCrypt 12 y 401/403 en RFC 7807 | P2 |
 | `archivo/` | Subida de fotos y PDF, borrado en borradores, URL firmadas y purga de 210 días (RN-ARC) | P1 |
-| `curso/` (07/10) | Cursos propios, inscripciones, asignaciones y contrato 6; [documentación](docs/P7/README.md) | P7 |
 | Los demás módulos | Tabla, migración y entidad del modelo base ([ADR 0010](docs/adr/0010-modelo-de-datos-base.md)); todavía sin servicios ni endpoints | Cada responsable |
 
-- El login JWT es de P2 y todavía no existe: hoy Spring Security autentica con su configuración por defecto. P7 habilita seguridad por método para aplicar los roles; su integración de sesión y activación se describe en [ADR 0015](docs/adr/0015-cursos-asignaciones-y-contratos-p7.md).
+- La seguridad base (cadena de filtros JWT, `@EnableMethodSecurity`) ya existe; el login, la renovación y el cierre de sesión (US-P2-06 y US-P2-07) todavía no, así que por ahora no hay cómo obtener un token por HTTP. Ver [Seguridad](#seguridad).
 - Los contratos entre módulos y las fechas están en `docs-analisis/Equipo`.
 
 ## Desarrollo local
@@ -32,7 +32,7 @@ docker compose -f compose.local.yaml up --watch
 El backend crea el bucket `archivos` de MinIO al arrancar. Si tu volumen local se creó con otras contraseñas, recréalo: `docker compose -f compose.local.yaml down -v`.
 
 **Documentación de la API:** http://localhost:8080/api/docs/swagger-ui.html (el JSON está en `/api/docs`). Todo endpoint nuevo lleva `@Tag`, `@Operation` y un `@ApiResponse` por código.
-- Mientras no exista la seguridad de P2, Spring pide iniciar sesión con el usuario `user` y la contraseña que imprime al arrancar: `docker compose -f compose.local.yaml logs backend | grep "generated security password"`.
+- Fuera de producción la documentación es pública; con `APP_ENV=prod` (perfil `prod`) exige un token válido.
 
 **Hot reload:** al guardar en `src/`, la app se recompila y devtools la reinicia (unos 5 s). Si cambias `pom.xml`, se reconstruye la imagen.
 
@@ -58,6 +58,16 @@ El script `docker/postgres/01-usuario-app.sh` crea `puentes_app` solo cuando el 
 - Las entidades usan Lombok (`@Getter`, `@Setter`, constructor protegido), nunca `@Data` ([ADR 0012](docs/adr/0012-lombok-en-las-entidades.md)).
 - Toda tabla y columna lleva `COMMENT ON`. Con ellos, `./mvnw verify` regenera el [diccionario de datos](docs/diccionario-de-datos.md): versiónalo con tu migración, porque el CI falla si quedó desactualizado.
 
+### Seguridad
+
+- **Todo es privado por defecto.** Sin `Authorization: Bearer <jwt>` válido, la respuesta es 401 (Problem Details y `WWW-Authenticate: Bearer`); con un rol sin permiso, 403.
+- **Token de acceso:** HS256, 15 minutos, solo `sub` (id del usuario), `rol`, `iat` y `exp`. La clave sale de `JWT_SECRET` (mínimo 32 bytes: `openssl rand -hex 32`); si falta o es corta, la app no arranca.
+- **El filtro consulta la cuenta en cada petición** (una consulta por clave primaria): solo una cuenta `ACTIVO` pasa, y el rol que autoriza es el de la base. Una baja surte efecto de inmediato.
+- **En tus servicios:** `Principal.getName()` es el UUID del usuario y las autoridades son `ROLE_<ROL>`; protege cada método con `@PreAuthorize("hasAnyRole(...)")`.
+- **Rutas públicas:** se declaran solo en `sgp.seguridad.rutas-publicas` de `application.properties`, separadas por coma: `/ruta/**` (cualquier método) o `GET /ruta/**`. No hace falta tocar la cadena de filtros.
+- **Contraseñas:** inyecta `PasswordEncoder` (BCrypt, factor 12).
+- **Healthcheck:** `/actuator/health` (puerto 8081) es la única ruta de actuator sin token.
+
 ### Procesos programados
 
 Cada `@Scheduled` lleva `@SchedulerLock(name = "...")`: así una sola réplica lo ejecuta (DT-BE-14). La configuración está en `common/ProcesosProgramadosConfig` y la tabla `shedlock` ya existe ([ADR 0014](docs/adr/0014-tabla-shedlock-con-el-esquema-de-la-libreria.md)).
@@ -74,7 +84,7 @@ Son los mismos chequeos que corre el CI:
 
 - PMD usa sus reglas por defecto; cada violación sale en la consola y en `target/pmd.xml`.
 - `verify` necesita Docker: Testcontainers levanta PostgreSQL + PostGIS y MinIO reales. Las pruebas de integración extienden `PruebaIntegracion`, que comparte un solo contenedor de cada uno en toda la suite.
-- Pruebas de rol por endpoint (DT-CAL-03): hasta que P2 entregue su helper de JWT, sigue el ejemplo de `archivo/ArchivoControllerTest` (`@EnableMethodSecurity` de prueba y `user("<uuid>").roles(...)`).
+- Pruebas de rol por endpoint (DT-CAL-03, contrato 12): en tu `@WebMvcTest` agrega `@Import(SeguridadDePrueba.class)` (seguridad real: `@PreAuthorize`, 401 y 403 en RFC 7807) y autentica cada petición con `.with(como(Rol.CATEDRATICO, usuarioId))` de `AutenticacionDePrueba`. Ejemplo completo con 401, 403 y 2xx por rol en `common/seguridad/EjemploPruebaDeRolTest`.
 - El reporte de JaCoCo queda en `target/site/jacoco/index.html`.
 - El CI falla si las clases `*Service` bajan de 70 % de líneas cubiertas (DT-CAL-01).
 

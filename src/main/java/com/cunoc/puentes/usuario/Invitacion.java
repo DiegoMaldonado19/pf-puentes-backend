@@ -5,6 +5,7 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
+import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import java.time.Instant;
 import lombok.AccessLevel;
@@ -31,4 +32,14 @@ public class Invitacion extends EntidadBase {
 
   @ManyToOne(fetch = FetchType.LAZY, optional = false)
   private Usuario administrador;
+
+  private Instant revocadaEn;
+
+  @ManyToOne(fetch = FetchType.LAZY)
+  @JoinColumn(name = "revocada_por")
+  private Usuario revocadaPor;
+
+  /** Cuenta creada al aceptar la invitación (RN-USR-03). */
+  @ManyToOne(fetch = FetchType.LAZY)
+  private Usuario usuario;
 }

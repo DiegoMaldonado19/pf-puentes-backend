@@ -35,6 +35,7 @@ public abstract class PruebaIntegracion {
   static void propiedades(DynamicPropertyRegistry registry) {
     registry.add("spring.flyway.user", POSTGRES::getUsername);
     registry.add("spring.flyway.password", POSTGRES::getPassword);
+    registry.add("sgp.jwt.secreto", () -> "clave-de-pruebas-de-al-menos-32-bytes!");
     registry.add("sgp.minio.url", MINIO::getS3URL);
     registry.add("sgp.minio.url-publica", MINIO::getS3URL);
     registry.add("sgp.minio.usuario", MINIO::getUserName);
