@@ -8,9 +8,10 @@ API REST del Sistema de Gestión de Puentes (SGP).
 |---|---|---|
 | `common/` | Errores RFC 7807 (`NegocioException`), CORS, OpenAPI en `/api/docs`, ShedLock | P1 |
 | `archivo/` | Subida de fotos y PDF, borrado en borradores, URL firmadas y purga de 210 días (RN-ARC) | P1 |
+| `curso/` (07/10) | Cursos propios, inscripciones, asignaciones y contrato 6; [documentación](docs/P7/README.md) | P7 |
 | Los demás módulos | Tabla, migración y entidad del modelo base ([ADR 0010](docs/adr/0010-modelo-de-datos-base.md)); todavía sin servicios ni endpoints | Cada responsable |
 
-- La seguridad (login JWT, `@EnableMethodSecurity`) es de P2 y todavía no existe: hoy Spring Security protege todo con su configuración por defecto.
+- El login JWT es de P2 y todavía no existe: hoy Spring Security autentica con su configuración por defecto. P7 habilita seguridad por método para aplicar los roles; su integración de sesión y activación se describe en [ADR 0015](docs/adr/0015-cursos-asignaciones-y-contratos-p7.md).
 - Los contratos entre módulos y las fechas están en `docs-analisis/Equipo`.
 
 ## Desarrollo local
