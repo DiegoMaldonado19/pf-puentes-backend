@@ -1,4 +1,4 @@
-# 0015. Núcleo puro del Índice de Condición
+# 0016. Núcleo puro del Índice de Condición
 
 - Estado: propuesto para revisión del equipo; implementado en `feat/IC-base`
 - Fecha: 09/10/2026

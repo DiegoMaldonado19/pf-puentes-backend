@@ -1,5 +1,6 @@
-package com.cunoc.puentes.common;
+package com.cunoc.puentes.common.auditoria;
 
+import com.cunoc.puentes.common.EntidadBase;
 import jakarta.persistence.Entity;
 import java.util.Map;
 import java.util.UUID;
@@ -29,4 +30,12 @@ public class Auditoria extends EntidadBase {
 
   @JdbcTypeCode(SqlTypes.JSON)
   private Map<String, Object> valorNuevo;
+
+  private String motivo;
+
+  /** Nulo si la acción fue del Sistema. */
+  private String origenIp;
+
+  /** Agrupa las filas generadas por una misma operación de negocio. */
+  private UUID correlacionId;
 }

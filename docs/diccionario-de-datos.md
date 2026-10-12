@@ -26,6 +26,7 @@
 - [`shedlock`](#shedlock): Candados de los procesos programados; la escribe solo ShedLock (DT-BE-14, ADR 0014)
 - [`solicitud_puente`](#solicitud_puente): Solicitudes de alta de un Catedrático, pendientes de un Administrador (RN-INV-07)
 - [`token_renovacion`](#token_renovacion): Tokens de renovación emitidos, para poder revocarlos (DT-SEC-01)
+- [`token_verificacion`](#token_verificacion): Tokens de un solo uso enviados por correo: verificar el correo (RN-USR-01) o recuperar la contraseña (DT-SEC-07)
 - [`usuario`](#usuario): Cuentas del sistema; nunca se borran, se desactivan (RN-USR-08)
 - [`version_pesos`](#version_pesos): Juego de pesos del IC para una versión del formulario (RN-IC-03)
 
@@ -90,6 +91,15 @@ Bitácora de toda acción sobre datos (RN-USR-09); sin contraseñas, tokens ni d
 | `valor_nuevo` | jsonb | Sí |  |  | Valores después de la acción |
 | `creado_en` | timestamp with time zone | No | now() |  | Momento de la acción, en UTC |
 | `actualizado_en` | timestamp with time zone | No | now() |  | Igual a creado_en: la bitácora no se modifica |
+| `motivo` | character varying(500) | Sí |  |  | Justificación escrita; obligatoria en moderación, bajas y rechazos (RN-FOR-08, RN-INV-08) |
+| `origen_ip` | character varying(45) | Sí |  |  | Dirección IP de la petición; NULL si la acción fue del Sistema |
+| `correlacion_id` | uuid | Sí |  |  | Agrupa las filas generadas por una misma operación de negocio |
+
+**Restricciones**
+
+- `CHECK (((accion)::text ~ '^[A-Z][A-Z0-9_]*$'::text)) NOT VALID`
+- `CHECK (((entidad)::text ~ '^[a-z][a-z0-9_]*$'::text)) NOT VALID`
+- `CHECK (((motivo IS NULL) OR (btrim((motivo)::text) <> ''::text)))`
 
 ## comentario
 
@@ -296,10 +306,17 @@ Invitaciones del Administrador para roles que no se auto-registran (RN-USR-03)
 | `administrador_id` | uuid | No |  | FK → usuario | Administrador que invitó |
 | `creado_en` | timestamp with time zone | No | now() |  | Fecha de envío, en UTC |
 | `actualizado_en` | timestamp with time zone | No | now() |  | Última modificación, en UTC |
+| `revocada_en` | timestamp with time zone | Sí |  |  | Cuándo un Administrador la anuló; NULL si no se anuló |
+| `revocada_por` | uuid | Sí |  | FK → usuario | Administrador que la anuló |
+| `usuario_id` | uuid | Sí |  | FK → usuario | Cuenta creada al aceptarla; NULL mientras esté pendiente o revocada |
 
 **Restricciones**
 
 - `UNIQUE (token_hash)`
+- `UNIQUE (usuario_id)`
+- `CHECK (((aceptada_en IS NULL) = (usuario_id IS NULL))) NOT VALID`
+- `CHECK (((aceptada_en IS NULL) OR (revocada_en IS NULL)))`
+- `CHECK (((revocada_en IS NULL) = (revocada_por IS NULL)))`
 - `CHECK (((rol)::text = ANY ((ARRAY['PROFESIONAL_EXTERNO'::character varying, 'CATEDRATICO'::character varying, 'ADMINISTRADOR'::character varying])::text[])))`
 
 ## municipio
@@ -527,6 +544,27 @@ Tokens de renovación emitidos, para poder revocarlos (DT-SEC-01)
 
 - `UNIQUE (token_hash)`
 
+## token_verificacion
+
+Tokens de un solo uso enviados por correo: verificar el correo (RN-USR-01) o recuperar la contraseña (DT-SEC-07)
+
+| Columna | Tipo | Nulo | Por defecto | Llaves | Descripción |
+|---|---|---|---|---|---|
+| `id` | uuid | No |  | PK | UUID v7 |
+| `usuario_id` | uuid | No |  | FK → usuario | Cuenta a la que pertenece el token |
+| `tipo` | character varying(30) | No |  |  | VERIFICACION_CORREO o RECUPERACION_CONTRASENA |
+| `token_hash` | character varying(64) | No |  |  | SHA-256 del token del enlace; nunca el valor (DT-SEC-12) |
+| `expira_en` | timestamp with time zone | No |  |  | Vencimiento del enlace |
+| `usado_en` | timestamp with time zone | Sí |  |  | Cuándo se usó; NULL si sigue sin usar. Un token usado no se reutiliza |
+| `creado_en` | timestamp with time zone | No | now() |  | Fecha de emisión, en UTC |
+| `actualizado_en` | timestamp with time zone | No | now() |  | Última modificación, en UTC |
+
+**Restricciones**
+
+- `UNIQUE (token_hash)`
+- `CHECK ((expira_en > creado_en))`
+- `CHECK (((tipo)::text = ANY ((ARRAY['VERIFICACION_CORREO'::character varying, 'RECUPERACION_CONTRASENA'::character varying])::text[])))`
+
 ## usuario
 
 Cuentas del sistema; nunca se borran, se desactivan (RN-USR-08)
@@ -547,11 +585,21 @@ Cuentas del sistema; nunca se borran, se desactivan (RN-USR-08)
 | `bloqueado_hasta` | timestamp with time zone | Sí |  |  | Fin del bloqueo temporal |
 | `creado_en` | timestamp with time zone | No | now() |  | Fecha de creación, en UTC |
 | `actualizado_en` | timestamp with time zone | No | now() |  | Última modificación, en UTC |
+| `desactivado_en` | timestamp with time zone | Sí |  |  | Cuándo se dio de baja la cuenta; NULL mientras no esté INACTIVO (RN-USR-08) |
+| `desactivado_por` | uuid | Sí |  | FK → usuario | Administrador que dio la baja; NULL si no hay baja o la hizo el Sistema |
+| `motivo_baja` | character varying(500) | Sí |  |  | Motivo escrito de la baja; también el del rechazo de un colegiado |
+| `colegiado_verificado_por` | uuid | Sí |  | FK → usuario | Administrador que verificó el número de colegiado (RN-USR-04) |
 
 **Restricciones**
 
+- `CHECK ((((estado)::text <> 'ACTIVO'::text) OR (correo_verificado_en IS NOT NULL))) NOT VALID`
+- `CHECK ((((estado)::text = 'INACTIVO'::text) = (desactivado_en IS NOT NULL)))`
+- `CHECK (((desactivado_en IS NULL) = (motivo_baja IS NULL)))`
+- `CHECK (((motivo_baja IS NULL) OR (btrim((motivo_baja)::text) <> ''::text)))`
+- `CHECK (((desactivado_por IS NULL) OR (desactivado_en IS NOT NULL)))`
 - `CHECK ((((rol)::text <> 'PROFESIONAL_EXTERNO'::text) OR (numero_colegiado IS NOT NULL)))`
 - `CHECK ((((rol)::text <> 'PROFESIONAL_EXTERNO'::text) OR ((estado)::text <> 'ACTIVO'::text) OR (colegiado_verificado_en IS NOT NULL)))`
+- `CHECK (((colegiado_verificado_en IS NULL) = (colegiado_verificado_por IS NULL))) NOT VALID`
 - `CHECK (((estado)::text = ANY ((ARRAY['PENDIENTE'::character varying, 'ACTIVO'::character varying, 'INACTIVO'::character varying])::text[])))`
 - `CHECK ((intentos_fallidos >= 0))`
 - `CHECK (((rol)::text = ANY ((ARRAY['ESTUDIANTE'::character varying, 'PROFESIONAL_EXTERNO'::character varying, 'CATEDRATICO'::character varying, 'ADMINISTRADOR'::character varying])::text[])))`
