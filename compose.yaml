@@ -51,6 +51,8 @@ services:
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
       MINIO_URL_PUBLICA: ${MINIO_URL_PUBLICA}
       JWT_SECRET: ${JWT_SECRET}
+      # El perfil prod exige sesión en /api/docs (DT-BE-12)
+      SPRING_PROFILES_ACTIVE: ${APP_ENV}
       CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS}
 
 volumes:
