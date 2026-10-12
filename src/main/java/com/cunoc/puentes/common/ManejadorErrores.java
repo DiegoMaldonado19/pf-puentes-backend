@@ -36,7 +36,8 @@ class ManejadorErrores extends ResponseEntityExceptionHandler {
     return super.handleMethodArgumentNotValid(ex, headers, status, request);
   }
 
-  // Spring Security las convierte en 401 o 403; sin esto caerían en el 500 de abajo
+  // Las convierte en 401 o 403 con el mismo cuerpo RFC 7807 el entry point y el handler de
+  // common/seguridad/RespuestasSeguridad; sin esto caerían en el 500 de abajo
   @ExceptionHandler({AccessDeniedException.class, AuthenticationException.class})
   void seguridad(RuntimeException ex) {
     throw ex;

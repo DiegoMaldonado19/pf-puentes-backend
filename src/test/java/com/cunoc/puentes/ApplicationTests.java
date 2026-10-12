@@ -8,7 +8,6 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
-import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.web.servlet.MockMvc;
 
 @SpringBootTest
@@ -20,9 +19,8 @@ class ApplicationTests extends PruebaIntegracion {
   @Autowired MockMvc mvc;
 
   // DT-BE-12: la documentación sale de los controladores y vive bajo /api/, que es lo que nginx
-  // reenvía
+  // reenvía. Fuera de producción es pública; en prod exige sesión (SeguridadIntegracionTest)
   @Test
-  @WithMockUser
   void publicaLaDocumentacionEnApiDocs() throws Exception {
     mvc.perform(get("/api/docs"))
         .andExpect(status().isOk())

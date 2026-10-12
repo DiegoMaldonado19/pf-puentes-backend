@@ -9,6 +9,7 @@ import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.util.Arrays;
 import java.util.List;
+import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
@@ -95,6 +96,26 @@ class UsuarioRepositoryTest extends PruebaIntegracion {
 
     assertThat(repositorio.existePorCorreo("ANA@correo.com")).isTrue();
     assertThat(repositorio.existePorCorreo("otra@correo.com")).isFalse();
+  }
+
+  @Test
+  void soloUnaCuentaActivaTieneRolVigente() {
+    Usuario activa = repositorio.saveAndFlush(Cuentas.estudiante("activa@correo.com"));
+    Usuario pendiente = Cuentas.estudiante("pendiente@correo.com");
+    pendiente.setEstado(EstadoUsuario.PENDIENTE);
+    pendiente.setCorreoVerificadoEn(null);
+    repositorio.saveAndFlush(pendiente);
+    Usuario inactiva = Cuentas.estudiante("inactiva@correo.com");
+    inactiva.setEstado(EstadoUsuario.INACTIVO);
+    inactiva.setDesactivadoEn(AHORA);
+    inactiva.setMotivoBaja("Baja de prueba");
+    repositorio.saveAndFlush(inactiva);
+    em.clear();
+
+    assertThat(repositorio.buscarRolActivo(activa.getId())).contains(Rol.ESTUDIANTE);
+    assertThat(repositorio.buscarRolActivo(pendiente.getId())).isEmpty();
+    assertThat(repositorio.buscarRolActivo(inactiva.getId())).isEmpty();
+    assertThat(repositorio.buscarRolActivo(UUID.randomUUID())).isEmpty();
   }
 
   @Test
