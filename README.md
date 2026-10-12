@@ -7,6 +7,7 @@ API REST del Sistema de Gestión de Puentes (SGP).
 | Paquete | Qué hay | Responsable |
 |---|---|---|
 | `common/` | Errores RFC 7807 (`NegocioException`), CORS, OpenAPI en `/api/docs`, ShedLock | P1 |
+| `common/auditoria/` | Bitácora automática con `@Auditable`: valores anterior y posterior, saneamiento, IP y correlación | P2 |
 | `common/seguridad/` | Seguridad stateless con JWT de acceso (15 min), rutas públicas/privadas, BCrypt 12 y 401/403 en RFC 7807 | P2 |
 | `archivo/` | Subida de fotos y PDF, borrado en borradores, URL firmadas y purga de 210 días (RN-ARC) | P1 |
 | Los demás módulos | Tabla, migración y entidad del modelo base ([ADR 0010](docs/adr/0010-modelo-de-datos-base.md)); todavía sin servicios ni endpoints | Cada responsable |
@@ -67,6 +68,29 @@ El script `docker/postgres/01-usuario-app.sh` crea `puentes_app` solo cuando el 
 - **Rutas públicas:** se declaran solo en `sgp.seguridad.rutas-publicas` de `application.properties`, separadas por coma: `/ruta/**` (cualquier método) o `GET /ruta/**`. No hace falta tocar la cadena de filtros.
 - **Contraseñas:** inyecta `PasswordEncoder` (BCrypt, factor 12).
 - **Healthcheck:** `/actuator/health` (puerto 8081) es la única ruta de actuator sin token.
+
+### Auditoría (RN-USR-09)
+
+Toda acción que cree, modifique, cambie de estado o modere datos se registra en `auditoria` con una anotación en el método de **servicio**; no escribas en esa tabla ni inyectes su repositorio. Diseño en el [ADR 0015](docs/adr/0015-auditoria-por-aspecto-en-la-capa-de-servicio.md).
+
+```java
+@Transactional
+@Auditable(accion = Acciones.DAR_DE_BAJA, entidad = "usuario", entidadId = "#id", motivo = "#motivo")
+public void darDeBaja(UUID id, String motivo) { ... }          // antes y después: la fila "usuario" de #id
+
+@Auditable(accion = Acciones.CREAR, entidad = "puente", entidadId = "#result.id")
+public Puente crear(CrearPuenteDTO datos) { ... }              // una creación no tiene valor anterior
+```
+
+- **`accion`:** una constante de `Acciones` (`CREAR`, `MODIFICAR`, `CAMBIAR_ESTADO`, `DAR_DE_BAJA`, `REACTIVAR`, `MODERAR`, `INVITAR`, `REVOCAR_INVITACION`, `VERIFICAR_COLEGIADO`, `BLOQUEAR_CUENTA`). Si necesitas otra, agrégala a `Acciones.CATALOGO` y avisa al equipo.
+- **`entidad`:** el nombre de tu clase de entidad en snake_case (`OrdenMantenimiento` → `"orden_mantenimiento"`).
+- **`entidadId`:** SpEL con el UUID de la fila: `#parametro` si llega por argumento (se guarda el valor anterior) o `#result.id` si la crea el método. Por defecto es `#result`.
+- **`motivo`:** SpEL opcional con la justificación; obligatorio en bajas, moderación y rechazos (RN-FOR-08, RN-INV-08).
+- **Si el método falla no queda fila; si falla la bitácora se revierte todo** (500 genérico). Un `@Auditable` mal declarado (acción fuera del catálogo, `"crear"`, `"Puente"`, entidad inexistente) **impide que la aplicación arranque**.
+- **Nunca se guardan** campos con `contrasena`, `password`, `hash`, `token` o `secret` en el nombre; los correos salen enmascarados (`a***@dominio.com`).
+- Sin sesión, la fila queda sin usuario (acción del Sistema). Varias filas de una misma petición comparten `correlacion_id`.
+- Cambia la entidad con JPA y llama al método desde otro bean (el aspecto es un proxy, igual que `@Transactional`). No anotes los intentos de login fallidos: solo el bloqueo (`BLOQUEAR_CUENTA`).
+- Ejemplo ejecutable: `usuario/AuditablesDePrueba` y `usuario/AuditoriaPorAspectoTest`.
 
 ### Procesos programados
 

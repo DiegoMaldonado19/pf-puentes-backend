@@ -1,4 +1,4 @@
-package com.cunoc.puentes.common;
+package com.cunoc.puentes.common.auditoria;
 
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;

@@ -3,7 +3,7 @@ package com.cunoc.puentes.usuario;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.cunoc.puentes.PruebaIntegracion;
-import com.cunoc.puentes.common.Auditoria;
+import com.cunoc.puentes.common.auditoria.Auditoria;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
