@@ -3,13 +3,26 @@ package com.cunoc.puentes.indice;
 import java.math.BigDecimal;
 import java.math.MathContext;
 import java.util.List;
+import java.util.Set;
 
-/** Núcleo puro del IC (RN-IC-01/02/04, DT-ARQ-06): cálculo y clasificación sin anulaciones. */
+/** Núcleo puro del IC (RN-IC-01/02/04/05, DT-ARQ-06): fórmula, clasificación y anulaciones. */
 public final class CalculadoraIndiceCondicion {
 
   private static final BigDecimal CIEN = BigDecimal.valueOf(100);
   private static final BigDecimal MINIMO_BUENO = BigDecimal.valueOf(75);
   private static final BigDecimal MINIMO_REGULAR = BigDecimal.valueOf(50);
+
+  /** Aplica las anulaciones al estado, conservando el IC de la fórmula y todas las causas. */
+  public ResultadoIndiceCondicion calcular(
+      List<CalificacionElemento> elementos, CondicionesCriticas condiciones) {
+    if (condiciones == null) {
+      throw new IllegalArgumentException("Las condiciones críticas deben estar presentes.");
+    }
+    BigDecimal indice = calcular(elementos);
+    Set<Anulacion> anulaciones = condiciones.anulaciones();
+    EstadoCondicion estado = anulaciones.isEmpty() ? clasificar(indice) : EstadoCondicion.MALO;
+    return new ResultadoIndiceCondicion(indice, estado, anulaciones);
+  }
 
   /** Clasifica el IC sin aplicar redondeo de presentación ni condiciones de anulación. */
   public EstadoCondicion clasificar(BigDecimal indice) {

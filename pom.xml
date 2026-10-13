@@ -291,6 +291,8 @@
 							<includes>
 								<include>**/indice/CalificacionElemento.class</include>
 								<include>**/indice/CalculadoraIndiceCondicion.class</include>
+								<include>**/indice/CondicionesCriticas.class</include>
+								<include>**/indice/ResultadoIndiceCondicion.class</include>
 							</includes>
 							<rules>
 								<rule>
