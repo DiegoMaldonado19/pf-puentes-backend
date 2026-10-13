@@ -2,7 +2,7 @@
 
 API REST del Sistema de Gestión de Puentes (SGP).
 
-## Estado (04/10/2026)
+## Estado (12/10/2026)
 
 | Paquete | Qué hay | Responsable |
 |---|---|---|
@@ -10,6 +10,7 @@ API REST del Sistema de Gestión de Puentes (SGP).
 | `common/auditoria/` | Bitácora automática con `@Auditable`: valores anterior y posterior, saneamiento, IP y correlación | P2 |
 | `common/seguridad/` | Seguridad stateless con JWT de acceso (15 min), rutas públicas/privadas, BCrypt 12 y 401/403 en RFC 7807 | P2 |
 | `archivo/` | Subida de fotos y PDF, borrado en borradores, URL firmadas y purga de 210 días (RN-ARC) | P1 |
+| `indice/` | Fórmula, clasificación y cuatro anulaciones con banderas normalizadas; pruebas propias, adaptación e integración pendientes ([ADR 0016](docs/adr/0016-nucleo-puro-del-indice-de-condicion.md)) | P8 |
 | Los demás módulos | Tabla, migración y entidad del modelo base ([ADR 0010](docs/adr/0010-modelo-de-datos-base.md)); todavía sin servicios ni endpoints | Cada responsable |
 
 - La seguridad base (cadena de filtros JWT, `@EnableMethodSecurity`) ya existe; el login, la renovación y el cierre de sesión (US-P2-06 y US-P2-07) todavía no, así que por ahora no hay cómo obtener un token por HTTP. Ver [Seguridad](#seguridad).
@@ -111,6 +112,7 @@ Son los mismos chequeos que corre el CI:
 - Pruebas de rol por endpoint (DT-CAL-03, contrato 12): en tu `@WebMvcTest` agrega `@Import(SeguridadDePrueba.class)` (seguridad real: `@PreAuthorize`, 401 y 403 en RFC 7807) y autentica cada petición con `.with(como(Rol.CATEDRATICO, usuarioId))` de `AutenticacionDePrueba`. Ejemplo completo con 401, 403 y 2xx por rol en `common/seguridad/EjemploPruebaDeRolTest`.
 - El reporte de JaCoCo queda en `target/site/jacoco/index.html`.
 - El CI falla si las clases `*Service` bajan de 70 % de líneas cubiertas (DT-CAL-01).
+- El núcleo IC (`CalificacionElemento`, `CalculadoraIndiceCondicion`, `CondicionesCriticas` y `ResultadoIndiceCondicion`) exige 100 % de líneas y ramas por clase. Sus pruebas pueden ejecutarse sin Docker; comando en el [ADR 0016](docs/adr/0016-nucleo-puro-del-indice-de-condicion.md).
 
 ## Despliegue
 
