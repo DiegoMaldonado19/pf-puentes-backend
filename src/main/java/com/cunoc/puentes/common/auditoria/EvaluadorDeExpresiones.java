@@ -44,6 +44,12 @@ class EvaluadorDeExpresiones {
     return motivo == null || motivo.toString().isBlank() ? null : motivo.toString().strip();
   }
 
+  /** Verdadero si no hay condición: por defecto todo se audita. */
+  boolean cumple(String condicion, Method metodo, Object[] argumentos, Object resultado) {
+    return condicion.isBlank()
+        || Boolean.TRUE.equals(evaluar(condicion, metodo, argumentos, resultado));
+  }
+
   private Object evaluar(String expresion, Method metodo, Object[] argumentos, Object resultado) {
     StandardEvaluationContext contexto = new StandardEvaluationContext();
     String[] parametros = nombres.getParameterNames(metodo);
