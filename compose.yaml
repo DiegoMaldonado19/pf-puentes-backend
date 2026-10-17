@@ -59,6 +59,8 @@ services:
       ADMIN_INICIAL_NOMBRE: ${ADMIN_INICIAL_NOMBRE:-}
       ADMIN_INICIAL_CONTRASENA: ${ADMIN_INICIAL_CONTRASENA:-}
       FRONTEND_URL: ${FRONTEND_URL:-http://localhost:4200}
+      # false solo en desarrollo local, sin HTTPS
+      COOKIE_SECURE: ${COOKIE_SECURE:-true}
       # consola solo en desarrollo; con APP_ENV=prod la app exige smtp
       CORREO_MODO: ${CORREO_MODO:-consola}
       CORREO_REMITENTE: ${CORREO_REMITENTE:-no-reply@puentes.local}
