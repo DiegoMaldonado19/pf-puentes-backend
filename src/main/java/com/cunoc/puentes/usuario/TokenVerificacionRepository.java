@@ -5,6 +5,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 
 interface TokenVerificacionRepository extends JpaRepository<TokenVerificacion, UUID> {
@@ -20,4 +21,13 @@ interface TokenVerificacionRepository extends JpaRepository<TokenVerificacion, U
         AND t.usadoEn IS NULL AND t.expiraEn > :ahora
       """)
   List<TokenVerificacion> buscarVigentes(UUID usuarioId, TipoTokenVerificacion tipo, Instant ahora);
+
+  /** Consume el token de forma atómica; 0 si otra petición ya lo usó. */
+  @Modifying
+  @Query(
+      """
+      UPDATE TokenVerificacion t SET t.usadoEn = :ahora, t.actualizadoEn = :ahora
+      WHERE t.id = :id AND t.usadoEn IS NULL
+      """)
+  int marcarUsado(UUID id, Instant ahora);
 }
