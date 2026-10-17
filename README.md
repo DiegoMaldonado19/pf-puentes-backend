@@ -79,6 +79,13 @@ Al arrancar, si no existe ninguna cuenta con rol `ADMINISTRADOR`, la app crea un
 - **Contraseña débil** (menos de 10 caracteres, sin letra o sin dígito, RN-USR-06): el arranque falla con un mensaje que indica la política, sin mostrar el valor.
 - En local, `.env.local` trae un administrador de desarrollo (`admin@puentes.local`). En dev, stage y prod defínelas como secretos del Environment ([ADR 0004](docs/adr/0004-configuracion-por-entorno-con-github-environments.md)); son opcionales una vez creada la cuenta.
 
+### Registro de estudiantes y correo (RN-USR-01, RN-USR-02)
+
+- **Endpoints públicos** (`/api/v1/auth/`, declarados en `sgp.seguridad.rutas-publicas`): `POST /registro` (201, 409 si el correo ya existe), `POST /verificar-correo` con `{"token": "..."}` (204; 422 `token-invalido` si venció, ya se usó o no existe) y `POST /reenviar-verificacion` con `{"correo": "..."}` (202 siempre). El registro ignora cualquier `rol` del cuerpo: la cuenta nace `ESTUDIANTE` y `PENDIENTE`. Verificar el correo no la activa (US-P2-14).
+- **Token:** 256 bits aleatorios, vigencia `sgp.verificacion-correo.vigencia` (24 h); en la base solo queda su SHA-256. El enlace es `FRONTEND_URL/verificar-correo?token=...`.
+- **Correo:** `EnviadorDeCorreo` (`common/correo/`) tiene dos implementaciones según `CORREO_MODO`. `smtp` usa `SMTP_HOST`, `SMTP_PORT`, `SMTP_USUARIO`, `SMTP_CLAVE` y `CORREO_REMITENTE`. `consola` (por defecto) imprime el correo, enlace incluido, en el log: es solo para desarrollo y la app no arranca con `APP_ENV=prod`. Se envía de forma asíncrona tras el commit: si el SMTP falla, la cuenta queda creada y se pide el reenvío.
+- Otros flujos con correo (invitaciones, recuperación) inyectan `EnviadorDeCorreo`; no uses `JavaMailSender` directamente.
+
 ### Auditoría (RN-USR-09)
 
 Toda acción que cree, modifique, cambie de estado o modere datos se registra en `auditoria` con una anotación en el método de **servicio**; no escribas en esa tabla ni inyectes su repositorio. Diseño en el [ADR 0015](docs/adr/0015-auditoria-por-aspecto-en-la-capa-de-servicio.md).
