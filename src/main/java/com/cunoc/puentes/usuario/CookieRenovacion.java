@@ -21,7 +21,16 @@ class CookieRenovacion {
     this.segura = segura;
   }
 
+  /** Ordena al navegador descartar la cookie: mismos atributos y vigencia cero. */
+  ResponseCookie borrar() {
+    return construir("", Duration.ZERO);
+  }
+
   ResponseCookie crear(String token, Duration vigencia) {
+    return construir(token, vigencia);
+  }
+
+  private ResponseCookie construir(String token, Duration vigencia) {
     return ResponseCookie.from(NOMBRE, token)
         .httpOnly(true)
         .secure(segura)
