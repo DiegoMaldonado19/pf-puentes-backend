@@ -1,7 +1,6 @@
 package com.cunoc.puentes.usuario;
 
 import com.cunoc.puentes.common.NegocioException;
-import com.cunoc.puentes.common.seguridad.TokenService;
 import com.cunoc.puentes.usuario.dto.SesionDTO;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
@@ -37,10 +36,9 @@ public class AutenticacionService {
   private final UsuarioRepository usuarios;
   private final TokenRenovacionRepository renovaciones;
   private final ControlDeIntentos intentos;
-  private final TokenService tokens;
+  private final EmisorDeAcceso emisorDeAcceso;
   private final PasswordEncoder codificador;
   private final PoliticaDeBloqueo politica;
-  private final UsuarioMapper mapper;
   private final Duration vigenciaRenovacion;
   private final String hashFicticio;
 
@@ -48,18 +46,16 @@ public class AutenticacionService {
       UsuarioRepository usuarios,
       TokenRenovacionRepository renovaciones,
       ControlDeIntentos intentos,
-      TokenService tokens,
+      EmisorDeAcceso emisorDeAcceso,
       PasswordEncoder codificador,
       PoliticaDeBloqueo politica,
-      UsuarioMapper mapper,
       @Value("${sgp.jwt.vigencia-renovacion:P7D}") Duration vigenciaRenovacion) {
     this.usuarios = usuarios;
     this.renovaciones = renovaciones;
     this.intentos = intentos;
-    this.tokens = tokens;
+    this.emisorDeAcceso = emisorDeAcceso;
     this.codificador = codificador;
     this.politica = politica;
-    this.mapper = mapper;
     this.vigenciaRenovacion = vigenciaRenovacion;
     // Con un correo desconocido se compara contra esto: tarda lo mismo que con uno conocido
     this.hashFicticio = codificador.encode("contrasena-ficticia-que-nadie-tiene");
@@ -132,13 +128,7 @@ public class AutenticacionService {
     fila.setExpiraEn(ahora.plus(vigenciaRenovacion));
     renovaciones.save(fila);
 
-    SesionDTO sesion =
-        new SesionDTO(
-            tokens.emitirAcceso(cuenta.getId(), cuenta.getRol()),
-            SesionDTO.BEARER,
-            tokens.vigencia().toSeconds(),
-            mapper.aSesion(cuenta));
-    return new SesionIniciada(sesion, renovacion, vigenciaRenovacion);
+    return new SesionIniciada(emisorDeAcceso.emitir(cuenta), renovacion, vigenciaRenovacion);
   }
 
   // BCrypt trunca (o rechaza) más de 72 bytes: eso nunca puede ser una contraseña válida
