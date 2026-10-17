@@ -28,6 +28,9 @@ La configuración va en un `.env` fuera de git, documentado en `.env.example`. C
 | Environment | `JWT_SECRET` | secreto | `openssl rand -hex 32` |
 | Environment | `MINIO_URL_PUBLICA` | secreto | `https://pf-puentes.duckdns.org:8082` (dev), `:8081` (stage), sin puerto (prod) ([0013](0013-url-firmadas-de-minio-servidas-por-nginx.md)) |
 | Environment | `CORS_ALLOWED_ORIGINS` | secreto | `https://pf-puentes.duckdns.org:8082` (dev), `:8081` (stage), sin puerto (prod) |
+| Environment | `ADMIN_INICIAL_CORREO` | secreto | Correo del primer administrador (RN-USR-03) |
+| Environment | `ADMIN_INICIAL_NOMBRE` | secreto | Nombre completo del primer administrador |
+| Environment | `ADMIN_INICIAL_CONTRASENA` | secreto | Mínimo 10 caracteres, con letra y dígito; `openssl rand -base64 18` sirve. Solo se usa si no existe ningún administrador |
 
 ## Consecuencias
 - Un solo workflow para los tres entornos, y ningún secreto en el repo ni en la imagen.
