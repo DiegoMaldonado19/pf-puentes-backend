@@ -14,6 +14,8 @@ interface UsuarioRepository extends JpaRepository<Usuario, UUID> {
   @Query("SELECT count(u) > 0 FROM Usuario u WHERE lower(u.correo) = lower(:correo)")
   boolean existePorCorreo(String correo);
 
+  boolean existsByRol(Rol rol);
+
   // Una consulta por la clave primaria: el filtro JWT la hace en cada petición
   @Query(
       "SELECT u.rol FROM Usuario u WHERE u.id = :id"

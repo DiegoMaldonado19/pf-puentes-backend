@@ -70,6 +70,15 @@ El script `docker/postgres/01-usuario-app.sh` crea `puentes_app` solo cuando el 
 - **Contraseñas:** inyecta `PasswordEncoder` (BCrypt, factor 12).
 - **Healthcheck:** `/actuator/health` (puerto 8081) es la única ruta de actuator sin token.
 
+### Administrador inicial (RN-USR-03)
+
+Al arrancar, si no existe ninguna cuenta con rol `ADMINISTRADOR`, la app crea una `ACTIVO` con el correo verificado a partir de `ADMIN_INICIAL_CORREO`, `ADMIN_INICIAL_NOMBRE` y `ADMIN_INICIAL_CONTRASENA` (BCrypt 12; la creación queda auditada como acción del Sistema).
+
+- **Idempotente:** si ya hay un administrador no hace nada y nunca toca su contraseña; los cambios de contraseña son de US-P2-11.
+- **Sin variables:** avisa con un `WARN` en el log y sigue arrancando; sin administrador no se puede invitar a nadie.
+- **Contraseña débil** (menos de 10 caracteres, sin letra o sin dígito, RN-USR-06): el arranque falla con un mensaje que indica la política, sin mostrar el valor.
+- En local, `.env.local` trae un administrador de desarrollo (`admin@puentes.local`). En dev, stage y prod defínelas como secretos del Environment ([ADR 0004](docs/adr/0004-configuracion-por-entorno-con-github-environments.md)); son opcionales una vez creada la cuenta.
+
 ### Auditoría (RN-USR-09)
 
 Toda acción que cree, modifique, cambie de estado o modere datos se registra en `auditoria` con una anotación en el método de **servicio**; no escribas en esa tabla ni inyectes su repositorio. Diseño en el [ADR 0015](docs/adr/0015-auditoria-por-aspecto-en-la-capa-de-servicio.md).
