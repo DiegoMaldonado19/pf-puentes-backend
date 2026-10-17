@@ -21,7 +21,8 @@ import org.springframework.test.web.servlet.MockMvc;
  * La aplicación completa con el perfil de producción: {@code /api/docs} exige sesión (DT-BE-12) y
  * el estado de la cuenta se consulta en la base real en cada petición (RN-USR-08, RN-USR-10).
  */
-@SpringBootTest
+// En prod el correo va por SMTP: el modo consola imprimiría los enlaces en el log
+@SpringBootTest(properties = "sgp.correo.modo=smtp")
 @AutoConfigureMockMvc
 @ActiveProfiles("prod")
 class SeguridadIntegracionTest extends PruebaIntegracion {
