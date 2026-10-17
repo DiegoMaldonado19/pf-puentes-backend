@@ -122,6 +122,9 @@ jobs:
           MINIO_URL_PUBLICA='${{ secrets.MINIO_URL_PUBLICA }}'
           JWT_SECRET='${{ secrets.JWT_SECRET }}'
           CORS_ALLOWED_ORIGINS='${{ secrets.CORS_ALLOWED_ORIGINS }}'
+          ADMIN_INICIAL_CORREO='${{ secrets.ADMIN_INICIAL_CORREO }}'
+          ADMIN_INICIAL_NOMBRE='${{ secrets.ADMIN_INICIAL_NOMBRE }}'
+          ADMIN_INICIAL_CONTRASENA='${{ secrets.ADMIN_INICIAL_CONTRASENA }}'
           EOF
       - name: Desplegar en la EC2
         run: |

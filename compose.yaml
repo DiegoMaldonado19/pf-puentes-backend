@@ -54,6 +54,10 @@ services:
       # El perfil prod exige sesión en /api/docs (DT-BE-12)
       SPRING_PROFILES_ACTIVE: ${APP_ENV}
       CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS}
+      # Vacías en un entorno sin administrador: la app avisa en el log y sigue (RN-USR-03)
+      ADMIN_INICIAL_CORREO: ${ADMIN_INICIAL_CORREO:-}
+      ADMIN_INICIAL_NOMBRE: ${ADMIN_INICIAL_NOMBRE:-}
+      ADMIN_INICIAL_CONTRASENA: ${ADMIN_INICIAL_CONTRASENA:-}
 
 volumes:
   postgres-data:
