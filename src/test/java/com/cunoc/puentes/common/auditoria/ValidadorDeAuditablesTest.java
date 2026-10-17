@@ -99,6 +99,22 @@ class ValidadorDeAuditablesTest {
         .run(c -> assertThat(c).hasFailed().getFailure().hasMessageContaining("#id.("));
   }
 
+  static class CondicionInvalida {
+    @Auditable(
+        accion = Acciones.MODIFICAR,
+        entidad = "usuario",
+        entidadId = "#id",
+        condicion = "#a.(")
+    void modificar(java.util.UUID id) {}
+  }
+
+  @Test
+  void unaCondicionInvalidaImpideElArranque() {
+    contexto
+        .withBean(CondicionInvalida.class)
+        .run(c -> assertThat(c).hasFailed().getFailure().hasMessageContaining("#a.("));
+  }
+
   @Test
   void unaEntidadQueNoExisteComoEntidadJpaImpideElArranque() {
     EstadoDeEntidad estados = mock(EstadoDeEntidad.class);

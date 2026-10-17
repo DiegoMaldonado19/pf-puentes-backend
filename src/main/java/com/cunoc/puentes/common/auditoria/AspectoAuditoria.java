@@ -59,6 +59,9 @@ class AspectoAuditoria {
     String motivo = expresiones.motivo(auditable.motivo(), metodo, argumentos);
 
     Object resultado = proceder(punto);
+    if (!expresiones.cumple(auditable.condicion(), metodo, argumentos, resultado)) {
+      return resultado;
+    }
 
     UUID id =
         idPrevio != null
