@@ -13,7 +13,7 @@ API REST del Sistema de Gestión de Puentes (SGP).
 | `indice/` | Fórmula, clasificación y cuatro anulaciones con banderas normalizadas; pruebas propias, adaptación e integración pendientes ([ADR 0016](docs/adr/0016-nucleo-puro-del-indice-de-condicion.md)) | P8 |
 | Los demás módulos | Tabla, migración y entidad del modelo base ([ADR 0010](docs/adr/0010-modelo-de-datos-base.md)); todavía sin servicios ni endpoints | Cada responsable |
 
-- La seguridad base (cadena de filtros JWT, `@EnableMethodSecurity`) y el inicio de sesión (`POST /api/v1/auth/login`) ya existen; la renovación y el cierre de sesión (US-P2-07) todavía no. Ver [Seguridad](#seguridad) e [Inicio de sesión](#inicio-de-sesión-y-bloqueo-rn-usr-07).
+- La seguridad base (cadena de filtros JWT, `@EnableMethodSecurity`) y el inicio de sesión, la renovación, el cierre de sesión y el perfil propio ya existen. Ver [Seguridad](#seguridad) e [Inicio de sesión](#inicio-de-sesión-y-bloqueo-rn-usr-07).
 - Los contratos entre módulos y las fechas están en `docs-analisis/Equipo`.
 
 ## Desarrollo local
@@ -84,6 +84,9 @@ Al arrancar, si no existe ninguna cuenta con rol `ADMINISTRADOR`, la app crea un
 - `POST /api/v1/auth/login` (público) con `{"correo", "contrasena"}` responde 200 con `access_token` (JWT de 15 minutos), `token_type` (`Bearer`), `expires_in` (segundos) y `usuario` (`id`, `nombre`, `rol`). El token de renovación **no** va en el cuerpo: viaja en la cookie `refresh_token` (`HttpOnly`, `SameSite=Strict`, `Path=/api/v1/auth`, 7 días y `Secure` salvo con `COOKIE_SECURE=false`, solo para desarrollo local). La base guarda su SHA-256 en `token_renovacion`; cada inicio de sesión crea uno nuevo.
 - **Errores:** 401 `credenciales-invalidas` (mismo cuerpo para correo inexistente y contraseña incorrecta; con un correo desconocido también se compara un hash, para que el tiempo no delate la cuenta) y 403 `cuenta-bloqueada` (dice cuántos minutos faltan), `cuenta-pendiente` o `cuenta-inactiva`. Estos tres solo se dicen **con la contraseña correcta**; con una incorrecta siempre es el 401.
 - **Bloqueo:** 5 fallos dentro de una ventana de 15 minutos bloquean la cuenta 15 minutos (`sgp.login.intentos-maximos`, `sgp.login.ventana`, `sgp.login.bloqueo`). El conteo vive en `usuario` y lo actualiza una sola sentencia atómica (`UsuarioRepository.registrarFallo`), así que intentos simultáneos no pierden cuentas. Mientras dura el bloqueo, un fallo no cuenta ni lo extiende. Un inicio de sesión correcto reinicia el contador. Solo el fallo que bloquea se audita (`BLOQUEAR_CUENTA`).
+- **Renovar y cerrar sesión** (públicos, se autentican con la cookie): `POST /api/v1/auth/renovar` responde 200 con el mismo cuerpo del login (token de acceso nuevo; el de renovación no va ni se rota, [ADR 0017](docs/adr/0017-token-de-renovacion-sin-rotacion.md)). Ante cualquier fallo (sin cookie, vencida, revocada, inexistente o cuenta dada de baja) responde un único 401 `sesion-invalida` y ordena borrar la cookie. `POST /api/v1/auth/cerrar-sesion` revoca solo la sesión de esa cookie, borra la cookie y siempre responde 204. Ninguno de los dos se audita.
+- **Revocar todas las sesiones de una cuenta:** `SesionService.revocarTodas(usuarioId)` (para la baja y el cambio de contraseña); devuelve cuántas revocó.
+- **Perfil propio:** `GET /api/v1/usuarios/me` (cualquier rol autenticado) devuelve `id`, `nombre`, `correo`, `rol` y `estado`. El id sale del token, nunca de un parámetro.
 - Las vigencias salen de `sgp.jwt.vigencia-acceso` y `sgp.jwt.vigencia-renovacion`. Para emitir tokens desde otro módulo usa `TokenService`.
 
 ### Registro de estudiantes y correo (RN-USR-01, RN-USR-02)
