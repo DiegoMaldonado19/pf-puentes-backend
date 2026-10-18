@@ -134,6 +134,24 @@ class AuditoriaPorAspectoTest extends PruebaIntegracion {
   }
 
   @Test
+  void conCondicionFalsaElMetodoSeConfirmaPeroNoQuedaFila() {
+    servicio.renombrarSiAudita(ana, "Sin fila", false);
+
+    assertThat(usuarios.findById(ana).orElseThrow().getNombre()).isEqualTo("Sin fila");
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT count(*) FROM auditoria WHERE entidad_id = ?", Integer.class, ana))
+        .isZero();
+  }
+
+  @Test
+  void conCondicionVerdaderaSiQuedaLaFila() {
+    servicio.renombrarSiAudita(ana, "Con fila", true);
+
+    assertThat(json(unaFila(ana), "valor_nuevo")).containsEntry("nombre", "Con fila");
+  }
+
+  @Test
   void siLaOperacionFallaNoQuedaRegistroNiCambio() {
     assertThatThrownBy(() -> servicio.renombrarYFallar(ana, "Nombre que no debe quedar"))
         .isInstanceOf(IllegalStateException.class)

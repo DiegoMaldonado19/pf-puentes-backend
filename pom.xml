@@ -55,6 +55,10 @@
 		</dependency>
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-mail</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-validation</artifactId>
 		</dependency>
 		<dependency>
@@ -274,6 +278,39 @@
 											<counter>LINE</counter>
 											<value>COVEREDRATIO</value>
 											<minimum>0.70</minimum>
+										</limit>
+									</limits>
+								</rule>
+							</rules>
+						</configuration>
+					</execution>
+					<execution>
+						<!-- DT-CAL-01: 100 % en el núcleo puro del cálculo IC -->
+						<id>check-indice</id>
+						<phase>verify</phase>
+						<goals>
+							<goal>check</goal>
+						</goals>
+						<configuration>
+							<includes>
+								<include>**/indice/CalificacionElemento.class</include>
+								<include>**/indice/CalculadoraIndiceCondicion.class</include>
+								<include>**/indice/CondicionesCriticas.class</include>
+								<include>**/indice/ResultadoIndiceCondicion.class</include>
+							</includes>
+							<rules>
+								<rule>
+									<element>CLASS</element>
+									<limits>
+										<limit>
+											<counter>LINE</counter>
+											<value>COVEREDRATIO</value>
+											<minimum>1.00</minimum>
+										</limit>
+										<limit>
+											<counter>BRANCH</counter>
+											<value>COVEREDRATIO</value>
+											<minimum>1.00</minimum>
 										</limit>
 									</limits>
 								</rule>
