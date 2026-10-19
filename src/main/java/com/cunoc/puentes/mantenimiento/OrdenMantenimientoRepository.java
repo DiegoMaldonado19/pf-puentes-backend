@@ -14,6 +14,8 @@ interface OrdenMantenimientoRepository extends Repository<OrdenMantenimiento, UU
 
   Optional<OrdenMantenimiento> findById(UUID id);
 
+  Optional<OrdenMantenimiento> findByIdAndPuenteId(UUID id, UUID puenteId);
+
   Page<OrdenMantenimiento> findByPuenteId(UUID puenteId, Pageable pageable);
 
   // ADR 0010: consultar módulos vecinos por SQL, sin importar sus entidades JPA.

@@ -46,6 +46,17 @@ Verificación de esta ampliación: tres pruebas nuevas de contrato aprobadas y s
 
 Esto aún no publica un endpoint ni un contrato HTTP activo: falta integrarlo en el servicio autorizado y en el controlador. No se creó un cliente frontend para URLs inexistentes ni una pantalla sin permisos.
 
+## Consulta interna incorporada el 19/10
+
+`ConsultaOrdenes` conecta el repositorio, el validador de existencia y MapStruct en una transacción de solo lectura. Es un componente de paquete, no la fachada de autorización ni un controlador. Su futuro llamador debe comprobar primero el actor y su acceso al puente.
+
+- `listar(puenteId, pagina, tamano)` devuelve `Page<OrdenMantenimientoDTO>`, ordenada por ID descendente. Página desde cero, tamaño 1–100 y desplazamiento representable por JPA; entradas de paginación inválidas producen 400. El puente debe existir (404 en caso contrario). Una colección vacía o una página posterior al final se devuelven con sus totales.
+- `obtener(puenteId, ordenId)` usa una consulta conjunta por ambos IDs. Una orden inexistente o de otro puente devuelve 404; no se devuelve primero una orden ajena para filtrar en memoria. Los IDs internos nulos se rechazan antes de consultar.
+
+No se filtran órdenes descartadas/canceladas ni se escriben órdenes o auditorías de mutación al leer. No hay selección de roles, filtros inventados, DTO de creación ni API nueva. Las pruebas PostgreSQL recorren consultas, MapStruct y DTO, incluyendo páginas, aislamiento, recursos ausentes, límites, metadatos históricos y ausencia de escrituras. Esto comprueba pertenencia al puente, **no** autorización del usuario: seguirá pendiente integrar la fachada con la matriz de permisos acordada.
+
+Verificación de la consulta interna: 14 casos nuevos aprobados y suite global de 559 sin fallos, errores ni omisiones. Spotless, PMD, build y tres reglas JaCoCo aprobados con JDK 25 y los límites locales de memoria/CPU/contextos ya documentados. No se repitieron pruebas frontend porque no hubo cambios en ese repositorio.
+
 ## Consecuencias y pendientes
 
-MTO-01 pasa a progreso por su base de persistencia; no queda completa. Falta integrar la validación de origen y el DTO/MapStruct ya construidos en el servicio con permisos, API/OpenAPI y pantalla. Tampoco se cierran las HU de transiciones por guardar una entidad en pruebas. No se añade frontend para un repositorio interno ni una ruta de producción/demo. El siguiente incremento dependerá de la matriz de permisos acordada y de las entregas reales disponibles del equipo.
+MTO-01 pasa a progreso por su base de persistencia; no queda completa. Falta integrar las consultas internas, la validación de origen y el DTO/MapStruct ya construidos en la fachada con permisos, API/OpenAPI y pantalla. Tampoco se cierran las HU de transiciones por guardar una entidad en pruebas. No se añade frontend para un repositorio interno ni una ruta de producción/demo. El siguiente incremento dependerá de la matriz de permisos acordada y de las entregas reales disponibles del equipo.
