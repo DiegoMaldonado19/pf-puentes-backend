@@ -12,6 +12,7 @@ API REST del Sistema de Gestión de Puentes (SGP).
 | `archivo/` | Subida de fotos y PDF, borrado en borradores, URL firmadas y purga de 210 días (RN-ARC) | P1 |
 | `indice/` | Fórmula, clasificación y cuatro anulaciones con banderas normalizadas; pruebas propias, adaptación e integración pendientes ([ADR 0016](docs/adr/0016-nucleo-puro-del-indice-de-condicion.md)) | P8 |
 | Configuración de pesos (`indice/`) | Modelo, repositorios, creación interna transaccional auditada y API de consulta paginada para Admin; adaptador P4, API de creación y pantalla pendientes ([ADR 0018](docs/adr/0018-validacion-de-configuraciones-de-pesos.md), [ADR 0019](docs/adr/0019-creacion-transaccional-y-auditada-de-pesos.md), [ADR 0020](docs/adr/0020-consulta-paginada-de-juegos-de-pesos.md)) | P8 |
+| `mantenimiento/` | Núcleo de transiciones conocidas y condiciones de cierre/descarte; setter de estado eliminado, regla de cobertura 100 %. Servicio autorizado/auditado, persistencia y API/UI pendientes ([ADR 0021](docs/adr/0021-nucleo-de-transiciones-de-ordenes.md)) | P8 |
 | Los demás módulos | Tabla, migración y entidad del modelo base ([ADR 0010](docs/adr/0010-modelo-de-datos-base.md)); todavía sin servicios ni endpoints | Cada responsable |
 
 - La seguridad base (cadena de filtros JWT, `@EnableMethodSecurity`) y el inicio de sesión, la renovación, el cierre de sesión y el perfil propio ya existen. Ver [Seguridad](#seguridad) e [Inicio de sesión](#inicio-de-sesión-y-bloqueo-rn-usr-07).
