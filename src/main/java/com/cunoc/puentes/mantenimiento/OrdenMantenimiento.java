@@ -18,6 +18,7 @@ import lombok.Setter;
 public class OrdenMantenimiento extends EntidadBase {
 
   private static final MaquinaEstadosOrden MAQUINA = new MaquinaEstadosOrden();
+  private static final ReglasPrioridadOrden REGLAS_PRIORIDAD = new ReglasPrioridadOrden();
 
   private UUID puenteId;
 
@@ -35,12 +36,15 @@ public class OrdenMantenimiento extends EntidadBase {
 
   private String elementoRef;
 
+  @Setter(AccessLevel.PACKAGE)
   @Enumerated(EnumType.STRING)
   private Prioridad prioridadSugerida;
 
+  @Setter(AccessLevel.PACKAGE)
   @Enumerated(EnumType.STRING)
   private Prioridad prioridad;
 
+  @Setter(AccessLevel.PACKAGE)
   private String justificacionPrioridad;
 
   private LocalDate fechaProgramada;
@@ -50,6 +54,15 @@ public class OrdenMantenimiento extends EntidadBase {
   private String responsable;
 
   private String motivo;
+
+  /** El futuro servicio debe autorizar y auditar el ajuste en su transacción. */
+  void ajustarPrioridad(Prioridad nueva, String justificacion) {
+    REGLAS_PRIORIDAD.validar(prioridad, nueva, justificacion);
+    if (prioridad != nueva) {
+      prioridad = nueva;
+      justificacionPrioridad = justificacion;
+    }
+  }
 
   /**
    * El servicio autorizado llamará esta única puerta de mutación después de obtener la evidencia.
