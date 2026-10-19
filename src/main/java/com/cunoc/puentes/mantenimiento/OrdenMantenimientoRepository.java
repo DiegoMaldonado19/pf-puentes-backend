@@ -1,9 +1,11 @@
 package com.cunoc.puentes.mantenimiento;
 
+import jakarta.persistence.LockModeType;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.Repository;
 
@@ -15,6 +17,10 @@ interface OrdenMantenimientoRepository extends Repository<OrdenMantenimiento, UU
   Optional<OrdenMantenimiento> findById(UUID id);
 
   Optional<OrdenMantenimiento> findByIdAndPuenteId(UUID id, UUID puenteId);
+
+  @Lock(LockModeType.PESSIMISTIC_WRITE)
+  @Query("select o from OrdenMantenimiento o where o.id = :ordenId and o.puenteId = :puenteId")
+  Optional<OrdenMantenimiento> bloquear(UUID puenteId, UUID ordenId);
 
   Page<OrdenMantenimiento> findByPuenteId(UUID puenteId, Pageable pageable);
 

@@ -60,3 +60,7 @@ Verificación de la consulta interna: 14 casos nuevos aprobados y suite global d
 ## Consecuencias y pendientes
 
 MTO-01 pasa a progreso por su base de persistencia; no queda completa. Falta integrar las consultas internas, la validación de origen y el DTO/MapStruct ya construidos en la fachada con permisos, API/OpenAPI y pantalla. Tampoco se cierran las HU de transiciones por guardar una entidad en pruebas. No se añade frontend para un repositorio interno ni una ruta de producción/demo. El siguiente incremento dependerá de la matriz de permisos acordada y de las entregas reales disponibles del equipo.
+
+## Integración posterior — 19/10/2026
+
+La aceptación PROPUESTA → PROGRAMADA ya dispone de fachada autorizada, auditoría y POST con los roles explícitos de RN-MTO-02; ver [ADR 0025](0025-aceptacion-autorizada-y-auditada-de-propuestas.md). Las referencias anteriores a ausencia de servicios/API describen el punto de partida de este ADR. La consulta general y las demás operaciones mantienen sus pendientes; no se introduce un filtro de mantenimiento por curso no prescrito por el enunciado.
