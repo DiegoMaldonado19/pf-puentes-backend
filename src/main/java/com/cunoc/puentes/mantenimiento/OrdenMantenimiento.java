@@ -17,6 +17,8 @@ import lombok.Setter;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class OrdenMantenimiento extends EntidadBase {
 
+  private static final MaquinaEstadosOrden MAQUINA = new MaquinaEstadosOrden();
+
   private UUID puenteId;
 
   private UUID inspeccionId;
@@ -25,7 +27,7 @@ public class OrdenMantenimiento extends EntidadBase {
   private TipoOrden tipo;
 
   // DT-BE-07: solo la máquina de estados del servicio lo cambia
-  @Setter(AccessLevel.PACKAGE)
+  @Setter(AccessLevel.NONE)
   @Enumerated(EnumType.STRING)
   private EstadoOrden estado = EstadoOrden.PROPUESTA;
 
@@ -48,4 +50,22 @@ public class OrdenMantenimiento extends EntidadBase {
   private String responsable;
 
   private String motivo;
+
+  /**
+   * El servicio autorizado llamará esta única puerta de mutación después de obtener la evidencia.
+   */
+  void cambiarEstado(EstadoOrden destino, DatosTransicionOrden datos) {
+    MAQUINA.validar(estado, destino, datos);
+    switch (destino) {
+      case EJECUTADA -> {
+        fechaEjecucion = datos.fechaEjecucion();
+        responsable = datos.responsable();
+      }
+      case DESCARTADA -> motivo = datos.motivo();
+      default -> {
+        // Programar e iniciar conservan los datos ya registrados de la intervención.
+      }
+    }
+    estado = destino;
+  }
 }

@@ -297,6 +297,42 @@
 								<include>**/indice/CalculadoraIndiceCondicion.class</include>
 								<include>**/indice/CondicionesCriticas.class</include>
 								<include>**/indice/ResultadoIndiceCondicion.class</include>
+								<include>**/indice/PesoConfigurado.class</include>
+								<include>**/indice/JuegoPesos.class</include>
+								<include>**/indice/ElementosDeDano.class</include>
+							</includes>
+							<rules>
+								<rule>
+									<element>CLASS</element>
+									<limits>
+										<limit>
+											<counter>LINE</counter>
+											<value>COVEREDRATIO</value>
+											<minimum>1.00</minimum>
+										</limit>
+										<limit>
+											<counter>BRANCH</counter>
+											<value>COVEREDRATIO</value>
+											<minimum>1.00</minimum>
+										</limit>
+									</limits>
+								</rule>
+							</rules>
+						</configuration>
+					</execution>
+					<execution>
+						<!-- DT-CAL-01: núcleo de transiciones de mantenimiento, 100 % por clase -->
+						<id>check-maquina-orden</id>
+						<phase>verify</phase>
+						<goals>
+							<goal>check</goal>
+						</goals>
+						<configuration>
+							<includes>
+								<include>**/mantenimiento/EstadoOrden.class</include>
+								<include>**/mantenimiento/DatosTransicionOrden.class</include>
+								<include>**/mantenimiento/MaquinaEstadosOrden.class</include>
+								<include>**/mantenimiento/OrdenMantenimiento.class</include>
 							</includes>
 							<rules>
 								<rule>
