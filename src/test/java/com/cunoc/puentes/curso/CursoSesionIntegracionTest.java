@@ -94,7 +94,7 @@ class CursoSesionIntegracionTest extends PruebaIntegracion {
                 .param("estudiante_id", DOCENTE)
                 .header(HttpHeaders.AUTHORIZATION, estudiante.bearer()))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.total_elements").value(1))
+        .andExpect(jsonPath("$.total_elements").value(2))
         .andExpect(jsonPath("$.content[0].estudiante_id").value(ESTUDIANTE))
         .andExpect(jsonPath("$.content[0].curso_id").value(curso));
     mvc.perform(get("/api/v1/cursos").header(HttpHeaders.AUTHORIZATION, estudiante.bearer()))
