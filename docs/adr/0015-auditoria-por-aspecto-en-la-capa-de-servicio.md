@@ -19,5 +19,7 @@ RN-USR-09 pide registrar toda acción sobre datos con quién, cuándo, qué y lo
 - Un módulo audita con una anotación; no escribe en `auditoria` ni inyecta su repositorio.
 - El método auditable debe cambiar la entidad con JPA y ser llamado a través del proxy de Spring (no desde otro método del mismo bean), como cualquier `@Transactional`.
 - Los intentos de inicio de sesión fallidos no se anotan (evita inundar la bitácora); solo el bloqueo de la cuenta lleva `BLOQUEAR_CUENTA` (RN-USR-07).
+- `@Auditable.condicion` (SpEL booleana sobre los parámetros y `#result`, evaluada después del método) permite auditar solo algunas ejecuciones: el registro de un intento fallido de inicio de sesión audita únicamente el que bloquea la cuenta. Si la condición da falso, el método se confirma sin fila.
+- Una sentencia `UPDATE` masiva de JPQL debe limpiar el contexto de persistencia (`clearAutomatically`), porque el aspecto lee las fotos con el `EntityManager`.
 - Cada método auditable agrega dos lecturas por clave primaria y un `INSERT`.
 - Un campo cuyo nombre contenga `hash` se omite aunque no sea una contraseña (por ejemplo, el hash de un archivo); es el precio de una exclusión simple y segura.

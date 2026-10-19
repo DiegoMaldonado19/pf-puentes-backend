@@ -42,6 +42,16 @@ public class AuditablesDePrueba {
     }
 
     @Transactional
+    @Auditable(
+        accion = Acciones.MODIFICAR,
+        entidad = "usuario",
+        entidadId = "#id",
+        condicion = "#audita")
+    public void renombrarSiAudita(UUID id, String nombre, boolean audita) {
+      repositorio.findById(id).orElseThrow().setNombre(nombre);
+    }
+
+    @Transactional
     @Auditable(accion = Acciones.CREAR, entidad = "usuario", entidadId = "#result.id")
     public Usuario crear(String correo) {
       return repositorio.save(Cuentas.estudiante(correo));

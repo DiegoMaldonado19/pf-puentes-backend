@@ -16,12 +16,13 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 /**
- * Emite y valida los JWT de acceso: HS256, 15 minutos y sin datos personales (DT-SEC-01). La
- * renovación y su tabla son de US-P2-07.
+ * Emite y valida los JWT de acceso: HS256, 15 minutos por defecto y sin datos personales
+ * (DT-SEC-01). El token de renovación y su tabla son de {@code usuario/}.
  */
 @Service
-class TokenService {
+public class TokenService {
 
+  /** Vigencia por defecto (DT-SEC-01); se cambia con {@code sgp.jwt.vigencia-acceso}. */
   static final Duration VIGENCIA = Duration.ofMinutes(15);
 
   private static final int MIN_BYTES_CLAVE = 32;
@@ -29,13 +30,25 @@ class TokenService {
 
   private final SecretKey clave;
   private final Clock reloj;
+  private final Duration vigencia;
 
   @Autowired
-  TokenService(@Value("${sgp.jwt.secreto}") String secreto) {
-    this(secreto, Clock.systemUTC());
+  TokenService(
+      @Value("${sgp.jwt.secreto}") String secreto,
+      // Texto ISO-8601 (PT15M): así no depende del servicio de conversión del contexto
+      @Value("${sgp.jwt.vigencia-acceso:PT15M}") String vigencia) {
+    this(secreto, Clock.systemUTC(), Duration.parse(vigencia));
+  }
+
+  TokenService(String secreto) {
+    this(secreto, Clock.systemUTC(), VIGENCIA);
   }
 
   TokenService(String secreto, Clock reloj) {
+    this(secreto, reloj, VIGENCIA);
+  }
+
+  TokenService(String secreto, Clock reloj, Duration vigencia) {
     // El mensaje nunca incluye el valor de la clave (DT-SEC-12)
     byte[] bytes = secreto == null ? new byte[0] : secreto.getBytes(StandardCharsets.UTF_8);
     if (bytes.length < MIN_BYTES_CLAVE) {
@@ -45,15 +58,21 @@ class TokenService {
     }
     this.clave = Keys.hmacShaKeyFor(bytes);
     this.reloj = reloj;
+    this.vigencia = vigencia;
   }
 
-  String emitirAcceso(UUID usuarioId, Rol rol) {
+  /** Cuánto dura un token de acceso recién emitido. */
+  public Duration vigencia() {
+    return vigencia;
+  }
+
+  public String emitirAcceso(UUID usuarioId, Rol rol) {
     Instant ahora = reloj.instant();
     return Jwts.builder()
         .subject(usuarioId.toString())
         .claim(RECLAMO_ROL, rol.name())
         .issuedAt(Date.from(ahora))
-        .expiration(Date.from(ahora.plus(VIGENCIA)))
+        .expiration(Date.from(ahora.plus(vigencia)))
         .signWith(clave, Jwts.SIG.HS256)
         .compact();
   }

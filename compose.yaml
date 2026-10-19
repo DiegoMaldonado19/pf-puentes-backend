@@ -54,6 +54,20 @@ services:
       # El perfil prod exige sesión en /api/docs (DT-BE-12)
       SPRING_PROFILES_ACTIVE: ${APP_ENV}
       CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS}
+      # Vacías en un entorno sin administrador: la app avisa en el log y sigue (RN-USR-03)
+      ADMIN_INICIAL_CORREO: ${ADMIN_INICIAL_CORREO:-}
+      ADMIN_INICIAL_NOMBRE: ${ADMIN_INICIAL_NOMBRE:-}
+      ADMIN_INICIAL_CONTRASENA: ${ADMIN_INICIAL_CONTRASENA:-}
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:4200}
+      # false solo en desarrollo local, sin HTTPS
+      COOKIE_SECURE: ${COOKIE_SECURE:-true}
+      # consola solo en desarrollo; con APP_ENV=prod la app exige smtp
+      CORREO_MODO: ${CORREO_MODO:-consola}
+      CORREO_REMITENTE: ${CORREO_REMITENTE:-no-reply@puentes.local}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USUARIO: ${SMTP_USUARIO:-}
+      SMTP_CLAVE: ${SMTP_CLAVE:-}
 
 volumes:
   postgres-data:

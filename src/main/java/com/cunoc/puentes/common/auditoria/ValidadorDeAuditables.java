@@ -77,9 +77,10 @@ class ValidadorDeAuditables implements SmartInitializingSingleton {
       errores.add(
           "%s: no existe una entidad JPA llamada '%s'".formatted(donde, auditable.entidad()));
     }
-    for (String expresion : List.of(auditable.entidadId(), auditable.motivo())) {
+    for (String expresion :
+        List.of(auditable.entidadId(), auditable.motivo(), auditable.condicion())) {
       if (expresion.isBlank()) {
-        continue; // el motivo es opcional
+        continue; // el motivo y la condición son opcionales
       }
       try {
         expresiones.validar(expresion);

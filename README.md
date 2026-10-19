@@ -14,7 +14,7 @@ API REST del Sistema de Gestión de Puentes (SGP).
 | Configuración de pesos (`indice/`) | Modelo inmutable y validaciones de HU-P8-IC-04; servicio, API y pantalla pendientes ([ADR 0017](docs/adr/0017-validacion-de-configuraciones-de-pesos.md)) | P8 |
 | Los demás módulos | Tabla, migración y entidad del modelo base ([ADR 0010](docs/adr/0010-modelo-de-datos-base.md)); todavía sin servicios ni endpoints | Cada responsable |
 
-- La seguridad base (cadena de filtros JWT, `@EnableMethodSecurity`) ya existe; el login, la renovación y el cierre de sesión (US-P2-06 y US-P2-07) todavía no, así que por ahora no hay cómo obtener un token por HTTP. Ver [Seguridad](#seguridad).
+- La seguridad base (cadena de filtros JWT, `@EnableMethodSecurity`) y el inicio de sesión, la renovación, el cierre de sesión y el perfil propio ya existen. Ver [Seguridad](#seguridad) e [Inicio de sesión](#inicio-de-sesión-y-bloqueo-rn-usr-07).
 - Los contratos entre módulos y las fechas están en `docs-analisis/Equipo`.
 
 ## Desarrollo local
@@ -71,6 +71,32 @@ El script `docker/postgres/01-usuario-app.sh` crea `puentes_app` solo cuando el 
 - **Contraseñas:** inyecta `PasswordEncoder` (BCrypt, factor 12).
 - **Healthcheck:** `/actuator/health` (puerto 8081) es la única ruta de actuator sin token.
 
+### Administrador inicial (RN-USR-03)
+
+Al arrancar, si no existe ninguna cuenta con rol `ADMINISTRADOR`, la app crea una `ACTIVO` con el correo verificado a partir de `ADMIN_INICIAL_CORREO`, `ADMIN_INICIAL_NOMBRE` y `ADMIN_INICIAL_CONTRASENA` (BCrypt 12; la creación queda auditada como acción del Sistema).
+
+- **Idempotente:** si ya hay un administrador no hace nada y nunca toca su contraseña; los cambios de contraseña son de US-P2-11.
+- **Sin variables:** avisa con un `WARN` en el log y sigue arrancando; sin administrador no se puede invitar a nadie.
+- **Contraseña débil** (menos de 10 caracteres, sin letra o sin dígito, RN-USR-06): el arranque falla con un mensaje que indica la política, sin mostrar el valor.
+- En local, `.env.local` trae un administrador de desarrollo (`admin@puentes.local`). En dev, stage y prod defínelas como secretos del Environment ([ADR 0004](docs/adr/0004-configuracion-por-entorno-con-github-environments.md)); son opcionales una vez creada la cuenta.
+
+### Inicio de sesión y bloqueo (RN-USR-07)
+
+- `POST /api/v1/auth/login` (público) con `{"correo", "contrasena"}` responde 200 con `access_token` (JWT de 15 minutos), `token_type` (`Bearer`), `expires_in` (segundos) y `usuario` (`id`, `nombre`, `rol`). El token de renovación **no** va en el cuerpo: viaja en la cookie `refresh_token` (`HttpOnly`, `SameSite=Strict`, `Path=/api/v1/auth`, 7 días y `Secure` salvo con `COOKIE_SECURE=false`, solo para desarrollo local). La base guarda su SHA-256 en `token_renovacion`; cada inicio de sesión crea uno nuevo.
+- **Errores:** 401 `credenciales-invalidas` (mismo cuerpo para correo inexistente y contraseña incorrecta; con un correo desconocido también se compara un hash, para que el tiempo no delate la cuenta) y 403 `cuenta-bloqueada` (dice cuántos minutos faltan), `cuenta-pendiente` o `cuenta-inactiva`. Estos tres solo se dicen **con la contraseña correcta**; con una incorrecta siempre es el 401.
+- **Bloqueo:** 5 fallos dentro de una ventana de 15 minutos bloquean la cuenta 15 minutos (`sgp.login.intentos-maximos`, `sgp.login.ventana`, `sgp.login.bloqueo`). El conteo vive en `usuario` y lo actualiza una sola sentencia atómica (`UsuarioRepository.registrarFallo`), así que intentos simultáneos no pierden cuentas. Mientras dura el bloqueo, un fallo no cuenta ni lo extiende. Un inicio de sesión correcto reinicia el contador. Solo el fallo que bloquea se audita (`BLOQUEAR_CUENTA`).
+- **Renovar y cerrar sesión** (públicos, se autentican con la cookie): `POST /api/v1/auth/renovar` responde 200 con el mismo cuerpo del login (token de acceso nuevo; el de renovación no va ni se rota, [ADR 0017](docs/adr/0017-token-de-renovacion-sin-rotacion.md)). Ante cualquier fallo (sin cookie, vencida, revocada, inexistente o cuenta dada de baja) responde un único 401 `sesion-invalida` y ordena borrar la cookie. `POST /api/v1/auth/cerrar-sesion` revoca solo la sesión de esa cookie, borra la cookie y siempre responde 204. Ninguno de los dos se audita.
+- **Revocar todas las sesiones de una cuenta:** `SesionService.revocarTodas(usuarioId)` (para la baja y el cambio de contraseña); devuelve cuántas revocó.
+- **Perfil propio:** `GET /api/v1/usuarios/me` (cualquier rol autenticado) devuelve `id`, `nombre`, `correo`, `rol` y `estado`. El id sale del token, nunca de un parámetro.
+- Las vigencias salen de `sgp.jwt.vigencia-acceso` y `sgp.jwt.vigencia-renovacion`. Para emitir tokens desde otro módulo usa `TokenService`.
+
+### Registro de estudiantes y correo (RN-USR-01, RN-USR-02)
+
+- **Endpoints públicos** (`/api/v1/auth/`, declarados en `sgp.seguridad.rutas-publicas`): `POST /registro` (201, 409 si el correo ya existe), `POST /verificar-correo` con `{"token": "..."}` (204; 422 `token-invalido` si venció, ya se usó o no existe) y `POST /reenviar-verificacion` con `{"correo": "..."}` (202 siempre). El registro ignora cualquier `rol` del cuerpo: la cuenta nace `ESTUDIANTE` y `PENDIENTE`. Verificar el correo no la activa (US-P2-14).
+- **Token:** 256 bits aleatorios, vigencia `sgp.verificacion-correo.vigencia` (24 h); en la base solo queda su SHA-256. El enlace es `FRONTEND_URL/verificar-correo?token=...`.
+- **Correo:** `EnviadorDeCorreo` (`common/correo/`) tiene dos implementaciones según `CORREO_MODO`. `smtp` usa `SMTP_HOST`, `SMTP_PORT`, `SMTP_USUARIO`, `SMTP_CLAVE` y `CORREO_REMITENTE`. `consola` (por defecto) imprime el correo, enlace incluido, en el log: es solo para desarrollo y la app no arranca con `APP_ENV=prod`. Se envía de forma asíncrona tras el commit: si el SMTP falla, la cuenta queda creada y se pide el reenvío.
+- Otros flujos con correo (invitaciones, recuperación) inyectan `EnviadorDeCorreo`; no uses `JavaMailSender` directamente.
+
 ### Auditoría (RN-USR-09)
 
 Toda acción que cree, modifique, cambie de estado o modere datos se registra en `auditoria` con una anotación en el método de **servicio**; no escribas en esa tabla ni inyectes su repositorio. Diseño en el [ADR 0015](docs/adr/0015-auditoria-por-aspecto-en-la-capa-de-servicio.md).
@@ -88,6 +114,7 @@ public Puente crear(CrearPuenteDTO datos) { ... }              // una creación 
 - **`entidad`:** el nombre de tu clase de entidad en snake_case (`OrdenMantenimiento` → `"orden_mantenimiento"`).
 - **`entidadId`:** SpEL con el UUID de la fila: `#parametro` si llega por argumento (se guarda el valor anterior) o `#result.id` si la crea el método. Por defecto es `#result`.
 - **`motivo`:** SpEL opcional con la justificación; obligatorio en bajas, moderación y rechazos (RN-FOR-08, RN-INV-08).
+- **`condicion`:** SpEL booleana opcional, evaluada con los parámetros y `#result` después de ejecutar el método. Si da falso el método se confirma pero no queda fila (por ejemplo, `condicion = "#result.bloqueoNuevo()"` en `ControlDeIntentos.registrarFallo`: solo el fallo que bloquea se audita).
 - **Si el método falla no queda fila; si falla la bitácora se revierte todo** (500 genérico). Un `@Auditable` mal declarado (acción fuera del catálogo, `"crear"`, `"Puente"`, entidad inexistente) **impide que la aplicación arranque**.
 - **Nunca se guardan** campos con `contrasena`, `password`, `hash`, `token` o `secret` en el nombre; los correos salen enmascarados (`a***@dominio.com`).
 - Sin sesión, la fila queda sin usuario (acción del Sistema). Varias filas de una misma petición comparten `correlacion_id`.

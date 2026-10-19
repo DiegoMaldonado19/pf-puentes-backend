@@ -47,4 +47,12 @@ public @interface Auditable {
    * Expresión SpEL con la justificación escrita, para acciones que la exigen (bajas, moderación).
    */
   String motivo() default "";
+
+  /**
+   * Expresión SpEL booleana evaluada después de ejecutar el método, con los parámetros y {@code
+   * #result}. Si da falso no se escribe la fila (el método sí se confirma). Vacía: siempre se
+   * audita. Sirve para operaciones que solo a veces son auditables, como el bloqueo de una cuenta
+   * dentro del registro de un intento fallido.
+   */
+  String condicion() default "";
 }
