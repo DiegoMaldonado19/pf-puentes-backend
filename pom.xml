@@ -299,6 +299,7 @@
 								<include>**/indice/ResultadoIndiceCondicion.class</include>
 								<include>**/indice/PesoConfigurado.class</include>
 								<include>**/indice/JuegoPesos.class</include>
+								<include>**/indice/ElementosDeDano.class</include>
 							</includes>
 							<rules>
 								<rule>

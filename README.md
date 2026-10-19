@@ -2,7 +2,7 @@
 
 API REST del Sistema de Gestión de Puentes (SGP).
 
-## Estado (18/10/2026)
+## Estado (19/10/2026)
 
 | Paquete | Qué hay | Responsable |
 |---|---|---|
@@ -11,7 +11,7 @@ API REST del Sistema de Gestión de Puentes (SGP).
 | `common/seguridad/` | Seguridad stateless con JWT de acceso (15 min), rutas públicas/privadas, BCrypt 12 y 401/403 en RFC 7807 | P2 |
 | `archivo/` | Subida de fotos y PDF, borrado en borradores, URL firmadas y purga de 210 días (RN-ARC) | P1 |
 | `indice/` | Fórmula, clasificación y cuatro anulaciones con banderas normalizadas; pruebas propias, adaptación e integración pendientes ([ADR 0016](docs/adr/0016-nucleo-puro-del-indice-de-condicion.md)) | P8 |
-| Configuración de pesos (`indice/`) | Modelo inmutable, validaciones y repositorios con consulta paginada por juego; servicio, API y pantalla pendientes ([ADR 0018](docs/adr/0018-validacion-de-configuraciones-de-pesos.md)) | P8 |
+| Configuración de pesos (`indice/`) | Modelo, repositorios y creación transaccional con permiso Admin y auditoría; adaptador P4, API y pantalla pendientes ([ADR 0018](docs/adr/0018-validacion-de-configuraciones-de-pesos.md), [ADR 0019](docs/adr/0019-creacion-transaccional-y-auditada-de-pesos.md)) | P8 |
 | Los demás módulos | Tabla, migración y entidad del modelo base ([ADR 0010](docs/adr/0010-modelo-de-datos-base.md)); todavía sin servicios ni endpoints | Cada responsable |
 
 - La seguridad base (cadena de filtros JWT, `@EnableMethodSecurity`) y el inicio de sesión, la renovación, el cierre de sesión y el perfil propio ya existen. Ver [Seguridad](#seguridad) e [Inicio de sesión](#inicio-de-sesión-y-bloqueo-rn-usr-07).

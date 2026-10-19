@@ -33,6 +33,9 @@ public abstract class PruebaIntegracion {
 
   @DynamicPropertySource
   static void propiedades(DynamicPropertyRegistry registry) {
+    // La suite conserva varios contextos: no reservar diez conexiones por cada uno.
+    registry.add("spring.datasource.hikari.maximum-pool-size", () -> "4");
+    registry.add("spring.datasource.hikari.minimum-idle", () -> "1");
     registry.add("spring.flyway.user", POSTGRES::getUsername);
     registry.add("spring.flyway.password", POSTGRES::getPassword);
     registry.add("sgp.jwt.secreto", () -> "clave-de-pruebas-de-al-menos-32-bytes!");
