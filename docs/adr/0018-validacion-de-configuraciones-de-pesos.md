@@ -1,7 +1,9 @@
-# 0017. Validación de configuraciones de pesos
+# 0018. Validación de configuraciones de pesos
 
-- Estado: propuesto para revisión del equipo; modelo y validaciones implementados
+- Estado: propuesto para revisión del equipo; modelo, validaciones y repositorios implementados
 - Fecha: 12/10/2026
+- Renumerado el 18/10/2026 tras integrar el ADR 0017 de renovación de sesión de P2.
+- Ampliación del 18/10/2026: repositorios y pruebas de persistencia con PostgreSQL/Testcontainers.
 - Historia: HU-P8-IC-04, primera parte (modelo y validación)
 - Reglas: RN-IC-03, RN-FRM-02/03, RN-IC-08; límites de la migración `V2026_10_04_2006__crear_pesos_ic.sql`
 
@@ -36,9 +38,19 @@ El UUID y la referencia son entradas de prueba, no un esquema oficial. La defini
 
 ## Consecuencias y siguiente entrega
 
-Esta primera parte de HU-P8-IC-04 valida y conserva una definición en memoria. No guarda pesos, no protege por rol a un endpoint y no demuestra preservación de históricos en base de datos. No hay repositorios, servicio, controlador, migración ni pantalla nuevos en esta entrega.
+La primera entrega de HU-P8-IC-04 validó y conservó una definición en memoria. La ampliación del 18/10 añade persistencia base con `VersionPesosRepository` y `PesoElementoRepository`, internos al paquete `indice`, sobre las entidades y tablas existentes. No requiere migraciones ni cambios del diccionario de datos.
+
+La consulta de pesos usa el ID exacto del juego y `Pageable`; no selecciona por sí sola el juego activo o más reciente de un formulario. `@EntityGraph` carga el juego en la consulta para permitir su lectura sin N+1. El límite de página máximo de 100 se aplicará al exponer la futura API; esta entrega solo incorpora repositorios internos.
+
+Las pruebas usan dos versiones ficticias de formulario en BORRADOR, creadas por SQL dentro de transacciones de prueba revertidas al terminar. Esto prueba las claves foráneas, no una política que autorice administrar pesos de formularios en borrador. No se interpreta el JSON Schema ni se decide el vínculo entre nuevas versiones de pesos y formulario.
+
+Se comprueba guardar y releer IDs UUID v7, formulario, acta opcional, fechas y pesos decimales; paginación y ausencia de cargas perezosas adicionales al consultar el juego; separación de juegos del mismo formulario y de formularios diferentes; juego inexistente; rechazo de referencias duplicadas, pesos no positivos y claves foráneas inexistentes mediante restricciones reales de PostgreSQL.
+
+Guardar dos juegos nuevos permite consultar el anterior sin reemplazarlo. Esto no impone inmutabilidad histórica: los repositorios JPA todavía permiten actualizaciones y borrados. El servicio posterior debe impedir modificaciones indebidas, aplicar autorización y auditoría, y crear juegos/pesos en una única transacción de negocio. No hay todavía servicio, controlador ni pantalla nuevos. Tener una referencia de acta guardada no verifica su existencia o firma.
 
 El siguiente servicio debe comprobar que existe la versión del formulario, validar sus referencias con los metadatos acordados de P4, crear juegos sin sobrescribir los usados por inspecciones y aplicar autorización exclusiva de Administrador y auditoría al persistir. Después vendrán DTO con Bean Validation, MapStruct, API/OpenAPI y pantalla Admin. La calibración inicial con acta sigue requiriendo al catedrático; el vínculo entre versiones no se decide en este modelo.
+
+La prueba focalizada de los repositorios necesita Docker: `./mvnw -B -ntp -Dtest=PesosRepositoryTest test`. Se reutiliza `PruebaIntegracion` con PostgreSQL/PostGIS y MinIO del proyecto, sin H2. No existe aún una API que deba probarse desde Postman ni una pantalla que consuma estos repositorios; el siguiente paso corresponde al backend de servicio.
 
 Pruebas específicas: límites positivos y precisión sin redondeo, referencias/acta Unicode, duplicados, entradas ausentes y copia inmutable entre definiciones. Ejecución focalizada:
 
@@ -49,3 +61,5 @@ Pruebas específicas: límites positivos y precisión sin redondeo, referencias/
 Para verificar todas las reglas de cobertura y la integración del repositorio: `./mvnw -B -ntp spotless:check verify pmd:check`, con Docker disponible.
 
 Verificación del 12/10/2026: formato, compilación, PMD y suite completa aprobados; 301 casos en total, incluidos 31 nuevos de configuración (19 de `PesoConfigurado`, 12 de `JuegoPesos`), sin fallos, errores ni omisiones. Ambos registros alcanzaron 100 % de líneas y ramas; se cumplieron las reglas JaCoCo existentes y ampliadas. Las pruebas de copia inmutable verifican las definiciones en memoria, no la futura conservación histórica en base de datos.
+
+Verificación del 18/10/2026: `./mvnw -B -ntp spotless:check verify pmd:check` aprobado con 424 casos de toda la suite actual, incluidos 11 nuevos de `PesosRepositoryTest` y 144 del paquete `indice/` en total. Sin fallos, errores ni omisiones; ambas reglas JaCoCo cumplidas y las seis clases de cálculo/configuración conservan 100 % de líneas y ramas donde existen ramas. Los repositorios se prueban contra PostgreSQL real; la prueba no atribuye a esta capa autorización o protección histórica que aún corresponden al servicio pendiente.
