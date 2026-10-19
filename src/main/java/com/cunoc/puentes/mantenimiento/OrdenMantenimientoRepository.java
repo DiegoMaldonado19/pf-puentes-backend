@@ -4,6 +4,7 @@ import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.Repository;
 
 /** Interno al módulo; no expone borrado físico ni listados sin paginación (DT-BD-11, DT-BE-08). */
@@ -14,4 +15,11 @@ interface OrdenMantenimientoRepository extends Repository<OrdenMantenimiento, UU
   Optional<OrdenMantenimiento> findById(UUID id);
 
   Page<OrdenMantenimiento> findByPuenteId(UUID puenteId, Pageable pageable);
+
+  // ADR 0010: consultar módulos vecinos por SQL, sin importar sus entidades JPA.
+  @Query(value = "SELECT EXISTS (SELECT 1 FROM puente WHERE id = :puenteId)", nativeQuery = true)
+  boolean existePuente(UUID puenteId);
+
+  @Query(value = "SELECT puente_id FROM inspeccion WHERE id = :inspeccionId", nativeQuery = true)
+  Optional<UUID> buscarPuenteDeInspeccion(UUID inspeccionId);
 }

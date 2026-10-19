@@ -32,7 +32,7 @@ Con JDK 25 y Docker disponibles:
 ./mvnw -B -ntp clean spotless:check verify pmd:check
 ```
 
-El resultado ejecutado se registra en el avance de P8 al terminar la verificación.
+La primera ejecución global se interrumpió, aunque sus 14 casos nuevos pasaron. La comprobación se completó el 19/10 junto con el validador de origen ([ADR 0023](0023-validacion-del-origen-de-ordenes.md)): 542 casos sin fallos, errores ni omisiones; Spotless, PMD, build y tres reglas JaCoCo aprobados. No se acredita una ejecución previa de 535 casos como completada.
 
 ## Consecuencias y pendientes
 
