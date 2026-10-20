@@ -119,4 +119,27 @@ class OrdenMantenimientoController {
   OrdenMantenimientoDTO aceptar(@PathVariable UUID puenteId, @PathVariable UUID ordenId) {
     return servicio.aceptar(puenteId, ordenId);
   }
+
+  @PostMapping("/{ordenId}/inicio-ejecucion")
+  @PreAuthorize("hasAnyRole('CATEDRATICO', 'ADMINISTRADOR')")
+  @Operation(
+      summary = "Inicia una orden PROGRAMADA y la pasa a EN_EJECUCION (RN-MTO-04)",
+      description =
+          "Sin cuerpo. Actores confirmados: Catedrático y Administrador. "
+              + "Conserva fechas, origen, prioridades e intervención. Audita el cambio en la misma transacción. "
+              + "No admite un estado de destino enviado por el cliente.")
+  @ApiResponse(responseCode = "200", description = "Orden persistida en EN_EJECUCION")
+  @ApiResponse(responseCode = "400", description = "UUID inválido")
+  @ApiResponse(responseCode = "401", description = "Sin sesión o token inválido")
+  @ApiResponse(
+      responseCode = "403",
+      description = "Solo Catedrático o Administrador inicia ejecución")
+  @ApiResponse(responseCode = "404", description = "La orden no existe en el puente indicado")
+  @ApiResponse(responseCode = "409", description = "La orden ya no está en PROGRAMADA")
+  @ApiResponse(
+      responseCode = "422",
+      description = "La inspección de origen pertenece a otro puente")
+  OrdenMantenimientoDTO iniciarEjecucion(@PathVariable UUID puenteId, @PathVariable UUID ordenId) {
+    return servicio.iniciarEjecucion(puenteId, ordenId);
+  }
 }
