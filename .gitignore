@@ -65,3 +65,7 @@ scripts/
 
 # El .env.example si se versiona.
 !.env.example
+
+# Ajustes personales de Compose; el archivo base sigue versionado.
+/compose.local.override.yaml
+/compose.local.override.yml
