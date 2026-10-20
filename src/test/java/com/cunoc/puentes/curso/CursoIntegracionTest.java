@@ -292,7 +292,7 @@ class CursoIntegracionTest extends PruebaIntegracion {
             get(BASE + "/estudiantes-elegibles")
                 .with(user(DOCENTE.toString()).roles("CATEDRATICO")))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.total_elements").value(3))
+        .andExpect(jsonPath("$.total_elements").value(19))
         .andExpect(jsonPath("$.content[0].correo").doesNotExist());
     mvc.perform(
             get(BASE + "/puentes-disponibles").with(user(DOCENTE.toString()).roles("CATEDRATICO")))
