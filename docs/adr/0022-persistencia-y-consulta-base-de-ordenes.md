@@ -64,3 +64,9 @@ MTO-01 pasa a progreso por su base de persistencia; no queda completa. Falta int
 ## Integración posterior — 19/10/2026
 
 La aceptación PROPUESTA → PROGRAMADA ya dispone de fachada autorizada, auditoría y POST con los roles explícitos de RN-MTO-02; ver [ADR 0025](0025-aceptacion-autorizada-y-auditada-de-propuestas.md). Las referencias anteriores a ausencia de servicios/API describen el punto de partida de este ADR. La consulta general y las demás operaciones mantienen sus pendientes; no se introduce un filtro de mantenimiento por curso no prescrito por el enunciado.
+
+## Filtro interno de propuestas — 19/10/2026
+
+`ConsultaOrdenes.listarPropuestas` utiliza `findByPuenteIdAndEstado` con estado fijo PROPUESTA en SQL/JPA. Comparte validación de puente y página (máximo 100), orden ID descendente y MapStruct con la consulta interna existente. La consulta cuenta y pagina pendientes, sin traer todo el historial para filtrarlo en memoria. Una aceptada deja de contarse; la fila y su historial siguen consultables por los métodos anteriores. No escribe ni audita mutaciones.
+
+El usuario confirmó que el grupo aún no responde sobre lectores. No se habilita un GET ni se atribuye un permiso de lectura a los roles de aceptación por suposición. Diez casos PostgreSQL verifican los seis estados, puente, paginación/totales, desaparición del pendiente tras cambio de estado, vacíos, validación y ausencia de escrituras. Verificación global con JDK 25: `./mvnw -B -ntp clean spotless:check verify pmd:check`, 612 casos sin fallos/errores/omisiones; formato, PMD, build y las tres reglas JaCoCo cumplidos.

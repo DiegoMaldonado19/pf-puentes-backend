@@ -5,6 +5,7 @@ import com.cunoc.puentes.mantenimiento.dto.OrdenMantenimientoDTO;
 import java.util.UUID;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
@@ -29,6 +30,19 @@ class ConsultaOrdenes {
   }
 
   Page<OrdenMantenimientoDTO> listar(UUID puenteId, int pagina, int tamano) {
+    Pageable paginaValidada = validarPagina(puenteId, pagina, tamano);
+    return ordenes.findByPuenteId(puenteId, paginaValidada).map(mapper::aDTO);
+  }
+
+  /** Solo pendientes de aceptar; no elimina ni oculta terminales en la consulta histórica. */
+  Page<OrdenMantenimientoDTO> listarPropuestas(UUID puenteId, int pagina, int tamano) {
+    Pageable paginaValidada = validarPagina(puenteId, pagina, tamano);
+    return ordenes
+        .findByPuenteIdAndEstado(puenteId, EstadoOrden.PROPUESTA, paginaValidada)
+        .map(mapper::aDTO);
+  }
+
+  private Pageable validarPagina(UUID puenteId, int pagina, int tamano) {
     if (pagina < 0 || tamano < 1 || tamano > 100 || (long) pagina * tamano > Integer.MAX_VALUE) {
       throw new NegocioException(
           HttpStatus.BAD_REQUEST,
@@ -37,9 +51,7 @@ class ConsultaOrdenes {
           "La página debe ser no negativa, con tamaño entre 1 y 100 y dentro del límite admitido.");
     }
     origen.validar(puenteId, null);
-    return ordenes
-        .findByPuenteId(puenteId, PageRequest.of(pagina, tamano, Sort.by("id").descending()))
-        .map(mapper::aDTO);
+    return PageRequest.of(pagina, tamano, Sort.by("id").descending());
   }
 
   OrdenMantenimientoDTO obtener(UUID puenteId, UUID ordenId) {
