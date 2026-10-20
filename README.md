@@ -2,7 +2,7 @@
 
 API REST del Sistema de Gestión de Puentes (SGP).
 
-## Estado (19/10/2026)
+## Estado (20/10/2026)
 
 | Paquete | Qué hay | Responsable |
 |---|---|---|
@@ -12,11 +12,12 @@ API REST del Sistema de Gestión de Puentes (SGP).
 | `archivo/` | Subida de fotos y PDF, borrado en borradores, URL firmadas y purga de 210 días (RN-ARC) | P1 |
 | `indice/` | Fórmula, clasificación y cuatro anulaciones con banderas normalizadas; pruebas propias, adaptación e integración pendientes ([ADR 0016](docs/adr/0016-nucleo-puro-del-indice-de-condicion.md)) | P8 |
 | Configuración de pesos (`indice/`) | Modelo, repositorios, creación interna transaccional auditada y API de consulta paginada para Admin; adaptador P4, API de creación y pantalla pendientes ([ADR 0018](docs/adr/0018-validacion-de-configuraciones-de-pesos.md), [ADR 0019](docs/adr/0019-creacion-transaccional-y-auditada-de-pesos.md), [ADR 0020](docs/adr/0020-consulta-paginada-de-juegos-de-pesos.md)) | P8 |
-| `mantenimiento/` | Núcleo de transiciones/cierre/descarte con cobertura 100 %; repositorio interno de guardado y consulta paginada sin métodos de borrado; validador de existencia y correspondencia inspección/puente; DTO de lectura con MapStruct y consultas internas paginadas/detalle por puente, incluida consulta de propuestas pendientes filtrada en base de datos; ajuste interno de prioridad con justificación, conservando la sugerida. Servicio y POST de aceptación Catedrático/Admin, auditados y con bloqueo concurrente; otras operaciones HTTP y UI pendientes ([ADR 0021](docs/adr/0021-nucleo-de-transiciones-de-ordenes.md), [ADR 0022](docs/adr/0022-persistencia-y-consulta-base-de-ordenes.md), [ADR 0023](docs/adr/0023-validacion-del-origen-de-ordenes.md), [ADR 0024](docs/adr/0024-ajuste-justificado-de-prioridad-de-ordenes.md), [ADR 0025](docs/adr/0025-aceptacion-autorizada-y-auditada-de-propuestas.md)) | P8 |
+| `mantenimiento/` | Núcleo de transiciones/cierre/descarte con cobertura 100 %; repositorio interno de guardado y consulta paginada sin métodos de borrado; validador de existencia y correspondencia inspección/puente; DTO de lectura con MapStruct y consultas internas paginadas/detalle por puente, incluida consulta de propuestas pendientes filtrada en base de datos; ajuste interno de prioridad con justificación, conservando la sugerida. GET paginado de propuestas para Catedrático/Admin y servicio/POST de aceptación auditado con bloqueo concurrente; otras operaciones HTTP y UI pendientes ([ADR 0021](docs/adr/0021-nucleo-de-transiciones-de-ordenes.md), [ADR 0022](docs/adr/0022-persistencia-y-consulta-base-de-ordenes.md), [ADR 0023](docs/adr/0023-validacion-del-origen-de-ordenes.md), [ADR 0024](docs/adr/0024-ajuste-justificado-de-prioridad-de-ordenes.md), [ADR 0025](docs/adr/0025-aceptacion-autorizada-y-auditada-de-propuestas.md)) | P8 |
 | Los demás módulos | Tabla, migración y entidad del modelo base ([ADR 0010](docs/adr/0010-modelo-de-datos-base.md)); todavía sin servicios ni endpoints | Cada responsable |
 
 - La seguridad base (cadena de filtros JWT, `@EnableMethodSecurity`) y el inicio de sesión, la renovación, el cierre de sesión y el perfil propio ya existen. Ver [Seguridad](#seguridad) e [Inicio de sesión](#inicio-de-sesión-y-bloqueo-rn-usr-07).
 - Los contratos entre módulos y las fechas están en `docs-analisis/Equipo`.
+- Integración y prueba de lo implementado por P8: [Manual técnico de IC y mantenimiento](docs/manual-tecnico-p8.md), con API disponible, contratos Java, transacciones y dependencias pendientes.
 
 ### Aceptar una propuesta de mantenimiento (P8)
 
@@ -250,3 +251,7 @@ docker run --rm -u "$(id -u):$(id -g)" -v "$PWD":/app -v "$HOME/.m2":/var/maven/
 | `docker/login-action` | v4.6.0 |
 | `docker/setup-buildx-action` | v4.4.1 |
 | `docker/build-push-action` | v7.4.0 |
+
+### Consulta de propuestas pendientes (P8)
+
+`GET /api/v1/puentes/{puenteId}/ordenes-mantenimiento/propuestas?page=0&size=20`, solo Catedrático y Administrador (lectores confirmados por el grupo). Devuelve `puente_id`, `content`, `page`, `size`, `total_elements`, `total_pages`; únicamente PROPUESTA del puente solicitado, por ID descendente. Tamaño máximo 100; puente inexistente devuelve 404. Usa el mismo Bearer Token de la aceptación. No expone el historial completo ni genera propuestas. Ver [ADR 0026](docs/adr/0026-consulta-autorizada-de-propuestas.md) y el manual técnico enlazado arriba.

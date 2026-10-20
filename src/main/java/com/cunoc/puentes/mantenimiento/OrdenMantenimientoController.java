@@ -1,11 +1,17 @@
 package com.cunoc.puentes.mantenimiento;
 
 import com.cunoc.puentes.mantenimiento.dto.OrdenMantenimientoDTO;
+import com.cunoc.puentes.mantenimiento.dto.PaginaPropuestasDTO;
+import com.cunoc.puentes.mantenimiento.dto.PaginacionPropuestasDTO;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import java.util.UUID;
+import org.springdoc.core.annotations.ParameterObject;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -18,8 +24,34 @@ class OrdenMantenimientoController {
 
   private final OrdenMantenimientoService servicio;
 
-  OrdenMantenimientoController(OrdenMantenimientoService servicio) {
+  private final ConsultaPropuestasService consulta;
+
+  OrdenMantenimientoController(
+      OrdenMantenimientoService servicio, ConsultaPropuestasService consulta) {
     this.servicio = servicio;
+    this.consulta = consulta;
+  }
+
+  @GetMapping("/propuestas")
+  @PreAuthorize("hasAnyRole('CATEDRATICO', 'ADMINISTRADOR')")
+  @Operation(
+      summary = "Lista propuestas pendientes del puente para su aceptación",
+      description =
+          "Solo PROPUESTA, por ID descendente. page desde 0; size por defecto 20, máximo 100. "
+              + "Lectores confirmados por el equipo: Catedrático y Administrador. No expone el historial.")
+  @ApiResponse(
+      responseCode = "200",
+      description = "Página de propuestas, con puente de origen y totales filtrados")
+  @ApiResponse(responseCode = "400", description = "UUID o paginación inválidos")
+  @ApiResponse(responseCode = "401", description = "Sin sesión o token inválido")
+  @ApiResponse(
+      responseCode = "403",
+      description = "Solo Catedrático o Administrador consulta esta bandeja")
+  @ApiResponse(responseCode = "404", description = "Puente inexistente")
+  PaginaPropuestasDTO listarPropuestas(
+      @PathVariable UUID puenteId,
+      @Valid @ModelAttribute @ParameterObject PaginacionPropuestasDTO pagina) {
+    return consulta.listar(puenteId, pagina.page(), pagina.size());
   }
 
   @PostMapping("/{ordenId}/aceptacion")
