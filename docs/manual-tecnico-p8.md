@@ -7,8 +7,8 @@ Actualizado: 20/10/2026. Describe el código disponible; la integración complet
 | Pieza | Disponible | Pendiente |
 |---|---|---|
 | `indice/` | Núcleo puro, pesos normalizados, repositorios, creación Java autorizada/auditada, tres GET Admin | Adaptación real P4, publicación P5, confirmación/recálculos y creación HTTP |
-| `mantenimiento/` | Máquina, origen orden/puente/inspección, consultas de historial/detalle/propuestas, ajuste justificado de prioridad y POST de aceptación/inicio | Programación de fecha, demás operaciones HTTP, evidencia integrada, generación por catálogo y jobs |
-| Frontend P8 | Componente de condición, consulta de pesos, revisión/aceptación, bandeja, contenedor HTTP de propuestas e historial/detalle con inicio opcional | Sesión/guardias P2, rutas y conexiones pendientes; las piezas no aparecen aún en la página inicial |
+| `mantenimiento/` | Máquina, origen orden/puente/inspección, consultas de historial/detalle/propuestas, ajuste justificado de prioridad y POST de aceptación/inicio/cierre y carga/consulta paginada de evidencia P1 | Programación de fecha, descarte/ajuste HTTP, generación por catálogo y jobs |
+| Frontend P8 | Componente de condición, consulta de pesos, revisión/aceptación, bandeja, contenedor HTTP de propuestas e historial/detalle con inicio, evidencia y cierre opcionales | Sesión/guardias P2, rutas y conexiones pendientes; las piezas no aparecen aún en la página inicial |
 
 Se emplean DTO y MapStruct; las entidades JPA no se exponen por HTTP. La autorización efectiva vive en backend. La existencia de una validación interna o una columna no equivale a una operación HTTP habilitada.
 
@@ -67,6 +67,9 @@ En local: API `http://localhost:8080`; Swagger `http://localhost:8080/api/docs/s
 | `GET /api/v1/puentes/{puenteId}/ordenes-mantenimiento/propuestas` | CATEDRATICO o ADMINISTRADOR | Página de PROPUESTA del puente por ID descendente, con `puente_id` también si está vacía |
 | `POST /api/v1/puentes/{puenteId}/ordenes-mantenimiento/{ordenId}/aceptacion` | CATEDRATICO o ADMINISTRADOR | DTO de la orden aceptada, estado PROGRAMADA |
 | `POST /api/v1/puentes/{puenteId}/ordenes-mantenimiento/{ordenId}/inicio-ejecucion` | CATEDRATICO o ADMINISTRADOR | DTO persistido EN_EJECUCION; solo desde PROGRAMADA |
+| `POST /api/v1/puentes/{puenteId}/ordenes-mantenimiento/{ordenId}/evidencias` | CATEDRATICO o ADMINISTRADOR | Multipart foto/miniatura, 201 ArchivoDTO; PROGRAMADA o EN_EJECUCION |
+| `GET /api/v1/puentes/{puenteId}/ordenes-mantenimiento/{ordenId}/evidencias` | CATEDRATICO o ADMINISTRADOR | Página de JPEG/WebP no purgadas, incluso después de cerrar |
+| `POST /api/v1/puentes/{puenteId}/ordenes-mantenimiento/{ordenId}/cierre` | CATEDRATICO o ADMINISTRADOR | JSON fecha_ejecucion/responsable, 200 DTO EJECUTADA; requiere foto guardada de esta orden |
 
 Los GET paginados aceptan `page` desde 0 y `size` entre 1 y 100; valores predeterminados 0/20. La salida tiene `content`, `page`, `size`, `total_elements`, `total_pages`. Una colección existente sin registros devuelve página vacía; recurso inexistente, 404.
 
@@ -76,14 +79,15 @@ Errores en RFC 7807, con `type`, `title`, `status`, `detail` e `instance`:
 
 | Código | Significado en estas operaciones |
 |---|---|
-| 400 | UUID o parámetros de página inválidos |
+| 400 | UUID, metadatos/cuerpo obligatorio o parámetros de página inválidos |
 | 401 | Sin sesión o token inválido |
 | 403 | Rol sin permiso |
 | 404 | Formulario/juego/puente inexistente, u orden inexistente en el puente solicitado |
-| 409 | La orden ya no está en PROPUESTA para aceptar o PROGRAMADA para iniciar |
-| 422 | En aceptación/inicio, inspección de origen incompatible con el puente |
+| 409 | Estado incompatible con la operación o UUID de archivo usado en otro padre |
+| 413 | Archivo/petición supera el límite HTTP configurado |
+| 422 | Origen incompatible, firma de foto inválida, falta de fotografía guardada o responsable mayor de 150 caracteres Unicode |
 
-Propuestas, historial completo y detalle tienen GET para Catedrático y Administrador, con confirmaciones del grupo comunicadas por el usuario. Añade `puente_id` al contrato de página. Siguen pendientes creación HTTP de pesos, cierre, subida de evidencia desde P8 y recálculo HTTP. El permiso de lectura no asigna actores de escritura. El permiso de aceptación de RN-MTO-02 no se convierte automáticamente en una matriz completa de lectura o ejecución.
+Propuestas, historial completo y detalle tienen GET para Catedrático y Administrador, con confirmaciones del grupo comunicadas por el usuario. Añade `puente_id` al contrato de página. También se confirmaron los actores de evidencia y cierre y su carga en PROGRAMADA/EN_EJECUCION; están implementados. Siguen pendientes creación HTTP de pesos, descarte/ajuste, programación de fecha y recálculo HTTP. El permiso de lectura no asigna actores de escritura. El permiso de aceptación de RN-MTO-02 no se convierte automáticamente en una matriz completa de lectura o ejecución.
 
 Detalle: [ADR 0020](adr/0020-consulta-paginada-de-juegos-de-pesos.md), [ADR 0025](adr/0025-aceptacion-autorizada-y-auditada-de-propuestas.md).
 
@@ -91,7 +95,7 @@ Detalle: [ADR 0020](adr/0020-consulta-paginada-de-juegos-de-pesos.md), [ADR 0025
 
 La máquina interna admite PROPUESTA → PROGRAMADA, PROPUESTA → DESCARTADA, PROGRAMADA → EN_EJECUCION y EN_EJECUCION → EJECUTADA. CANCELADA puede leerse como histórico, pero su origen sigue pendiente y ninguna transición hacia ella está habilitada. `OrdenMantenimiento.cambiarEstado` valida antes de mutar; no existe setter público de estado.
 
-Cerrar exige fecha, responsable no vacío y una foto guardada. El contador de `DatosTransicionOrden` es interno: la futura fachada debe consultarlo mediante `ArchivoService.contarEvidencias(ordenId)`, nunca confiar en un contador del cliente. P1 ya ofrece `guardarEvidencia`, `listarEvidencias` y `contarEvidencias`; P8 aún debe conectar autorización, estado, subida y cierre. Una foto seleccionada cuya carga no terminó no satisface el mínimo.
+Cerrar exige fecha, responsable no vacío y una foto guardada. El contador de `DatosTransicionOrden` es interno: la fachada lo obtiene con `ArchivoService.contarEvidencias(ordenId)`, exclusivamente JPEG/WebP no purgadas de esa orden. P8 conecta autorización, estado, subida, consulta paginada y cierre; conserva las firmas públicas del contrato 16 y añade la consulta paginada. Una foto seleccionada cuya carga no terminó no satisface el mínimo.
 
 `OrdenMantenimientoService.aceptar` bloquea por orden y puente antes de llamar al bean auditado. Así el aspecto de P2 toma una instantánea anterior coherente con el bloqueo; cambio y auditoría se confirman o revierten juntos. Dos aceptaciones concurrentes producen una aceptación y un 409. No se escriben auditorías directamente desde P8.
 
@@ -103,6 +107,25 @@ Detalle: [ADR 0021](adr/0021-nucleo-de-transiciones-de-ordenes.md), [ADR 0022](a
 
 Inicio de ejecución: `OrdenMantenimientoService.iniciarEjecucion` reutiliza la carga/validación bloqueada y llama al bean `InicioEjecucionOrdenService` auditado. Solo PROGRAMADA → EN_EJECUCION, sin modificar fechas; actor/fecha/cambio quedan en auditoría. Dos inicios concurrentes producen 200/409 con una sola auditoría. Fallar la bitácora revierte el estado. El frontend habilita la acción con `puedeIniciar` explícito y confirma fila/detalle desde el POST, sin reintentar escrituras; sigue pendiente el host protegido de P2/P3. [ADR 0029](adr/0029-inicio-auditado-de-ejecucion-de-ordenes.md).
 
+### Prueba de evidencia y cierre con Postman
+
+Con Bearer de Catedrático/Admin y una orden real PROGRAMADA o EN_EJECUCION del puente:
+
+1. `POST .../{ordenId}/evidencias`, Body → form-data. Campos **File**: `foto` y `miniatura` (JPEG/WebP, foto comprimida y miniatura de 300 px). Campos **Text**: `id` (UUID v7 nuevo del cliente), `capturada_en` (ISO UTC, por ejemplo `2026-10-20T12:00:00Z`). Opcionales: `elemento_ref`, `latitud`, `longitud`. Deja que Postman genere Content-Type con su boundary.
+2. Comprueba 201, ID y URL firmadas; abre la miniatura/foto. Reenviar el mismo UUID en esa misma orden editable devuelve lo guardado sin duplicarlo. `GET .../{ordenId}/evidencias?page=0&size=20` devuelve solo fotos de esa orden; renovar esa consulta renueva las URL temporales.
+3. Si estaba PROGRAMADA, inicia con el POST sin cuerpo documentado arriba. Luego `POST .../{ordenId}/cierre`, Body → raw → JSON:
+
+```json
+{
+  "fecha_ejecucion": "2026-10-20",
+  "responsable": "Cuadrilla responsable de la intervención"
+}
+```
+
+4. Comprueba 200 y EJECUTADA, fecha/responsable persistidos; la consulta de evidencia sigue disponible. Cerrar sin foto guardada de esa orden: 422; repetir cierre o subir tras cerrar: 409. No se acepta un contador de fotos enviado por el navegador.
+
+Subida y cierre comparten bloqueo de fila; un cierre espera la carga en curso y evalúa su resultado confirmado. Cambio y bitácora SQL son atómicos. MinIO/S3 no participa en la transacción SQL de P1: fallos entre objetos o posteriores pueden dejar objetos sin fila confirmada; no se cuentan como evidencia. No hay máximo de fotos por orden, restricción temporal de ejecución ni notificación de cierre añadidos por P8. [ADR 0030](adr/0030-evidencia-y-cierre-autorizado-de-ordenes.md).
+
 ## 6. Conexiones pendientes del equipo
 
 | Responsable | Entrega necesaria para completar el flujo |
@@ -111,7 +134,7 @@ Inicio de ejecución: `OrdenMantenimientoService.iniciarEjecucion` reutiliza la 
 | P5 | Publicación que invoca el IC, guarda su resultado/versiones y emite el evento acordado en la misma transacción |
 | P3 | Integrar estado/Sin evaluar en lista, ficha y mapa mediante datos de inventario |
 | P2 | Sesión, interceptores y guardias frontend; aplicar los mecanismos backend existentes en cada nueva operación de P8 |
-| P1 | Reutilizar almacenamiento/captura existentes al conectar evidencia de órdenes |
+| P1 | Almacenamiento/captura reutilizados para evidencia de órdenes; conservar contrato 16 |
 | P9 | Emisor `NotificacionService` ya recibido y verificado; P8 debe integrar jobs con destinatarios/repetición acordados |
 | Equipo/catedrático | Actores pendientes de otras operaciones, catálogo daño → intervención, calibración/acta, prioridad, precisión/anulaciones y reglas temporales no especificadas |
 
@@ -119,7 +142,7 @@ El evento y las políticas pendientes son acuerdos por integrar, no clases/rutas
 
 ## 7. Verificación y entrega
 
-Verificación local del 20/10/2026, paso 3: **755 pruebas backend** sin fallos/errores/omisiones, incluidas 22 nuevas de inicio y 68 de Notificaciones recibidas. Compilación limpia, formato, PMD, empaquetado y las tres reglas JaCoCo aprobados (servicios ≥70 %, núcleo IC/máquina 100 % según sus clases configuradas). El [registro del merge de Cursos](verificacion-p8-post-merge-2026-10-20.md) conserva sus 651 casos históricos. **158 pruebas frontend**, lint, formato, compilación estricta y build aprobados; no se acredita recorrido con sesión P2 ni CI remoto.
+Verificación local del 20/10/2026, paso 4: **784 pruebas backend** sin fallos/errores/omisiones, incluidas 29 nuevas de evidencia/cierre. La entrega anterior tenía 755, con 22 de inicio y 68 de Notificaciones recibidas. Compilación limpia, formato, PMD, empaquetado y las tres reglas JaCoCo aprobados (servicios ≥70 %, núcleo IC/máquina 100 % según sus clases configuradas). El [registro del merge de Cursos](verificacion-p8-post-merge-2026-10-20.md) conserva sus 651 casos históricos. **186 pruebas frontend** (28 nuevas), lint, formato, compilación estricta y build aprobados; no se acredita recorrido con sesión P2 ni CI remoto.
 
 Desde este repositorio, con el JDK 25 de la base y Docker disponible:
 

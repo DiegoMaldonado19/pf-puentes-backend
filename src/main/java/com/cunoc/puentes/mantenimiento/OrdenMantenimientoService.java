@@ -1,6 +1,7 @@
 package com.cunoc.puentes.mantenimiento;
 
 import com.cunoc.puentes.common.NegocioException;
+import com.cunoc.puentes.mantenimiento.dto.CierreOrdenDTO;
 import com.cunoc.puentes.mantenimiento.dto.OrdenMantenimientoDTO;
 import java.util.UUID;
 import org.springframework.http.HttpStatus;
@@ -15,6 +16,7 @@ public class OrdenMantenimientoService {
   private final ValidacionOrigenOrden origen;
   private final AceptacionOrdenService aceptacion;
   private final InicioEjecucionOrdenService inicio;
+  private final CierreOrdenService cierre;
   private final OrdenMantenimientoMapper mapper;
 
   OrdenMantenimientoService(
@@ -22,11 +24,13 @@ public class OrdenMantenimientoService {
       ValidacionOrigenOrden origen,
       AceptacionOrdenService aceptacion,
       InicioEjecucionOrdenService inicio,
+      CierreOrdenService cierre,
       OrdenMantenimientoMapper mapper) {
     this.ordenes = ordenes;
     this.origen = origen;
     this.aceptacion = aceptacion;
     this.inicio = inicio;
+    this.cierre = cierre;
     this.mapper = mapper;
   }
 
@@ -47,6 +51,18 @@ public class OrdenMantenimientoService {
   public OrdenMantenimientoDTO iniciarEjecucion(UUID puenteId, UUID ordenId) {
     OrdenMantenimiento orden = obtenerBloqueada(puenteId, ordenId);
     inicio.iniciar(orden);
+    return mapper.aDTO(orden);
+  }
+
+  /** RN-MTO-05: fecha, responsable y fotografías guardadas de esta orden. */
+  @Transactional
+  @PreAuthorize("hasAnyRole('CATEDRATICO', 'ADMINISTRADOR')")
+  public OrdenMantenimientoDTO cerrar(UUID puenteId, UUID ordenId, CierreOrdenDTO datos) {
+    if (datos == null) {
+      throw new IllegalArgumentException("Los datos de cierre son obligatorios.");
+    }
+    OrdenMantenimiento orden = obtenerBloqueada(puenteId, ordenId);
+    cierre.cerrar(orden, datos);
     return mapper.aDTO(orden);
   }
 
