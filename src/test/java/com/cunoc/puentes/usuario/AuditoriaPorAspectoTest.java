@@ -72,6 +72,7 @@ class AuditoriaPorAspectoTest extends PruebaIntegracion {
         "DELETE FROM auditoria WHERE usuario_id = ? OR entidad_id IN"
             + " (SELECT id FROM usuario WHERE correo LIKE 'auditoria-%')",
         administrador);
+    jdbc.update("DELETE FROM usuario WHERE correo LIKE 'auditoria-%'");
   }
 
   @Test
