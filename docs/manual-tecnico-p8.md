@@ -7,8 +7,8 @@ Actualizado: 20/10/2026. Describe el código disponible; la integración complet
 | Pieza | Disponible | Pendiente |
 |---|---|---|
 | `indice/` | Núcleo puro, pesos normalizados, repositorios, creación Java autorizada/auditada, tres GET Admin | Adaptación real P4, publicación P5, confirmación/recálculos y creación HTTP |
-| `mantenimiento/` | Máquina, origen orden/puente/inspección, consultas internas, ajuste justificado de prioridad y GET de propuestas/POST de aceptación | Programación de fecha, demás operaciones HTTP, evidencia integrada, generación por catálogo y jobs |
-| Frontend P8 | Componente de condición, consulta de pesos, revisión/aceptación, bandeja y contenedor HTTP de consulta/recarga | Sesión/guardias P2, rutas y conexiones pendientes; las piezas no aparecen aún en la página inicial |
+| `mantenimiento/` | Máquina, origen orden/puente/inspección, consultas de historial/detalle/propuestas, ajuste justificado de prioridad y POST de aceptación | Programación de fecha, demás operaciones HTTP, evidencia integrada, generación por catálogo y jobs |
+| Frontend P8 | Componente de condición, consulta de pesos, revisión/aceptación, bandeja, contenedor HTTP de propuestas e historial/detalle | Sesión/guardias P2, rutas y conexiones pendientes; las piezas no aparecen aún en la página inicial |
 
 Se emplean DTO y MapStruct; las entidades JPA no se exponen por HTTP. La autorización efectiva vive en backend. La existencia de una validación interna o una columna no equivale a una operación HTTP habilitada.
 
@@ -62,6 +62,8 @@ En local: API `http://localhost:8080`; Swagger `http://localhost:8080/api/docs/s
 | `GET /api/v1/formularios/{formularioId}/juegos-pesos` | ADMINISTRADOR | Página de juegos de esa versión de formulario, por ID descendente |
 | `GET /api/v1/juegos-pesos/{id}` | ADMINISTRADOR | Juego: `id`, `formulario_version_id`, `acta`, `vigente_desde` |
 | `GET /api/v1/juegos-pesos/{id}/pesos` | ADMINISTRADOR | Página de elementos: `id`, `elemento_ref`, `peso`; referencia ascendente |
+| `GET /api/v1/puentes/{puenteId}/ordenes-mantenimiento` | CATEDRATICO o ADMINISTRADOR | Historial paginado de todos los estados del puente, con `puente_id`, ID descendente |
+| `GET /api/v1/puentes/{puenteId}/ordenes-mantenimiento/{ordenId}` | CATEDRATICO o ADMINISTRADOR | DTO de detalle; 404 si pertenece a otro puente o no existe |
 | `GET /api/v1/puentes/{puenteId}/ordenes-mantenimiento/propuestas` | CATEDRATICO o ADMINISTRADOR | Página de PROPUESTA del puente por ID descendente, con `puente_id` también si está vacía |
 | `POST /api/v1/puentes/{puenteId}/ordenes-mantenimiento/{ordenId}/aceptacion` | CATEDRATICO o ADMINISTRADOR | DTO de la orden aceptada, estado PROGRAMADA |
 
@@ -80,7 +82,7 @@ Errores en RFC 7807, con `type`, `title`, `status`, `detail` e `instance`:
 | 409 | La orden ya no está en PROPUESTA |
 | 422 | En aceptación, inspección de origen incompatible con el puente |
 
-La consulta de propuestas ya tiene GET para Catedrático y Administrador, según confirmación del grupo comunicada por el usuario. Añade `puente_id` al contrato de página. No existen aún GET de historial completo, creación HTTP de pesos, cierre, subida de evidencia desde P8 o recálculo HTTP. El permiso de aceptación de RN-MTO-02 no se convierte automáticamente en una matriz completa de lectura o ejecución.
+Propuestas, historial completo y detalle tienen GET para Catedrático y Administrador, con confirmaciones del grupo comunicadas por el usuario. Añade `puente_id` al contrato de página. Siguen pendientes creación HTTP de pesos, cierre, subida de evidencia desde P8 y recálculo HTTP. El permiso de lectura no asigna actores de escritura. El permiso de aceptación de RN-MTO-02 no se convierte automáticamente en una matriz completa de lectura o ejecución.
 
 Detalle: [ADR 0020](adr/0020-consulta-paginada-de-juegos-de-pesos.md), [ADR 0025](adr/0025-aceptacion-autorizada-y-auditada-de-propuestas.md).
 
@@ -92,7 +94,7 @@ Cerrar exige fecha, responsable no vacío y una foto guardada. El contador de `D
 
 `OrdenMantenimientoService.aceptar` bloquea por orden y puente antes de llamar al bean auditado. Así el aspecto de P2 toma una instantánea anterior coherente con el bloqueo; cambio y auditoría se confirman o revierten juntos. Dos aceptaciones concurrentes producen una aceptación y un 409. No se escriben auditorías directamente desde P8.
 
-`ConsultaOrdenes` es interno y devuelve DTO en transacción de solo lectura. `listarPropuestas` filtra PROPUESTA en base de datos, incluidos sus totales; el historial completo sigue disponible internamente. El repositorio no expone borrado físico. La inspección de origen es opcional; si existe, el validador comprueba que corresponda al mismo puente.
+`ConsultaOrdenes` es interno y devuelve DTO en transacción de solo lectura. `listarPropuestas` filtra PROPUESTA en base de datos, incluidos sus totales; la fachada autorizada `ConsultaOrdenesService` expone historial y detalle sin auditoría de escritura. Detalle en [ADR 0028](adr/0028-historial-y-detalle-autorizado-de-ordenes.md). El repositorio no expone borrado físico. La inspección de origen es opcional; si existe, el validador comprueba que corresponda al mismo puente.
 
 `ajustarPrioridad` conserva la sugerida y exige justificación no blanca para cambiar la vigente; no implementa la fórmula de sugerencia IC/peso ni tiene endpoint. Los roles de inicio/cierre, otros ajustes y las reglas temporales se mantienen pendientes donde el enunciado no los especifica.
 
@@ -114,7 +116,7 @@ El evento y las políticas pendientes son acuerdos por integrar, no clases/rutas
 
 ## 7. Verificación y entrega
 
-Verificación local del 20/10/2026: **651 pruebas backend** sin fallos/errores/omisiones; compilación limpia, Spotless, PMD y las tres reglas JaCoCo aprobados. Cobertura exigida: servicios ≥70 % como configuración del proyecto; núcleo IC y máquina 100 % por sus reglas específicas. Frontend: **115 unitarios**, lint, Prettier, build y compilación estricta de fuentes/pruebas/plantillas aprobados. La comprobación posterior al merge incluye 27 pruebas de Cursos y se detalla en [verificación del 20/10](verificacion-p8-post-merge-2026-10-20.md). Los 115 unitarios y controles frontend corresponden a la entrega anterior; no se repitieron en este paso documental. Las pruebas DOM/HTTP no acreditan el recorrido autenticado pendiente de P2.
+Verificación local del 20/10/2026: **665 pruebas backend** sin fallos/errores/omisiones, incluidas 14 nuevas de historial/detalle. Compilación limpia, formato, PMD, empaquetado y las tres reglas JaCoCo aprobados (servicios ≥70 %, núcleo IC/máquina 100 % según sus clases configuradas). El registro previo de [verificación del merge](verificacion-p8-post-merge-2026-10-20.md) conserva sus 651 casos históricos. **138 pruebas frontend** y sus controles de lint, formato, compilación estricta y build aprobados; el registro de 115 previo corresponde a la entrega anterior. Las pruebas DOM/HTTP frontend no acreditan el recorrido autenticado pendiente de P2.
 
 Desde este repositorio, con el JDK 25 de la base y Docker disponible:
 

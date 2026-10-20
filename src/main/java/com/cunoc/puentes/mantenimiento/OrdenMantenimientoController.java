@@ -1,8 +1,8 @@
 package com.cunoc.puentes.mantenimiento;
 
 import com.cunoc.puentes.mantenimiento.dto.OrdenMantenimientoDTO;
-import com.cunoc.puentes.mantenimiento.dto.PaginaPropuestasDTO;
-import com.cunoc.puentes.mantenimiento.dto.PaginacionPropuestasDTO;
+import com.cunoc.puentes.mantenimiento.dto.PaginaOrdenesDTO;
+import com.cunoc.puentes.mantenimiento.dto.PaginacionOrdenesDTO;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -25,11 +25,55 @@ class OrdenMantenimientoController {
   private final OrdenMantenimientoService servicio;
 
   private final ConsultaPropuestasService consulta;
+  private final ConsultaOrdenesService historial;
 
   OrdenMantenimientoController(
-      OrdenMantenimientoService servicio, ConsultaPropuestasService consulta) {
+      OrdenMantenimientoService servicio,
+      ConsultaPropuestasService consulta,
+      ConsultaOrdenesService historial) {
     this.servicio = servicio;
     this.consulta = consulta;
+    this.historial = historial;
+  }
+
+  @GetMapping
+  @PreAuthorize("hasAnyRole('CATEDRATICO', 'ADMINISTRADOR')")
+  @Operation(
+      summary = "Lista el historial de órdenes del puente, incluidos estados terminales",
+      description =
+          "Lectores confirmados: Catedrático y Administrador. Orden por ID descendente; "
+              + "page desde 0; size por defecto 20 y máximo 100. No modifica ni elimina órdenes.")
+  @ApiResponse(
+      responseCode = "200",
+      description = "Página de órdenes con puente de origen y totales")
+  @ApiResponse(responseCode = "400", description = "UUID o paginación inválidos")
+  @ApiResponse(responseCode = "401", description = "Sin sesión o token inválido")
+  @ApiResponse(
+      responseCode = "403",
+      description = "Solo Catedrático o Administrador consulta órdenes")
+  @ApiResponse(responseCode = "404", description = "Puente inexistente")
+  PaginaOrdenesDTO listar(
+      @PathVariable UUID puenteId,
+      @Valid @ModelAttribute @ParameterObject PaginacionOrdenesDTO pagina) {
+    return historial.listar(puenteId, pagina.page(), pagina.size());
+  }
+
+  @GetMapping("/{ordenId}")
+  @PreAuthorize("hasAnyRole('CATEDRATICO', 'ADMINISTRADOR')")
+  @Operation(
+      summary = "Consulta el detalle de una orden del puente indicado",
+      description =
+          "Incluye origen, prioridades, fechas y motivo disponibles. "
+              + "Una orden de otro puente devuelve 404; consultar no habilita acciones sobre ella.")
+  @ApiResponse(responseCode = "200", description = "DTO de la orden, también si es terminal")
+  @ApiResponse(responseCode = "400", description = "UUID inválido")
+  @ApiResponse(responseCode = "401", description = "Sin sesión o token inválido")
+  @ApiResponse(
+      responseCode = "403",
+      description = "Solo Catedrático o Administrador consulta órdenes")
+  @ApiResponse(responseCode = "404", description = "La orden no existe en el puente indicado")
+  OrdenMantenimientoDTO obtener(@PathVariable UUID puenteId, @PathVariable UUID ordenId) {
+    return historial.obtener(puenteId, ordenId);
   }
 
   @GetMapping("/propuestas")
@@ -48,9 +92,9 @@ class OrdenMantenimientoController {
       responseCode = "403",
       description = "Solo Catedrático o Administrador consulta esta bandeja")
   @ApiResponse(responseCode = "404", description = "Puente inexistente")
-  PaginaPropuestasDTO listarPropuestas(
+  PaginaOrdenesDTO listarPropuestas(
       @PathVariable UUID puenteId,
-      @Valid @ModelAttribute @ParameterObject PaginacionPropuestasDTO pagina) {
+      @Valid @ModelAttribute @ParameterObject PaginacionOrdenesDTO pagina) {
     return consulta.listar(puenteId, pagina.page(), pagina.size());
   }
 
