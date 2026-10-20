@@ -1,8 +1,9 @@
-# 0018. Validación de configuraciones de pesos
+# 0027. Validación de configuraciones de pesos
 
 - Estado: propuesto para revisión del equipo; modelo, validaciones y repositorios implementados
 - Fecha: 12/10/2026
 - Renumerado el 18/10/2026 tras integrar el ADR 0017 de renovación de sesión de P2.
+- Renumerado de 0018 a 0027 el 20/10/2026 tras integrar el ADR 0018 de cursos de P7; se conserva la decisión y se actualizan sus enlaces.
 - Ampliación del 18/10/2026: repositorios y pruebas de persistencia con PostgreSQL/Testcontainers.
 - Historia: HU-P8-IC-04, primera parte (modelo y validación)
 - Reglas: RN-IC-03, RN-FRM-02/03, RN-IC-08; límites de la migración `V2026_10_04_2006__crear_pesos_ic.sql`

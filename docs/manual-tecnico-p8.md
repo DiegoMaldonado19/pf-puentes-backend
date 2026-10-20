@@ -47,7 +47,7 @@ Detalle: [ADR 0016](adr/0016-nucleo-puro-del-indice-de-condicion.md).
 
 `ElementosDeDano` debe proceder de metadatos del servidor; **no puede recibirse como lista permitida declarada por el navegador**. Falta su extracción real desde P4. Los pesos se validan positivos y exactamente representables en `NUMERIC(6,3)`, con referencias no duplicadas. La referencia de acta es opcional para datos provisionales; una referencia presente no certifica una firma.
 
-La API de lectura no selecciona automáticamente un juego activo ni define la política de versiones. Detalle: [ADR 0018](adr/0018-validacion-de-configuraciones-de-pesos.md), [ADR 0019](adr/0019-creacion-transaccional-y-auditada-de-pesos.md).
+La API de lectura no selecciona automáticamente un juego activo ni define la política de versiones. Detalle: [ADR 0027](adr/0027-validacion-de-configuraciones-de-pesos.md), [ADR 0019](adr/0019-creacion-transaccional-y-auditada-de-pesos.md).
 
 ## 4. API disponible y prueba con Postman
 
@@ -114,7 +114,7 @@ El evento y las políticas pendientes son acuerdos por integrar, no clases/rutas
 
 ## 7. Verificación y entrega
 
-Verificación local del 20/10/2026: **624 pruebas backend** sin fallos/errores/omisiones; compilación limpia, Spotless, PMD y las tres reglas JaCoCo aprobados. Cobertura exigida: servicios ≥70 % como configuración del proyecto; núcleo IC y máquina 100 % por sus reglas específicas. Frontend: **115 unitarios**, lint, Prettier, build y compilación estricta de fuentes/pruebas/plantillas aprobados. Las pruebas DOM/HTTP no acreditan el recorrido autenticado pendiente de P2.
+Verificación local del 20/10/2026: **651 pruebas backend** sin fallos/errores/omisiones; compilación limpia, Spotless, PMD y las tres reglas JaCoCo aprobados. Cobertura exigida: servicios ≥70 % como configuración del proyecto; núcleo IC y máquina 100 % por sus reglas específicas. Frontend: **115 unitarios**, lint, Prettier, build y compilación estricta de fuentes/pruebas/plantillas aprobados. La comprobación posterior al merge incluye 27 pruebas de Cursos y se detalla en [verificación del 20/10](verificacion-p8-post-merge-2026-10-20.md). Los 115 unitarios y controles frontend corresponden a la entrega anterior; no se repitieron en este paso documental. Las pruebas DOM/HTTP no acreditan el recorrido autenticado pendiente de P2.
 
 Desde este repositorio, con el JDK 25 de la base y Docker disponible:
 
@@ -124,6 +124,6 @@ Desde este repositorio, con el JDK 25 de la base y Docker disponible:
 
 Los reportes están en `target/surefire-reports` y `target/site/jacoco/index.html`. Las pruebas de integración reutilizan PostgreSQL/PostGIS y MinIO de `PruebaIntegracion`, sin H2. No se deben editar archivos generados de `target/`.
 
-La última fusión local observada es `0fbe842`: trae la corrección de P1 para descargar por `GITHUB_SHA` en el deploy. Eso no incorpora contratos de P4/P5 ni cambia reglas de P8. Esta corrección no incorpora contratos de P4/P5. La conexión de propuestas se documenta en [ADR 0026](adr/0026-consulta-autorizada-de-propuestas.md); las verificaciones locales no acreditan CI remoto.
+La última fusión local verificada es `1f801da`: incorpora Cursos de P7 (`875a391`) y conserva el GET de propuestas de P8. La corrección previa de P1 (`0fbe842`) descarga por `GITHUB_SHA` en el deploy. Este merge no incorpora los contratos de P4/P5 ni la sesión frontend de P2. La conexión de propuestas se documenta en [ADR 0026](adr/0026-consulta-autorizada-de-propuestas.md); las verificaciones locales no acreditan CI remoto.
 
 Para cerrar la entrega faltan integración real, pruebas pertinentes de rol/fila, manual de usuario con capturas del recorrido disponible, exportación OpenAPI de entrega y revisión/CI/fusión del trabajo pendiente. El diccionario existente se genera desde migraciones; este documento no modifica el esquema.
