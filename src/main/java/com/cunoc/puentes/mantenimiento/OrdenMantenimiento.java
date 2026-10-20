@@ -17,6 +17,9 @@ import lombok.Setter;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class OrdenMantenimiento extends EntidadBase {
 
+  private static final MaquinaEstadosOrden MAQUINA = new MaquinaEstadosOrden();
+  private static final ReglasPrioridadOrden REGLAS_PRIORIDAD = new ReglasPrioridadOrden();
+
   private UUID puenteId;
 
   private UUID inspeccionId;
@@ -25,7 +28,7 @@ public class OrdenMantenimiento extends EntidadBase {
   private TipoOrden tipo;
 
   // DT-BE-07: solo la máquina de estados del servicio lo cambia
-  @Setter(AccessLevel.PACKAGE)
+  @Setter(AccessLevel.NONE)
   @Enumerated(EnumType.STRING)
   private EstadoOrden estado = EstadoOrden.PROPUESTA;
 
@@ -33,12 +36,15 @@ public class OrdenMantenimiento extends EntidadBase {
 
   private String elementoRef;
 
+  @Setter(AccessLevel.PACKAGE)
   @Enumerated(EnumType.STRING)
   private Prioridad prioridadSugerida;
 
+  @Setter(AccessLevel.PACKAGE)
   @Enumerated(EnumType.STRING)
   private Prioridad prioridad;
 
+  @Setter(AccessLevel.PACKAGE)
   private String justificacionPrioridad;
 
   private LocalDate fechaProgramada;
@@ -48,4 +54,31 @@ public class OrdenMantenimiento extends EntidadBase {
   private String responsable;
 
   private String motivo;
+
+  /** El futuro servicio debe autorizar y auditar el ajuste en su transacción. */
+  void ajustarPrioridad(Prioridad nueva, String justificacion) {
+    REGLAS_PRIORIDAD.validar(prioridad, nueva, justificacion);
+    if (prioridad != nueva) {
+      prioridad = nueva;
+      justificacionPrioridad = justificacion;
+    }
+  }
+
+  /**
+   * El servicio autorizado llamará esta única puerta de mutación después de obtener la evidencia.
+   */
+  void cambiarEstado(EstadoOrden destino, DatosTransicionOrden datos) {
+    MAQUINA.validar(estado, destino, datos);
+    switch (destino) {
+      case EJECUTADA -> {
+        fechaEjecucion = datos.fechaEjecucion();
+        responsable = datos.responsable();
+      }
+      case DESCARTADA -> motivo = datos.motivo();
+      default -> {
+        // Programar e iniciar conservan los datos ya registrados de la intervención.
+      }
+    }
+    estado = destino;
+  }
 }

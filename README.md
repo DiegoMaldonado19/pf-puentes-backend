@@ -2,7 +2,7 @@
 
 API REST del Sistema de Gestión de Puentes (SGP).
 
-## Estado (12/10/2026)
+## Estado (19/10/2026)
 
 | Paquete | Qué hay | Responsable |
 |---|---|---|
@@ -11,10 +11,24 @@ API REST del Sistema de Gestión de Puentes (SGP).
 | `common/seguridad/` | Seguridad stateless con JWT de acceso (15 min), rutas públicas/privadas, BCrypt 12 y 401/403 en RFC 7807 | P2 |
 | `archivo/` | Subida de fotos y PDF, borrado en borradores, URL firmadas y purga de 210 días (RN-ARC) | P1 |
 | `indice/` | Fórmula, clasificación y cuatro anulaciones con banderas normalizadas; pruebas propias, adaptación e integración pendientes ([ADR 0016](docs/adr/0016-nucleo-puro-del-indice-de-condicion.md)) | P8 |
+| Configuración de pesos (`indice/`) | Modelo, repositorios, creación interna transaccional auditada y API de consulta paginada para Admin; adaptador P4, API de creación y pantalla pendientes ([ADR 0018](docs/adr/0018-validacion-de-configuraciones-de-pesos.md), [ADR 0019](docs/adr/0019-creacion-transaccional-y-auditada-de-pesos.md), [ADR 0020](docs/adr/0020-consulta-paginada-de-juegos-de-pesos.md)) | P8 |
+| `mantenimiento/` | Núcleo de transiciones/cierre/descarte con cobertura 100 %; repositorio interno de guardado y consulta paginada sin métodos de borrado; validador de existencia y correspondencia inspección/puente; DTO de lectura con MapStruct y consultas internas paginadas/detalle por puente, incluida consulta de propuestas pendientes filtrada en base de datos; ajuste interno de prioridad con justificación, conservando la sugerida. Servicio y POST de aceptación Catedrático/Admin, auditados y con bloqueo concurrente; otras operaciones HTTP y UI pendientes ([ADR 0021](docs/adr/0021-nucleo-de-transiciones-de-ordenes.md), [ADR 0022](docs/adr/0022-persistencia-y-consulta-base-de-ordenes.md), [ADR 0023](docs/adr/0023-validacion-del-origen-de-ordenes.md), [ADR 0024](docs/adr/0024-ajuste-justificado-de-prioridad-de-ordenes.md), [ADR 0025](docs/adr/0025-aceptacion-autorizada-y-auditada-de-propuestas.md)) | P8 |
 | Los demás módulos | Tabla, migración y entidad del modelo base ([ADR 0010](docs/adr/0010-modelo-de-datos-base.md)); todavía sin servicios ni endpoints | Cada responsable |
 
 - La seguridad base (cadena de filtros JWT, `@EnableMethodSecurity`) y el inicio de sesión, la renovación, el cierre de sesión y el perfil propio ya existen. Ver [Seguridad](#seguridad) e [Inicio de sesión](#inicio-de-sesión-y-bloqueo-rn-usr-07).
 - Los contratos entre módulos y las fechas están en `docs-analisis/Equipo`.
+
+### Aceptar una propuesta de mantenimiento (P8)
+
+`POST /api/v1/puentes/{puenteId}/ordenes-mantenimiento/{ordenId}/aceptacion`
+
+- Autenticación JWT de una cuenta activa con rol **CATEDRATICO** o **ADMINISTRADOR** (RN-MTO-02).
+- Sin cuerpo. Requiere una orden persistida en PROPUESTA del puente indicado; devuelve 200 con el DTO de la orden en PROGRAMADA. Conserva fecha programada, prioridades e intervención.
+- Errores: 400 para UUID inválido, 401 sin sesión, 403 por rol, 404 si no existe en ese puente, 409 si ya no es PROPUESTA y 422 por inspección de origen incompatible.
+- El cambio y su auditoría se confirman juntos. Dos aceptaciones concurrentes producen una sola transición; la segunda recibe 409.
+- No genera propuestas de demostración. La creación desde daños depende del catálogo y de P5. El formulario para registrar/cambiar la fecha y las demás operaciones de mantenimiento siguen pendientes; aceptar no acredita por sí solo periodicidad anual.
+
+Para probarlo en Postman, usa POST a esa ruta con IDs existentes y `Authorization: Bearer <token de acceso>`; deja Body en `none`. El contrato está también en Swagger. Detalles de integración: [ADR 0025](docs/adr/0025-aceptacion-autorizada-y-auditada-de-propuestas.md).
 
 ## Desarrollo local
 
@@ -140,6 +154,7 @@ Son los mismos chequeos que corre el CI:
 - El reporte de JaCoCo queda en `target/site/jacoco/index.html`.
 - El CI falla si las clases `*Service` bajan de 70 % de líneas cubiertas (DT-CAL-01).
 - El núcleo IC (`CalificacionElemento`, `CalculadoraIndiceCondicion`, `CondicionesCriticas` y `ResultadoIndiceCondicion`) exige 100 % de líneas y ramas por clase. Sus pruebas pueden ejecutarse sin Docker; comando en el [ADR 0016](docs/adr/0016-nucleo-puro-del-indice-de-condicion.md).
+- `PesoConfigurado` y `JuegoPesos` también exigen 100 % de líneas y ramas; validan configuraciones antes de añadir el servicio de persistencia ([ADR 0018](docs/adr/0018-validacion-de-configuraciones-de-pesos.md)).
 
 ## Despliegue
 
