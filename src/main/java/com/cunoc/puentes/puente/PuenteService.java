@@ -4,6 +4,7 @@ import com.cunoc.puentes.common.NegocioException;
 import com.cunoc.puentes.common.auditoria.Acciones;
 import com.cunoc.puentes.common.auditoria.Auditable;
 import com.cunoc.puentes.puente.dto.CrearPuenteDTO;
+import com.cunoc.puentes.puente.dto.DarDeBajaPuenteDTO;
 import com.cunoc.puentes.puente.dto.EditarPuenteDTO;
 import com.cunoc.puentes.puente.dto.PaginaPuentesDTO;
 import com.cunoc.puentes.puente.dto.PuenteCercanoDTO;
@@ -78,6 +79,26 @@ public class PuenteService {
     puente.setRuta(datos.ruta().strip());
     puente.setUbicacion(punto(datos.latitud(), datos.longitud()));
     puente.setAnioConstruccion(datos.anioConstruccion());
+    return mapper.aDTO(puente);
+  }
+
+  /** RN-INV-08: baja lógica con motivo; nunca se borra la fila (DT-BD-11). */
+  @Auditable(
+      accion = Acciones.DAR_DE_BAJA,
+      entidad = "puente",
+      entidadId = "#id",
+      motivo = "#datos.motivo()")
+  public PuenteDTO darDeBaja(UUID id, DarDeBajaPuenteDTO datos) {
+    Puente puente = existente(id, true);
+    if (!puente.isActivo()) {
+      throw new NegocioException(
+          HttpStatus.CONFLICT,
+          "puente-dado-de-baja",
+          "Puente dado de baja",
+          "El puente ya estaba dado de baja.");
+    }
+    puente.setActivo(false);
+    puente.setMotivoBaja(datos.motivo().strip());
     return mapper.aDTO(puente);
   }
 

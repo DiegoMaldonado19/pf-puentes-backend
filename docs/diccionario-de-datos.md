@@ -459,6 +459,7 @@ Inventario permanente: un registro por puente, nunca por visita (RN-INV-01)
 - `CHECK (((codigo)::text ~ '^GT-[0-9]{2}-[0-9]{2,4}-[0-9]{4}$'::text))`
 - `CHECK (((estado_actual)::text = ANY ((ARRAY['BUENO'::character varying, 'REGULAR'::character varying, 'MALO'::character varying])::text[])))`
 - `CHECK (((indice_condicion_actual >= (0)::numeric) AND (indice_condicion_actual <= (100)::numeric)))`
+- `CHECK (((motivo_baja IS NULL) OR (btrim(motivo_baja) <> ''::text)))`
 
 ## recalculo_ic
 
@@ -533,12 +534,14 @@ Solicitudes de alta de un Catedrático, pendientes de un Administrador (RN-INV-0
 | `puente_id` | uuid | Sí |  | FK → puente | Puente creado al aprobarla |
 | `creado_en` | timestamp with time zone | No | now() |  | Fecha de la solicitud, en UTC |
 | `actualizado_en` | timestamp with time zone | No | now() |  | Última modificación, en UTC |
+| `motivo_rechazo` | character varying(500) | Sí |  |  | Motivo escrito por el Administrador al rechazar; obligatorio si está RECHAZADA (RN-INV-07) |
 
 **Restricciones**
 
 - `CHECK ((((estado)::text <> 'APROBADA'::text) OR (puente_id IS NOT NULL)))`
 - `CHECK ((((estado)::text = 'PENDIENTE'::text) OR (administrador_id IS NOT NULL)))`
 - `CHECK (((estado)::text = ANY ((ARRAY['PENDIENTE'::character varying, 'APROBADA'::character varying, 'RECHAZADA'::character varying])::text[])))`
+- `CHECK ((((estado)::text <> 'RECHAZADA'::text) OR (btrim((COALESCE(motivo_rechazo, ''::character varying))::text) <> ''::text)))`
 
 ## token_renovacion
 

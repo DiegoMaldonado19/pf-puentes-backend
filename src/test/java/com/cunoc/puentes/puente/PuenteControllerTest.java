@@ -221,6 +221,44 @@ class PuenteControllerTest {
         .andExpect(status().isOk());
   }
 
+  @ParameterizedTest
+  @EnumSource(
+      value = Rol.class,
+      names = {"ESTUDIANTE", "PROFESIONAL_EXTERNO", "CATEDRATICO"})
+  void soloElAdministradorDaDeBaja(Rol rol) throws Exception {
+    mvc.perform(
+            post("/api/v1/puentes/" + ID + "/baja")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"motivo\": \"Demolido\"}")
+                .with(como(rol)))
+        .andExpect(status().isForbidden());
+    mvc.perform(
+            post("/api/v1/puentes/" + ID + "/baja")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"motivo\": \"Demolido\"}"))
+        .andExpect(status().isUnauthorized());
+    verifyNoInteractions(servicio);
+  }
+
+  @Test
+  void elAdministradorDaDeBajaConMotivoObligatorio() throws Exception {
+    when(servicio.darDeBaja(eq(ID), any())).thenReturn(PUENTE);
+
+    mvc.perform(
+            post("/api/v1/puentes/" + ID + "/baja")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"motivo\": \" \"}")
+                .with(como(Rol.ADMINISTRADOR)))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.errores[0].campo").value("motivo"));
+    mvc.perform(
+            post("/api/v1/puentes/" + ID + "/baja")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"motivo\": \"Demolido\"}")
+                .with(como(Rol.ADMINISTRADOR)))
+        .andExpect(status().isOk());
+  }
+
   @Test
   void validaObligatoriosYRangos() throws Exception {
     mvc.perform(
