@@ -1,9 +1,11 @@
 package com.cunoc.puentes.mantenimiento;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.catchThrowable;
 
 import com.cunoc.puentes.PruebaIntegracion;
+import com.cunoc.puentes.common.NegocioException;
 import java.lang.reflect.Method;
 import java.time.LocalDate;
 import java.util.Arrays;
@@ -145,6 +147,51 @@ class OrdenMantenimientoRepositoryTest extends PruebaIntegracion {
             leida -> {
               assertThat(leida.getEstado()).isEqualTo(EstadoOrden.PROGRAMADA);
               assertThat(leida.getFechaProgramada()).isEqualTo(LocalDate.of(2026, 10, 25));
+            });
+  }
+
+  @Test
+  void persisteElAjusteJustificadoSinReemplazarLaSugerencia() {
+    OrdenMantenimiento orden = nueva(PUENTE_A, TipoOrden.CORRECTIVO);
+    orden.setPrioridadSugerida(Prioridad.MEDIA);
+    UUID id = guardar(orden).getId();
+    em.clear();
+
+    OrdenMantenimiento existente = repositorio.findById(id).orElseThrow();
+    existente.ajustarPrioridad(Prioridad.ALTA, "Se requiere atención prioritaria");
+    guardar(existente);
+    em.clear();
+
+    assertThat(repositorio.findById(id))
+        .hasValueSatisfying(
+            leida -> {
+              assertThat(leida.getPrioridadSugerida()).isEqualTo(Prioridad.MEDIA);
+              assertThat(leida.getPrioridad()).isEqualTo(Prioridad.ALTA);
+              assertThat(leida.getJustificacionPrioridad())
+                  .isEqualTo("Se requiere atención prioritaria");
+              assertThat(leida.getEstado()).isEqualTo(EstadoOrden.PROPUESTA);
+            });
+  }
+
+  @Test
+  void rechazarUnAjusteNoDejaCambiosParaElFlushDeUnaEntidadGestionada() {
+    OrdenMantenimiento orden = nueva(PUENTE_A, TipoOrden.PREVENTIVO);
+    orden.setPrioridadSugerida(Prioridad.MEDIA);
+    UUID id = guardar(orden).getId();
+    em.clear();
+    OrdenMantenimiento existente = repositorio.findById(id).orElseThrow();
+
+    assertThatThrownBy(() -> existente.ajustarPrioridad(Prioridad.BAJA, " \t"))
+        .isInstanceOf(NegocioException.class);
+    em.flush();
+    em.clear();
+
+    assertThat(repositorio.findById(id))
+        .hasValueSatisfying(
+            leida -> {
+              assertThat(leida.getPrioridadSugerida()).isEqualTo(Prioridad.MEDIA);
+              assertThat(leida.getPrioridad()).isEqualTo(Prioridad.MEDIA);
+              assertThat(leida.getJustificacionPrioridad()).isNull();
             });
   }
 

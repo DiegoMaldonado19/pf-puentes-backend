@@ -37,3 +37,7 @@ La ejecución Maven `check-maquina-orden` exige 100 % de líneas y ramas **por c
 ## Pendientes
 
 Las cuatro HU quedan en progreso por piezas compartidas; ninguna se cierra con el núcleo. Falta servicio/repositorio con permisos y auditoría, evidencia real con pertenencia a la orden, persistencia/transacciones, acuerdos de programación/cancelación/ejecutor y API/UI. MTO-01/02, generación desde publicación, catálogo y prioridades no se implementan aquí. Las entidades antiguas con CANCELADA siguen siendo representables sin habilitar una transición aún no acordada.
+
+## Integración posterior — 19/10/2026
+
+La aceptación PROPUESTA → PROGRAMADA ya dispone de fachada autorizada, auditoría y POST con los roles explícitos de RN-MTO-02; ver [ADR 0025](0025-aceptacion-autorizada-y-auditada-de-propuestas.md). Las referencias anteriores a ausencia de servicios/API describen el punto de partida de este ADR. La consulta general y las demás operaciones mantienen sus pendientes; no se introduce un filtro de mantenimiento por curso no prescrito por el enunciado.
