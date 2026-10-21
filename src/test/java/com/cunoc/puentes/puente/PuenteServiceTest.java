@@ -11,6 +11,7 @@ import static org.mockito.Mockito.when;
 import com.cunoc.puentes.common.NegocioException;
 import com.cunoc.puentes.indice.EstadoCondicion;
 import com.cunoc.puentes.puente.dto.CrearPuenteDTO;
+import com.cunoc.puentes.puente.dto.DarDeBajaPuenteDTO;
 import com.cunoc.puentes.puente.dto.EditarPuenteDTO;
 import com.cunoc.puentes.puente.dto.PuenteCercanoDTO;
 import com.cunoc.puentes.puente.dto.PuenteDTO;
@@ -198,6 +199,32 @@ class PuenteServiceTest {
       when(cercanos.buscar(14.84, -91.52, ID)).thenReturn(List.of(CERCANO));
 
       esError(() -> servicio().editar(ID, cambios), HttpStatus.CONFLICT, "posible-duplicado");
+    }
+  }
+
+  @Nested
+  class DarDeBaja {
+
+    @Test
+    void marcaInactivoConElMotivoSinBorrar() {
+      when(puentes.findConCatalogoById(ID)).thenReturn(Optional.of(puente(true)));
+
+      PuenteDTO baja = servicio().darDeBaja(ID, new DarDeBajaPuenteDTO("  Demolido  "));
+
+      assertThat(baja.activo()).isFalse();
+      assertThat(baja.motivoBaja()).isEqualTo("Demolido");
+      verify(puentes, never()).delete(any(Puente.class));
+      verify(puentes, never()).deleteById(any());
+    }
+
+    @Test
+    void unaSegundaBajaEs409() {
+      when(puentes.findConCatalogoById(ID)).thenReturn(Optional.of(puente(false)));
+
+      esError(
+          () -> servicio().darDeBaja(ID, new DarDeBajaPuenteDTO("Otra vez")),
+          HttpStatus.CONFLICT,
+          "puente-dado-de-baja");
     }
   }
 

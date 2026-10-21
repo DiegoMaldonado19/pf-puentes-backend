@@ -2,6 +2,7 @@ package com.cunoc.puentes.puente;
 
 import com.cunoc.puentes.common.NegocioException;
 import com.cunoc.puentes.puente.dto.CrearPuenteDTO;
+import com.cunoc.puentes.puente.dto.DarDeBajaPuenteDTO;
 import com.cunoc.puentes.puente.dto.EditarPuenteDTO;
 import com.cunoc.puentes.puente.dto.PaginaPuentesDTO;
 import com.cunoc.puentes.puente.dto.PuenteCercanoDTO;
@@ -209,6 +210,41 @@ class PuenteController {
   @PreAuthorize("hasRole('ADMINISTRADOR')")
   PuenteDTO editar(@PathVariable UUID id, @Valid @RequestBody EditarPuenteDTO datos) {
     return servicio.editar(id, datos);
+  }
+
+  @Operation(
+      summary = "Da de baja un puente",
+      description =
+          "Baja lógica con motivo obligatorio (RN-INV-08). El puente deja de verse en el listado"
+              + " público; sus inspecciones se conservan.")
+  @ApiResponse(
+      responseCode = "200",
+      description = "Puente dado de baja",
+      content = @Content(schema = @Schema(implementation = PuenteDTO.class)))
+  @ApiResponse(
+      responseCode = "400",
+      description = "Falta el motivo",
+      content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
+  @ApiResponse(
+      responseCode = "401",
+      description = "Sin sesión",
+      content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
+  @ApiResponse(
+      responseCode = "403",
+      description = "No es Administrador",
+      content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
+  @ApiResponse(
+      responseCode = "404",
+      description = "El puente no existe",
+      content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
+  @ApiResponse(
+      responseCode = "409",
+      description = "Ya estaba dado de baja",
+      content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
+  @PostMapping(path = "/{id}/baja", consumes = MediaType.APPLICATION_JSON_VALUE)
+  @PreAuthorize("hasRole('ADMINISTRADOR')")
+  PuenteDTO darDeBaja(@PathVariable UUID id, @Valid @RequestBody DarDeBajaPuenteDTO datos) {
+    return servicio.darDeBaja(id, datos);
   }
 
   private static boolean esAdministrador(Authentication usuario) {
