@@ -39,6 +39,8 @@ public abstract class PruebaIntegracion {
     registry.add("spring.flyway.user", POSTGRES::getUsername);
     registry.add("spring.flyway.password", POSTGRES::getPassword);
     registry.add("sgp.jwt.secreto", () -> "clave-de-pruebas-de-al-menos-32-bytes!");
+    // Misma IP en toda la suite: el tope real se prueba en LimitadorDeTasa*
+    registry.add("sgp.limite-tasa.reglas", () -> "");
     registry.add("sgp.minio.url", MINIO::getS3URL);
     registry.add("sgp.minio.url-publica", MINIO::getS3URL);
     registry.add("sgp.minio.usuario", MINIO::getUserName);

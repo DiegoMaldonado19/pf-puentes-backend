@@ -1,13 +1,27 @@
 package com.cunoc.puentes.usuario;
 
+import jakarta.persistence.LockModeType;
 import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 
-interface UsuarioRepository extends JpaRepository<Usuario, UUID> {
+interface UsuarioRepository
+    extends JpaRepository<Usuario, UUID>, JpaSpecificationExecutor<Usuario> {
+
+  /**
+   * La cuenta con su fila bloqueada hasta el fin de la transacción: cambios de estado sin carreras.
+   */
+  @Lock(LockModeType.PESSIMISTIC_WRITE)
+  @Query("SELECT u FROM Usuario u WHERE u.id = :id")
+  Optional<Usuario> bloquear(UUID id);
+
+  // RN-USR-08: no dejar el sistema sin un administrador activo
+  long countByRolAndEstado(Rol rol, EstadoUsuario estado);
 
   // lower(...) en ambos lados: es la expresión de usuario_correo_uk, así que usa su índice
   @Query("SELECT u FROM Usuario u WHERE lower(u.correo) = lower(:correo)")

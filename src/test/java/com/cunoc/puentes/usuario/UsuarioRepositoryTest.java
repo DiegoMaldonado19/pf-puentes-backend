@@ -15,6 +15,10 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
 import org.springframework.boot.jpa.test.autoconfigure.TestEntityManager;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
 
 @DataJpaTest
 class UsuarioRepositoryTest extends PruebaIntegracion {
@@ -116,6 +120,58 @@ class UsuarioRepositoryTest extends PruebaIntegracion {
     assertThat(repositorio.buscarRolActivo(pendiente.getId())).isEmpty();
     assertThat(repositorio.buscarRolActivo(inactiva.getId())).isEmpty();
     assertThat(repositorio.buscarRolActivo(UUID.randomUUID())).isEmpty();
+  }
+
+  @Test
+  void bloqueaLaCuentaPorSuIdDentroDeLaTransaccion() {
+    Usuario ana = repositorio.saveAndFlush(Cuentas.estudiante("ana@correo.com"));
+    em.clear();
+
+    assertThat(repositorio.bloquear(ana.getId()))
+        .hasValueSatisfying(usuario -> assertThat(usuario.getCorreo()).isEqualTo("ana@correo.com"));
+    assertThat(repositorio.bloquear(UUID.randomUUID())).isEmpty();
+  }
+
+  @Test
+  void cuentaSoloLasCuentasDelRolEnElEstadoPedido() {
+    long activosAntes = repositorio.countByRolAndEstado(Rol.ADMINISTRADOR, EstadoUsuario.ACTIVO);
+    long inactivosAntes =
+        repositorio.countByRolAndEstado(Rol.ADMINISTRADOR, EstadoUsuario.INACTIVO);
+    repositorio.saveAndFlush(Cuentas.administrador("admin1@correo.com"));
+    repositorio.saveAndFlush(Cuentas.administrador("admin2@correo.com"));
+    Usuario inactivo = Cuentas.administrador("admin3@correo.com");
+    inactivo.setEstado(EstadoUsuario.INACTIVO);
+    inactivo.setDesactivadoEn(AHORA);
+    inactivo.setMotivoBaja("Baja de prueba");
+    repositorio.saveAndFlush(inactivo);
+    repositorio.saveAndFlush(Cuentas.estudiante("estudiante@correo.com"));
+
+    long activos = repositorio.countByRolAndEstado(Rol.ADMINISTRADOR, EstadoUsuario.ACTIVO);
+    long inactivos = repositorio.countByRolAndEstado(Rol.ADMINISTRADOR, EstadoUsuario.INACTIVO);
+
+    assertThat(activos - activosAntes).isEqualTo(2);
+    assertThat(inactivos - inactivosAntes).isEqualTo(1);
+  }
+
+  @Test
+  void filtraYPaginaConEspecificaciones() {
+    repositorio.saveAndFlush(Cuentas.estudiante("filtro1@correo.com"));
+    repositorio.saveAndFlush(Cuentas.estudiante("filtro2@correo.com"));
+    repositorio.saveAndFlush(Cuentas.administrador("filtro3@correo.com"));
+    em.clear();
+    Specification<Usuario> estudiantesDelFiltro =
+        (raiz, consulta, cb) ->
+            cb.and(
+                cb.equal(raiz.get("rol"), Rol.ESTUDIANTE), cb.like(raiz.get("correo"), "filtro%"));
+
+    Page<Usuario> pagina =
+        repositorio.findAll(estudiantesDelFiltro, PageRequest.of(0, 1, Sort.by("correo")));
+
+    assertThat(pagina.getTotalElements()).isEqualTo(2);
+    assertThat(pagina.getContent())
+        .singleElement()
+        .extracting(Usuario::getCorreo)
+        .isEqualTo("filtro1@correo.com");
   }
 
   @Test

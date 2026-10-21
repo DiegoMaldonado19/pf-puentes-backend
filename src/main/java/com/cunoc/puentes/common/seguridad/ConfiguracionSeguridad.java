@@ -1,6 +1,7 @@
 package com.cunoc.puentes.common.seguridad;
 
 import com.cunoc.puentes.usuario.EstadoCuentaService;
+import java.time.Clock;
 import java.util.List;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
@@ -50,7 +51,8 @@ class ConfiguracionSeguridad {
       EstadoCuentaService cuentas,
       JsonMapper json,
       Environment entorno,
-      @Value("${sgp.seguridad.rutas-publicas:}") List<String> rutasPublicas)
+      @Value("${sgp.seguridad.rutas-publicas:}") List<String> rutasPublicas,
+      @Value("${sgp.limite-tasa.reglas:}") List<String> reglasTasa)
       throws Exception {
     RespuestasSeguridad respuestas = new RespuestasSeguridad(json);
     return http.csrf(AbstractHttpConfigurer::disable) // API stateless con Authorization
@@ -63,6 +65,9 @@ class ConfiguracionSeguridad {
             e ->
                 e.authenticationEntryPoint(respuestas.noAutenticado())
                     .accessDeniedHandler(respuestas.accesoDenegado()))
+        .addFilterBefore(
+            new LimitadorDeTasa(reglasTasa, Clock.systemUTC(), respuestas),
+            UsernamePasswordAuthenticationFilter.class)
         .addFilterBefore(new FiltroJwt(tokens, cuentas), UsernamePasswordAuthenticationFilter.class)
         .authorizeHttpRequests(
             rutas -> {
