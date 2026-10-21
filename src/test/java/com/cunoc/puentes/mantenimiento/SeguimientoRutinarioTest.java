@@ -13,6 +13,7 @@ import com.cunoc.puentes.common.seguridad.TokenService;
 import com.cunoc.puentes.usuario.Rol;
 import java.time.Clock;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.time.ZoneOffset;
 import java.util.List;
 import java.util.UUID;
@@ -45,6 +46,7 @@ class SeguimientoRutinarioTest extends PruebaIntegracion {
   @Autowired JdbcTemplate jdbc;
   @Autowired TokenService tokens;
   @Autowired SeguimientoRutinarioService servicio;
+  @Autowired SeguimientoRutinarioRepository seguimiento;
 
   @MockitoBean(name = "relojMantenimiento")
   Clock reloj;
@@ -61,8 +63,9 @@ class SeguimientoRutinarioTest extends PruebaIntegracion {
   @AfterEach
   void limpiar() {
     SecurityContextHolder.clearContext();
-    jdbc.update("DELETE FROM orden_mantenimiento WHERE puente_id IN (?, ?)", PUENTE, id(2));
-    jdbc.update("DELETE FROM puente WHERE id IN (?, ?)", PUENTE, id(2));
+    jdbc.update(
+        "DELETE FROM orden_mantenimiento WHERE puente_id IN (SELECT id FROM puente WHERE municipio_codigo = '9191')");
+    jdbc.update("DELETE FROM puente WHERE municipio_codigo = '9191'");
     jdbc.update("DELETE FROM usuario WHERE id = ?", id(6));
     jdbc.update("DELETE FROM usuario WHERE correo LIKE '%@anual-prueba.com'");
     jdbc.update("DELETE FROM municipio WHERE codigo = '9191'");
@@ -218,6 +221,69 @@ class SeguimientoRutinarioTest extends PruebaIntegracion {
                 ADMIN,
                 id(4)))
         .isZero();
+  }
+
+  @Test
+  void deteccionPorLotesCoincideConElResumenYConservaLosPuentesSinProgramacion() {
+    LocalDate hoy = LocalDate.of(2026, 2, 28);
+    assertThat(seguimiento.sinProgramacion(null, hoy)).contains(id(2)).doesNotContain(PUENTE);
+    autenticar(Rol.ADMINISTRADOR, ADMIN);
+    assertThat(servicio.consultar(PUENTE, 0, 20).programadasEnPlazo()).isEqualTo(2);
+    assertThat(servicio.consultar(id(2), 0, 20).programadasEnPlazo()).isZero();
+    jdbc.update(
+        "UPDATE orden_mantenimiento SET fecha_programada = NULL WHERE id IN (?,?)", id(13), id(14));
+    assertThat(seguimiento.sinProgramacion(null, hoy)).contains(PUENTE, id(2));
+    assertThat(servicio.consultar(PUENTE, 0, 20).programadasEnPlazo()).isZero();
+  }
+
+  @Test
+  void deteccionNoConfundePropuestasFechasPasadasOFechasPosterioresConProgramacionValida() {
+    jdbc.update(
+        "UPDATE orden_mantenimiento SET fecha_programada = '2026-03-02' WHERE id = ?", id(13));
+    jdbc.update(
+        "UPDATE orden_mantenimiento SET fecha_programada = '2026-02-27' WHERE id = ?", id(14));
+    assertThat(seguimiento.sinProgramacion(null, LocalDate.of(2026, 2, 28))).contains(PUENTE);
+    jdbc.update(
+        "UPDATE orden_mantenimiento SET fecha_programada = '2026-03-01' WHERE id = ?", id(14));
+    assertThat(seguimiento.sinProgramacion(null, LocalDate.of(2026, 2, 28))).doesNotContain(PUENTE);
+  }
+
+  @Test
+  void deteccionRespetaLimiteInclusivoYElDiaPosterior() {
+    assertThat(seguimiento.sinProgramacion(null, LocalDate.of(2026, 3, 1))).doesNotContain(PUENTE);
+    assertThat(seguimiento.sinProgramacion(null, LocalDate.of(2026, 3, 2))).contains(PUENTE);
+  }
+
+  @Test
+  void deteccionUsaElMismoAnioBisiestoQueLaConsulta() {
+    jdbc.update(
+        "UPDATE orden_mantenimiento SET fecha_ejecucion = '2024-02-29' WHERE id = ?", id(10));
+    jdbc.update(
+        "UPDATE orden_mantenimiento SET fecha_ejecucion = '2024-01-01' WHERE id = ?", id(11));
+    jdbc.update(
+        "UPDATE orden_mantenimiento SET fecha_programada = '2025-02-28' WHERE id = ?", id(13));
+    jdbc.update("UPDATE orden_mantenimiento SET fecha_programada = NULL WHERE id = ?", id(14));
+    assertThat(seguimiento.sinProgramacion(null, LocalDate.of(2025, 2, 28))).doesNotContain(PUENTE);
+    assertThat(seguimiento.sinProgramacion(null, LocalDate.of(2025, 3, 1))).contains(PUENTE);
+  }
+
+  @Test
+  void deteccionRecorreMasDeCienPuentesSinDuplicadosNiOmisiones() {
+    jdbc.update(
+        """
+        INSERT INTO puente (id,codigo,nombre,municipio_codigo,ruta,ubicacion,creado_en)
+        SELECT ('019a0035-0000-7000-8000-' || lpad(n::text,12,'0'))::uuid,
+          'GT-91-9191-' || n, 'Puente ficticio', '9191', 'Ruta ficticia',
+          'SRID=4326;POINT(-90.51 14.62)', '2026-01-01T00:00:00Z'
+        FROM generate_series(1000,1100) n
+        """);
+    LocalDate hoy = LocalDate.of(2026, 2, 28);
+    var primera = seguimiento.sinProgramacion(null, hoy);
+    var segunda = seguimiento.sinProgramacion(primera.getLast(), hoy);
+    assertThat(primera).hasSize(100).doesNotHaveDuplicates();
+    assertThat(segunda).hasSize(2).doesNotHaveDuplicates().doesNotContainAnyElementsOf(primera);
+    assertThat(seguimiento.sinProgramacion(segunda.getLast(), hoy)).isEmpty();
+    assertThat(primera).contains(id(2)).doesNotContain(PUENTE);
   }
 
   private static void autenticar(Rol rol, UUID usuario) {

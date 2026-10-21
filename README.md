@@ -2,6 +2,8 @@
 
 ### Seguimiento rutinario anual (P8, 21/10/2026)
 
+La detección interna permite recorrer, en lotes de 100 y con cursor, los puentes sin programación dentro del plazo, con la misma regla del resumen. DT-BE-14 respalda recordatorios y Backend/04 revisión diaria; destinatarios/disparo/repetición siguen pendientes. No activa el job ni genera avisos/propuestas, endpoint o cambio frontend. Verificación: **1110 pruebas backend**, cinco nuevas, más compilación limpia, Spotless, PMD, empaquetado y tres reglas JaCoCo aprobados.
+
 `GET /api/v1/puentes/{puenteId}/ordenes-mantenimiento/rutinario-anual?page=0&size=20` entrega a Catedrático/Admin la referencia (última ejecución rutinaria o registro sin ejecuciones), límite de un año y página de rutinarias PROGRAMADA/EN_EJECUCION. Base confirmada por el grupo según reporte del usuario; roles/criterio de consulta adoptados por delegación del usuario para los detalles no precisados en RN-MTO-07.
 
 Conteos globales de fechas dentro de la ventana inclusiva hoy–límite, ausencia de fecha, fechas pasadas y posteriores al límite. Los dos últimos indicadores pueden coincidir: no se suman. No se infiere ejecución ni se crean órdenes/avisos desde la consulta. Máximo 100 por página, 400/401/403/404 documentados. [ADR 0035](docs/adr/0035-consulta-del-seguimiento-rutinario-anual.md) y [manual con prueba Postman](docs/manual-tecnico-p8.md).
