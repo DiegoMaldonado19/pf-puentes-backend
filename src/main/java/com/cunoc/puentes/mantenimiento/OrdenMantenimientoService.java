@@ -3,6 +3,7 @@ package com.cunoc.puentes.mantenimiento;
 import com.cunoc.puentes.common.NegocioException;
 import com.cunoc.puentes.mantenimiento.dto.CierreOrdenDTO;
 import com.cunoc.puentes.mantenimiento.dto.OrdenMantenimientoDTO;
+import java.time.LocalDate;
 import java.util.UUID;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -19,6 +20,7 @@ public class OrdenMantenimientoService {
   private final CierreOrdenService cierre;
   private final DescarteOrdenService descarte;
   private final AjustePrioridadOrdenService prioridades;
+  private final ProgramacionOrdenService programacion;
   private final OrdenMantenimientoMapper mapper;
 
   OrdenMantenimientoService(
@@ -29,6 +31,7 @@ public class OrdenMantenimientoService {
       CierreOrdenService cierre,
       DescarteOrdenService descarte,
       AjustePrioridadOrdenService prioridades,
+      ProgramacionOrdenService programacion,
       OrdenMantenimientoMapper mapper) {
     this.ordenes = ordenes;
     this.origen = origen;
@@ -37,6 +40,7 @@ public class OrdenMantenimientoService {
     this.cierre = cierre;
     this.descarte = descarte;
     this.prioridades = prioridades;
+    this.programacion = programacion;
     this.mapper = mapper;
   }
 
@@ -88,6 +92,15 @@ public class OrdenMantenimientoService {
       UUID puenteId, UUID ordenId, Prioridad prioridad, String justificacion) {
     OrdenMantenimiento orden = obtenerBloqueada(puenteId, ordenId);
     prioridades.ajustar(orden, prioridad, justificacion);
+    return mapper.aDTO(orden);
+  }
+
+  /** Fecha operativa para una orden aceptada; no sustituye aceptación ni control anual. */
+  @Transactional
+  @PreAuthorize("hasAnyRole('CATEDRATICO', 'ADMINISTRADOR')")
+  public OrdenMantenimientoDTO programarFecha(UUID puenteId, UUID ordenId, LocalDate fecha) {
+    OrdenMantenimiento orden = obtenerBloqueada(puenteId, ordenId);
+    programacion.programar(orden, fecha);
     return mapper.aDTO(orden);
   }
 

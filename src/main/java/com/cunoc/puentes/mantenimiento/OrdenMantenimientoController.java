@@ -5,6 +5,7 @@ import com.cunoc.puentes.mantenimiento.dto.DescartarOrdenDTO;
 import com.cunoc.puentes.mantenimiento.dto.OrdenMantenimientoDTO;
 import com.cunoc.puentes.mantenimiento.dto.PaginaOrdenesDTO;
 import com.cunoc.puentes.mantenimiento.dto.PaginacionOrdenesDTO;
+import com.cunoc.puentes.mantenimiento.dto.ProgramarFechaDTO;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -196,5 +197,34 @@ class OrdenMantenimientoController {
       @PathVariable UUID ordenId,
       @Valid @RequestBody AjustarPrioridadDTO datos) {
     return servicio.ajustarPrioridad(puenteId, ordenId, datos.prioridad(), datos.justificacion());
+  }
+
+  @PatchMapping(path = "/{ordenId}/fecha-programada", consumes = "application/json")
+  @PreAuthorize("hasAnyRole('CATEDRATICO', 'ADMINISTRADOR')")
+  @Operation(
+      summary = "Registra o cambia la fecha de una orden PROGRAMADA",
+      description =
+          "Catedrático/Admin, solo PROGRAMADA según decisión del usuario. Fecha civil ISO obligatoria; "
+              + "sin restricciones temporales adicionales. Conserva estado, prioridades, origen y evidencia. "
+              + "Cada cambio se audita; repetir la misma fecha devuelve lo guardado sin nueva auditoría. "
+              + "No acepta propuestas, inicia ejecución ni certifica por sí solo periodicidad anual.")
+  @ApiResponse(responseCode = "200", description = "DTO con fecha programada persistida")
+  @ApiResponse(
+      responseCode = "400",
+      description = "UUID, fecha ausente o formato de fecha inválidos")
+  @ApiResponse(responseCode = "401", description = "Sin sesión o token inválido")
+  @ApiResponse(
+      responseCode = "403",
+      description = "Solo Catedrático o Administrador programa fechas")
+  @ApiResponse(responseCode = "404", description = "La orden no existe en el puente indicado")
+  @ApiResponse(responseCode = "409", description = "La orden ya no está en PROGRAMADA")
+  @ApiResponse(
+      responseCode = "422",
+      description = "Inspección de origen incompatible con el puente")
+  OrdenMantenimientoDTO programarFecha(
+      @PathVariable UUID puenteId,
+      @PathVariable UUID ordenId,
+      @Valid @RequestBody ProgramarFechaDTO datos) {
+    return servicio.programarFecha(puenteId, ordenId, datos.fechaProgramada());
   }
 }
