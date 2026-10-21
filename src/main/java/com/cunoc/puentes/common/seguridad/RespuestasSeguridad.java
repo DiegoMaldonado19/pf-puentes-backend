@@ -46,6 +46,22 @@ final class RespuestasSeguridad {
     };
   }
 
+  void demasiadasSolicitudes(
+      HttpServletRequest request, HttpServletResponse response, long reintentoSegundos)
+      throws IOException {
+    response.setHeader(HttpHeaders.RETRY_AFTER, Long.toString(reintentoSegundos));
+    log.warn(
+        "429 {} {} ip {}", request.getMethod(), request.getRequestURI(), request.getRemoteAddr());
+    escribir(
+        request,
+        response,
+        new NegocioException(
+            HttpStatus.TOO_MANY_REQUESTS,
+            "demasiadas-solicitudes",
+            "Demasiadas solicitudes",
+            "Espera un momento antes de volver a intentarlo."));
+  }
+
   AccessDeniedHandler accesoDenegado() {
     return (request, response, ex) -> {
       Authentication autenticacion = SecurityContextHolder.getContext().getAuthentication();

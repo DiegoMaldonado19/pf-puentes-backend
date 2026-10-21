@@ -11,6 +11,10 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
 import org.springframework.boot.jpa.test.autoconfigure.TestEntityManager;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
 
 @DataJpaTest
 class AuditoriaRepositoryTest extends PruebaIntegracion {
@@ -82,6 +86,30 @@ class AuditoriaRepositoryTest extends PruebaIntegracion {
     assertThatThrownBy(() -> repositorio.saveAndFlush(auditoria))
         .isInstanceOf(DataIntegrityViolationException.class)
         .hasMessageContaining("auditoria_motivo_ck");
+  }
+
+  @Test
+  void filtraYPaginaLaBitacoraConEspecificaciones() {
+    UUID entidadId = UUID.randomUUID();
+    for (String accion : new String[] {"CREAR", "MODIFICAR", "CAMBIAR_ESTADO"}) {
+      Auditoria auditoria = registro(accion, "usuario");
+      auditoria.setEntidadId(entidadId);
+      repositorio.save(auditoria);
+    }
+    Auditoria otra = registro("CREAR", "usuario");
+    otra.setEntidadId(UUID.randomUUID());
+    repositorio.saveAndFlush(otra);
+    em.clear();
+    Specification<Auditoria> deLaEntidad =
+        (raiz, consulta, cb) -> cb.equal(raiz.get("entidadId"), entidadId);
+
+    Page<Auditoria> pagina =
+        repositorio.findAll(deLaEntidad, PageRequest.of(0, 2, Sort.by("accion")));
+
+    assertThat(pagina.getTotalElements()).isEqualTo(3);
+    assertThat(pagina.getContent())
+        .extracting(Auditoria::getAccion)
+        .containsExactly("CAMBIAR_ESTADO", "CREAR");
   }
 
   private static Auditoria registro(String accion, String entidad) {

@@ -7,7 +7,7 @@
 
 ## Contexto
 
-Ya existen definiciones validadas y repositorios de pesos ([ADR 0018](0018-validacion-de-configuraciones-de-pesos.md)). Falta guardar un juego completo con autorización, auditoría y rollback de toda la operación. El usuario confirmó el 18/10 que P4 aún no entregó su contrato: no se conocen las rutas ni la representación de metadatos del formulario real.
+Ya existen definiciones validadas y repositorios de pesos ([ADR 0027](0027-validacion-de-configuraciones-de-pesos.md)). Falta guardar un juego completo con autorización, auditoría y rollback de toda la operación. El usuario confirmó el 18/10 que P4 aún no entregó su contrato: no se conocen las rutas ni la representación de metadatos del formulario real.
 
 ## Decisión
 

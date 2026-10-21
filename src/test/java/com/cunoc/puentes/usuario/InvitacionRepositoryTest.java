@@ -7,6 +7,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import com.cunoc.puentes.PruebaIntegracion;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 import java.util.stream.IntStream;
 import org.hibernate.SessionFactory;
 import org.hibernate.stat.Statistics;
@@ -15,6 +16,10 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
 import org.springframework.boot.jpa.test.autoconfigure.TestEntityManager;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
 
 @DataJpaTest(properties = "spring.jpa.properties.hibernate.generate_statistics=true")
 class InvitacionRepositoryTest extends PruebaIntegracion {
@@ -93,6 +98,65 @@ class InvitacionRepositoryTest extends PruebaIntegracion {
     assertThatThrownBy(() -> repositorio.saveAndFlush(duplicada))
         .isInstanceOf(DataIntegrityViolationException.class)
         .hasMessageContaining("invitacion_abierta_uk");
+  }
+
+  @Test
+  void buscaLaInvitacionPorElHashDeSuToken() {
+    Usuario admin = usuarios.save(Cuentas.administrador("admin@correo.com"));
+    Invitacion invitacion = repositorio.saveAndFlush(Cuentas.invitacion("prof@correo.com", admin));
+    em.clear();
+
+    assertThat(repositorio.findByTokenHash(Cuentas.hash("prof@correo.com")))
+        .hasValueSatisfying(leida -> assertThat(leida.getId()).isEqualTo(invitacion.getId()));
+    assertThat(repositorio.findByTokenHash(Cuentas.hash("otro"))).isEmpty();
+    assertThat(repositorio.buscarPorHash(Cuentas.hash("prof@correo.com")))
+        .hasValueSatisfying(leida -> assertThat(leida.getId()).isEqualTo(invitacion.getId()));
+  }
+
+  @Test
+  void bloqueaLaInvitacionPorSuIdDentroDeLaTransaccion() {
+    Usuario admin = usuarios.save(Cuentas.administrador("admin@correo.com"));
+    Invitacion invitacion = repositorio.saveAndFlush(Cuentas.invitacion("prof@correo.com", admin));
+    em.clear();
+
+    assertThat(repositorio.bloquear(invitacion.getId()))
+        .hasValueSatisfying(leida -> assertThat(leida.getCorreo()).isEqualTo("prof@correo.com"));
+    assertThat(repositorio.bloquear(UUID.randomUUID())).isEmpty();
+  }
+
+  // DT-BE-08, DT-BE-09: página filtrada, con el administrador en la misma consulta que las filas
+  @Test
+  void paginaLasInvitacionesFiltradasConSuAdministradorSinConsultasN1() {
+    List<Invitacion> invitaciones = new ArrayList<>();
+    IntStream.rangeClosed(1, 6)
+        .forEach(
+            n -> {
+              Usuario admin =
+                  usuarios.save(Cuentas.administrador("jefe%d@correo.com".formatted(n)));
+              invitaciones.add(Cuentas.invitacion("pagina%d@correo.com".formatted(n), admin));
+            });
+    repositorio.saveAllAndFlush(invitaciones);
+    em.clear();
+    Statistics estadisticas =
+        em.getEntityManager()
+            .getEntityManagerFactory()
+            .unwrap(SessionFactory.class)
+            .getStatistics();
+    estadisticas.clear();
+    Specification<Invitacion> delFiltro =
+        (raiz, consulta, cb) -> cb.like(raiz.get("correo"), "pagina%");
+
+    Page<Invitacion> pagina =
+        repositorio.findAll(delFiltro, PageRequest.of(0, 4, Sort.by("correo")));
+    List<String> administradores =
+        pagina.getContent().stream()
+            .map(invitacion -> invitacion.getAdministrador().getCorreo())
+            .toList();
+
+    assertThat(pagina.getTotalElements()).isEqualTo(6);
+    assertThat(administradores).hasSize(4).doesNotHaveDuplicates();
+    // una para la página y otra para el total
+    assertThat(estadisticas.getPrepareStatementCount()).isEqualTo(2);
   }
 
   // DT-BE-09: la cantidad de consultas no crece con la cantidad de invitaciones

@@ -6,6 +6,8 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 
@@ -20,7 +22,11 @@ interface ArchivoRepository extends JpaRepository<Archivo, UUID> {
 
   List<Archivo> findByOrdenMantenimientoIdOrderByCreadoEn(UUID ordenId);
 
-  long countByOrdenMantenimientoId(UUID ordenId);
+  long countByOrdenMantenimientoIdAndTipoInAndPurgadoEnIsNull(
+      UUID ordenId, Collection<TipoArchivo> tipos);
+
+  Page<Archivo> findByOrdenMantenimientoIdAndTipoInAndPurgadoEnIsNull(
+      UUID ordenId, Collection<TipoArchivo> tipos, Pageable pagina);
 
   // ADR 0010: otro módulo se lee por SQL, sin importar su entidad
   @Query(
