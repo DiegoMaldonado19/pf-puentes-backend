@@ -7,6 +7,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import com.cunoc.puentes.PruebaIntegracion;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 import java.util.stream.IntStream;
 import org.hibernate.SessionFactory;
 import org.hibernate.stat.Statistics;
@@ -108,6 +109,19 @@ class InvitacionRepositoryTest extends PruebaIntegracion {
     assertThat(repositorio.findByTokenHash(Cuentas.hash("prof@correo.com")))
         .hasValueSatisfying(leida -> assertThat(leida.getId()).isEqualTo(invitacion.getId()));
     assertThat(repositorio.findByTokenHash(Cuentas.hash("otro"))).isEmpty();
+    assertThat(repositorio.buscarPorHash(Cuentas.hash("prof@correo.com")))
+        .hasValueSatisfying(leida -> assertThat(leida.getId()).isEqualTo(invitacion.getId()));
+  }
+
+  @Test
+  void bloqueaLaInvitacionPorSuIdDentroDeLaTransaccion() {
+    Usuario admin = usuarios.save(Cuentas.administrador("admin@correo.com"));
+    Invitacion invitacion = repositorio.saveAndFlush(Cuentas.invitacion("prof@correo.com", admin));
+    em.clear();
+
+    assertThat(repositorio.bloquear(invitacion.getId()))
+        .hasValueSatisfying(leida -> assertThat(leida.getCorreo()).isEqualTo("prof@correo.com"));
+    assertThat(repositorio.bloquear(UUID.randomUUID())).isEmpty();
   }
 
   // DT-BE-08, DT-BE-09: página filtrada, con el administrador en la misma consulta que las filas
