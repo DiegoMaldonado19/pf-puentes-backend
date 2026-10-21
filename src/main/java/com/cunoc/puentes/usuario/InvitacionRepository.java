@@ -27,11 +27,20 @@ interface InvitacionRepository
       """)
   Optional<Invitacion> buscarAbierta(String correo);
 
+  /** Consulta el enlace sin bloquear la fila: sirve para la pantalla de aceptación. */
+  @Query("SELECT i FROM Invitacion i WHERE i.tokenHash = :tokenHash")
+  Optional<Invitacion> buscarPorHash(String tokenHash);
+
   /**
    * RN-USR-03: la fila queda bloqueada, así dos aceptaciones del mismo enlace no crean dos cuentas.
    */
   @Lock(LockModeType.PESSIMISTIC_WRITE)
   Optional<Invitacion> findByTokenHash(String tokenHash);
+
+  /** Revocar o reinvitar sin que otra petición cierre la misma fila al mismo tiempo. */
+  @Lock(LockModeType.PESSIMISTIC_WRITE)
+  @Query("SELECT i FROM Invitacion i WHERE i.id = :id")
+  Optional<Invitacion> bloquear(UUID id);
 
   // DT-BE-09: el administrador viaja en la misma consulta
   @EntityGraph(attributePaths = "administrador")
@@ -39,6 +48,6 @@ interface InvitacionRepository
 
   // DT-BE-08, DT-BE-09: el listado de la API es paginado y trae al administrador sin N+1
   @Override
-  @EntityGraph(attributePaths = "administrador")
+  @EntityGraph(attributePaths = {"administrador", "usuario"})
   Page<Invitacion> findAll(Specification<Invitacion> filtro, Pageable pagina);
 }
