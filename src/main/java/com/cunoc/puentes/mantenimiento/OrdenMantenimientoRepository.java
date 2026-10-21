@@ -1,6 +1,7 @@
 package com.cunoc.puentes.mantenimiento;
 
 import jakarta.persistence.LockModeType;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.domain.Page;
@@ -26,6 +27,9 @@ interface OrdenMantenimientoRepository extends Repository<OrdenMantenimiento, UU
 
   Page<OrdenMantenimiento> findByPuenteIdAndEstado(
       UUID puenteId, EstadoOrden estado, Pageable pageable);
+
+  Page<OrdenMantenimiento> findByPuenteIdAndTipoAndEstadoIn(
+      UUID puenteId, TipoOrden tipo, List<EstadoOrden> estados, Pageable pageable);
 
   @Query(value = "SELECT EXISTS (SELECT 1 FROM archivo WHERE id = :id)", nativeQuery = true)
   boolean existeArchivo(UUID id);

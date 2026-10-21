@@ -200,6 +200,16 @@ La política autorizada no incluye un filtro adicional de puentes por activo: se
 
 ## 7. Verificación y entrega
 
+### Seguimiento rutinario anual: consulta y acciones existentes
+
+Con una sesión Catedrático/Admin, usa Postman para `GET /api/v1/puentes/{puenteId}/ordenes-mantenimiento/rutinario-anual?page=0&size=20`. Devuelve `fecha_evaluacion`, `fecha_referencia`, `origen_referencia` (EJECUCION_RUTINARIA o REGISTRO_PUENTE), `fecha_limite`, `programadas_en_plazo`, `sin_fecha`, `fechas_pasadas`, `posteriores_al_limite` y página `ordenes` con el contrato existente. Conteos globales independientes de la página, máximo 100 filas; 400 por UUID/página inválidos, 401/403 acceso y 404 puente ausente.
+
+La base confirmada por el grupo es la última ejecución RUTINARIO/EJECUTADA o el registro sin ejecuciones. Otras tipologías, propuestas y fechas programadas no reinician el año. Se suma un año de calendario y se evalúa la ventana inclusiva hoy–límite. Registro/reloj UTC y fechas civiles sin segunda conversión de zona. Fecha pasada no equivale automáticamente a incumplimiento anual. Los indicadores de pasada y posterior al límite pueden coincidir; no se suman como un total. La consulta no confirma ejecución.
+
+`ConsultaOrdenes` incorpora el panel con `[mostrarSeguimientoRutinario]="true"`, conservando `puedeConsultar` de la sesión. Seleccionar abre el detalle y sus acciones existentes; fecha guardada, inicio y cierre recargan el resumen desde el servidor. No se añade ruta pública: host con sesión/interceptores/guardias P2 y conexión privada P3 pendientes. No hay propuestas/avisos anuales o job nuevo en esta entrega. MTO-08 queda en progreso. [ADR 0035](adr/0035-consulta-del-seguimiento-rutinario-anual.md).
+
+Verificación: **1105 pruebas backend**, 16 nuevas, sin fallos/errores/omisiones; compilación limpia, Spotless, PMD, empaquetado y tres reglas JaCoCo aprobados (servicios 95.28 %, núcleo IC/máquina 100 % según clases configuradas). **387 frontend**, 21 nuevas, lint, Prettier, compilación estricta y build aprobados (~90.73 kB iniciales). Fuentes/pruebas idénticas verificadas en `/tmp/p8-rutinario-verificacion`, sin editar generados; no acredita CI remoto ni recorrido frontend autenticado completo. Los párrafos siguientes conservan evidencia histórica.
+
 Verificación de **alerta de inspección vencida, 21/10/2026**: **1089 pruebas backend**, 17 nuevas sobre 1072; ninguna falla, error u omisión. Pasaron compilación limpia, Spotless, PMD, empaquetado y tres reglas JaCoCo: servicios 95.16 % de líneas, núcleo IC/máquina 100 % según clases configuradas y servicio de alertas 100 % de líneas/ramas. Incluye migración, PostgreSQL, P9, JWT, ShedLock real y escenarios de calendario, repetición, concurrencia, fallos y lotes. Verificada copia temporal de fuentes/pruebas idénticas sin interferencia del IDE, con reportes en `/tmp/p8-alertas-verificacion/target`. No se editan generados ni se rebajan controles. La primera corrida ajustó exclusivamente fixtures de baja P2 y expectativa JSON de P9; no cambió contratos o pruebas ajenas.
 
 Frontend sin cambios en esta entrega: no se repiten sus pruebas/build; la última verificación del paso 6 sigue siendo 366 pruebas. Falta presentación P9 y recorrido con sesión P2/publicación P5 reales; resultados locales no acreditan CI remoto.
