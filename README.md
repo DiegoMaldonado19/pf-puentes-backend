@@ -2,7 +2,7 @@
 
 API REST del Sistema de Gestión de Puentes (SGP).
 
-## Estado (19/10/2026)
+## Estado (20/10/2026)
 
 | Paquete | Qué hay | Responsable |
 |---|---|---|
@@ -11,12 +11,14 @@ API REST del Sistema de Gestión de Puentes (SGP).
 | `common/seguridad/` | Seguridad stateless con JWT de acceso (15 min), rutas públicas/privadas, BCrypt 12 y 401/403 en RFC 7807 | P2 |
 | `archivo/` | Subida de fotos y PDF, borrado en borradores, URL firmadas y purga de 210 días (RN-ARC) | P1 |
 | `indice/` | Fórmula, clasificación y cuatro anulaciones con banderas normalizadas; pruebas propias, adaptación e integración pendientes ([ADR 0016](docs/adr/0016-nucleo-puro-del-indice-de-condicion.md)) | P8 |
-| Configuración de pesos (`indice/`) | Modelo, repositorios, creación interna transaccional auditada y API de consulta paginada para Admin; adaptador P4, API de creación y pantalla pendientes ([ADR 0018](docs/adr/0018-validacion-de-configuraciones-de-pesos.md), [ADR 0019](docs/adr/0019-creacion-transaccional-y-auditada-de-pesos.md), [ADR 0020](docs/adr/0020-consulta-paginada-de-juegos-de-pesos.md)) | P8 |
-| `mantenimiento/` | Núcleo de transiciones/cierre/descarte con cobertura 100 %; repositorio interno de guardado y consulta paginada sin métodos de borrado; validador de existencia y correspondencia inspección/puente; DTO de lectura con MapStruct y consultas internas paginadas/detalle por puente, incluida consulta de propuestas pendientes filtrada en base de datos; ajuste interno de prioridad con justificación, conservando la sugerida. Servicio y POST de aceptación Catedrático/Admin, auditados y con bloqueo concurrente; otras operaciones HTTP y UI pendientes ([ADR 0021](docs/adr/0021-nucleo-de-transiciones-de-ordenes.md), [ADR 0022](docs/adr/0022-persistencia-y-consulta-base-de-ordenes.md), [ADR 0023](docs/adr/0023-validacion-del-origen-de-ordenes.md), [ADR 0024](docs/adr/0024-ajuste-justificado-de-prioridad-de-ordenes.md), [ADR 0025](docs/adr/0025-aceptacion-autorizada-y-auditada-de-propuestas.md)) | P8 |
+| Configuración de pesos (`indice/`) | Modelo, repositorios, creación interna transaccional auditada y API de consulta paginada para Admin; adaptador P4, API de creación y pantalla pendientes ([ADR 0027](docs/adr/0027-validacion-de-configuraciones-de-pesos.md), [ADR 0019](docs/adr/0019-creacion-transaccional-y-auditada-de-pesos.md), [ADR 0020](docs/adr/0020-consulta-paginada-de-juegos-de-pesos.md)) | P8 |
+| `mantenimiento/` | Núcleo de transiciones/cierre/descarte con cobertura 100 %; repositorio interno de guardado y consulta paginada sin métodos de borrado; validador de existencia y correspondencia inspección/puente; DTO de lectura con MapStruct y consultas internas paginadas/detalle por puente, incluida consulta de propuestas pendientes filtrada en base de datos; ajuste de prioridad con justificación, conservando la sugerida; servicio/PATCH autorizado y auditado en estados abiertos. GET paginados de historial/propuestas y detalle de órdenes para Catedrático/Admin; servicios/POST de aceptación, inicio, cierre y descarte auditados con bloqueo concurrente; carga y consulta paginada de evidencia P1 para Catedrático/Admin; otras operaciones y acceso UI pendientes ([ADR 0021](docs/adr/0021-nucleo-de-transiciones-de-ordenes.md), [ADR 0022](docs/adr/0022-persistencia-y-consulta-base-de-ordenes.md), [ADR 0023](docs/adr/0023-validacion-del-origen-de-ordenes.md), [ADR 0024](docs/adr/0024-ajuste-justificado-de-prioridad-de-ordenes.md), [ADR 0025](docs/adr/0025-aceptacion-autorizada-y-auditada-de-propuestas.md)) | P8 |
 | Los demás módulos | Tabla, migración y entidad del modelo base ([ADR 0010](docs/adr/0010-modelo-de-datos-base.md)); todavía sin servicios ni endpoints | Cada responsable |
 
 - La seguridad base (cadena de filtros JWT, `@EnableMethodSecurity`) y el inicio de sesión, la renovación, el cierre de sesión y el perfil propio ya existen. Ver [Seguridad](#seguridad) e [Inicio de sesión](#inicio-de-sesión-y-bloqueo-rn-usr-07).
 - Los contratos entre módulos y las fechas están en `docs-analisis/Equipo`.
+- Integración y prueba de lo implementado por P8: [Manual técnico de IC y mantenimiento](docs/manual-tecnico-p8.md), con API disponible, contratos Java, transacciones y dependencias pendientes.
+- [Verificación de P8 tras integrar Cursos, 20/10](docs/verificacion-p8-post-merge-2026-10-20.md): 651 pruebas backend y controles aprobados; colisión de ADR resuelta.
 
 ### Aceptar una propuesta de mantenimiento (P8)
 
@@ -154,7 +156,7 @@ Son los mismos chequeos que corre el CI:
 - El reporte de JaCoCo queda en `target/site/jacoco/index.html`.
 - El CI falla si las clases `*Service` bajan de 70 % de líneas cubiertas (DT-CAL-01).
 - El núcleo IC (`CalificacionElemento`, `CalculadoraIndiceCondicion`, `CondicionesCriticas` y `ResultadoIndiceCondicion`) exige 100 % de líneas y ramas por clase. Sus pruebas pueden ejecutarse sin Docker; comando en el [ADR 0016](docs/adr/0016-nucleo-puro-del-indice-de-condicion.md).
-- `PesoConfigurado` y `JuegoPesos` también exigen 100 % de líneas y ramas; validan configuraciones antes de añadir el servicio de persistencia ([ADR 0018](docs/adr/0018-validacion-de-configuraciones-de-pesos.md)).
+- `PesoConfigurado` y `JuegoPesos` también exigen 100 % de líneas y ramas; validan configuraciones antes de añadir el servicio de persistencia ([ADR 0027](docs/adr/0027-validacion-de-configuraciones-de-pesos.md)).
 
 ## Despliegue
 
@@ -250,3 +252,36 @@ docker run --rm -u "$(id -u):$(id -g)" -v "$PWD":/app -v "$HOME/.m2":/var/maven/
 | `docker/login-action` | v4.6.0 |
 | `docker/setup-buildx-action` | v4.4.1 |
 | `docker/build-push-action` | v7.4.0 |
+
+### Consulta de propuestas pendientes (P8)
+
+`GET /api/v1/puentes/{puenteId}/ordenes-mantenimiento/propuestas?page=0&size=20`, solo Catedrático y Administrador (lectores confirmados por el grupo). Devuelve `puente_id`, `content`, `page`, `size`, `total_elements`, `total_pages`; únicamente PROPUESTA del puente solicitado, por ID descendente. Tamaño máximo 100; puente inexistente devuelve 404. Usa el mismo Bearer Token de la aceptación. No expone el historial completo ni genera propuestas. Ver [ADR 0026](docs/adr/0026-consulta-autorizada-de-propuestas.md) y el manual técnico enlazado arriba.
+
+### Historial y detalle de órdenes (P8)
+
+Solo Catedrático y Administrador, con sesión de cuenta activa, según acuerdo de lectores comunicado por el usuario:
+
+- `GET /api/v1/puentes/{puenteId}/ordenes-mantenimiento?page=0&size=20`: todos los estados del puente, incluidos ejecutada/descartada/cancelada; página con `puente_id`, `content`, `page`, `size`, `total_elements`, `total_pages`. Tamaño máximo 100, orden por ID descendente.
+- `GET /api/v1/puentes/{puenteId}/ordenes-mantenimiento/{ordenId}`: detalle con prioridades, origen, fechas, responsable y motivo. Una orden de otro puente devuelve 404.
+
+En Postman usa el Bearer Token de P2; sin cuerpo. Ambas rutas son de lectura y no habilitan acciones sobre las órdenes. La ruta `/propuestas` conserva su filtro y contrato. Ver [ADR 0028](docs/adr/0028-historial-y-detalle-autorizado-de-ordenes.md).
+
+### Iniciar ejecución de una orden (P8)
+
+`POST /api/v1/puentes/{puenteId}/ordenes-mantenimiento/{ordenId}/inicio-ejecucion`, sin cuerpo y con Bearer Token de cuenta activa Catedrático/Admin (actores de inicio confirmados por el grupo). Solo PROGRAMADA → EN_EJECUCION; conserva programación/intervención/prioridades y devuelve el DTO persistido. La auditoría registra actor, fecha y cambio en la misma transacción.
+
+Repetición o estado incompatible: 409; una orden de otro puente: 404; origen incompatible: 422; UUID inválido: 400; sin sesión: 401; otro rol: 403. No registra una fecha de cierre ni envía notificaciones nuevas. Ver [ADR 0029](docs/adr/0029-inicio-auditado-de-ejecucion-de-ordenes.md). Verificación tras el merge de P9: 755 pruebas backend y controles aprobados, incluidas 22 nuevas de inicio y 68 de Notificaciones.
+
+### Evidencia y cierre de órdenes (P8)
+
+Para Catedrático/Admin, `POST .../ordenes-mantenimiento/{ordenId}/evidencias` guarda foto y miniatura mediante P1 en PROGRAMADA o EN_EJECUCION. `GET .../{ordenId}/evidencias?page=0&size=20` consulta fotos no purgadas de esa orden, también después del cierre (máximo 100). `POST .../{ordenId}/cierre` recibe `fecha_ejecucion` ISO y `responsable`, exige EN_EJECUCION y al menos una foto guardada de esa orden; responde DTO EJECUTADA. El servidor cuenta las fotos y audita el cambio con bloqueo compartido con subida. No basta seleccionar una imagen ni enviar un contador.
+
+Actores y ventana de carga confirmados por el equipo el 20/10; no asignan roles de otras operaciones. Contrato, errores, límites de almacenamiento y pruebas: [ADR 0030](docs/adr/0030-evidencia-y-cierre-autorizado-de-ordenes.md). Pasos de Postman en el [manual técnico P8](docs/manual-tecnico-p8.md). El frontend correspondiente aún requiere sesión/ruta protegida P2 y puente real P3 para abrirse desde la aplicación.
+
+### Descartar una propuesta de mantenimiento (P8)
+
+`POST /api/v1/puentes/{puenteId}/ordenes-mantenimiento/{ordenId}/descarte`, JSON `{"motivo":"Intervención duplicada"}`, para Catedrático/Admin confirmados. Solo PROPUESTA pasa a DESCARTADA; se conservan fila, motivo y demás datos en el historial. Motivo vacío: 400; repetición/otro estado: 409; otra orden/puente: 404. Comparte bloqueo con aceptación y audita el cambio en la misma transacción. No habilita cancelación. Ver [ADR 0031](docs/adr/0031-descarte-auditado-de-propuestas.md) y [manual técnico](docs/manual-tecnico-p8.md) para prueba y verificación del merge de P3.
+
+### Ajustar prioridad de una orden (P8)
+
+`PATCH /api/v1/puentes/{puenteId}/ordenes-mantenimiento/{ordenId}/prioridad`, JSON `{"prioridad":"ALTA","justificacion":"Se requiere atención urgente"}`. Según decisión explícita del usuario, Catedrático/Admin pueden ajustar en PROPUESTA, PROGRAMADA o EN_EJECUCION; terminales responden 409. Cada cambio real se justifica y audita; repetir el valor vigente no sustituye la razón previa ni duplica auditoría. Se conserva la sugerencia, incluso ausente; no se calcula su fórmula. [ADR 0032](docs/adr/0032-ajuste-autorizado-de-prioridad-de-ordenes.md), [manual técnico](docs/manual-tecnico-p8.md) y verificación: 939 backend y controles aprobados.

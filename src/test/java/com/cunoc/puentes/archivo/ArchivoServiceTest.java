@@ -278,7 +278,9 @@ class ArchivoServiceTest {
     evidencia.setOrdenMantenimientoId(ORDEN);
     when(repositorio.findByOrdenMantenimientoIdOrderByCreadoEn(ORDEN))
         .thenReturn(List.of(evidencia));
-    when(repositorio.countByOrdenMantenimientoId(ORDEN)).thenReturn(1L);
+    when(repositorio.countByOrdenMantenimientoIdAndTipoInAndPurgadoEnIsNull(
+            ORDEN, java.util.EnumSet.of(TipoArchivo.JPEG, TipoArchivo.WEBP)))
+        .thenReturn(1L);
 
     assertThat(servicio.listarEvidencias(ORDEN))
         .singleElement()
