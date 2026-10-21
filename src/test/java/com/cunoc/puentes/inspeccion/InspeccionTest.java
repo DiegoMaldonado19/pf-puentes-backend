@@ -28,8 +28,6 @@ class InspeccionTest extends PruebaIntegracion {
     em.getEntityManager()
         .createNativeQuery(
             """
-            INSERT INTO departamento VALUES ('09', 'Quetzaltenango');
-            INSERT INTO municipio VALUES ('0901', '09', 'Quetzaltenango');
             INSERT INTO puente (id, codigo, nombre, municipio_codigo, ruta, ubicacion)
               VALUES ('%s', 'GT-09-0901-0001', 'Las Rosas', '0901', 'CA-1', 'SRID=4326;POINT(-91.518 14.8347)');
             INSERT INTO usuario (id, correo, nombre, contrasena_hash, rol)
