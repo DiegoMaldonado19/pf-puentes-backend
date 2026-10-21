@@ -40,4 +40,6 @@ public class SolicitudPuente extends EntidadBase {
 
   @ManyToOne(fetch = FetchType.LAZY)
   private Puente puente;
+
+  private String motivoRechazo;
 }
