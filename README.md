@@ -28,7 +28,7 @@ API REST del Sistema de Gestión de Puentes (SGP).
 - Sin cuerpo. Requiere una orden persistida en PROPUESTA del puente indicado; devuelve 200 con el DTO de la orden en PROGRAMADA. Conserva fecha programada, prioridades e intervención.
 - Errores: 400 para UUID inválido, 401 sin sesión, 403 por rol, 404 si no existe en ese puente, 409 si ya no es PROPUESTA y 422 por inspección de origen incompatible.
 - El cambio y su auditoría se confirman juntos. Dos aceptaciones concurrentes producen una sola transición; la segunda recibe 409.
-- No genera propuestas de demostración. La creación desde daños depende del catálogo y de P5. El formulario para registrar/cambiar la fecha y las demás operaciones de mantenimiento siguen pendientes; aceptar no acredita por sí solo periodicidad anual.
+- No genera propuestas de demostración. La creación desde daños depende del catálogo y de P5. La fecha se registra/cambia mediante el PATCH documentado al final; cancelación y automatizaciones siguen pendientes; aceptar no acredita por sí solo periodicidad anual.
 
 Para probarlo en Postman, usa POST a esa ruta con IDs existentes y `Authorization: Bearer <token de acceso>`; deja Body en `none`. El contrato está también en Swagger. Detalles de integración: [ADR 0025](docs/adr/0025-aceptacion-autorizada-y-auditada-de-propuestas.md).
 
@@ -285,3 +285,9 @@ Actores y ventana de carga confirmados por el equipo el 20/10; no asignan roles 
 ### Ajustar prioridad de una orden (P8)
 
 `PATCH /api/v1/puentes/{puenteId}/ordenes-mantenimiento/{ordenId}/prioridad`, JSON `{"prioridad":"ALTA","justificacion":"Se requiere atención urgente"}`. Según decisión explícita del usuario, Catedrático/Admin pueden ajustar en PROPUESTA, PROGRAMADA o EN_EJECUCION; terminales responden 409. Cada cambio real se justifica y audita; repetir el valor vigente no sustituye la razón previa ni duplica auditoría. Se conserva la sugerencia, incluso ausente; no se calcula su fórmula. [ADR 0032](docs/adr/0032-ajuste-autorizado-de-prioridad-de-ordenes.md), [manual técnico](docs/manual-tecnico-p8.md) y verificación: 939 backend y controles aprobados.
+
+### Registrar o cambiar fecha programada (P8)
+
+`PATCH /api/v1/puentes/{puenteId}/ordenes-mantenimiento/{ordenId}/fecha-programada` recibe `{"fecha_programada":"2026-11-02"}`. Catedrático/Admin, exclusivamente PROGRAMADA: guarda fecha civil obligatoria, conserva el estado y audita cada cambio. Repetir la fecha no modifica actualizado_en ni duplica auditoría. Sin restricciones temporales adicionales, conforme a decisión explícita del usuario; la política no aparece detallada en el enunciado.
+
+Estado incompatible: 409; padre ajeno/ausente: 404; origen inconsistente: 422; fecha/UUID inválidos: 400; sesión o rol no autorizado: 401/403. Se reutiliza P2, incluida baja/rol vigente de cuenta. Aceptar, programar fecha e iniciar son operaciones distintas; registrar una fecha no garantiza la periodicidad anual. Ver [ADR 0033](docs/adr/0033-programacion-auditada-de-fecha-de-ordenes.md) y [manual técnico con prueba Postman](docs/manual-tecnico-p8.md).
