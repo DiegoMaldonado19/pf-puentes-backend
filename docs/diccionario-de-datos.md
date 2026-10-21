@@ -7,6 +7,7 @@
 - [`auditoria`](#auditoria): Bitácora de toda acción sobre datos (RN-USR-09); sin contraseñas, tokens ni datos personales completos (DT-SEC-12)
 - [`comentario`](#comentario): Comentario de un hilo; un solo nivel de respuesta (RN-FOR-04)
 - [`copia_conflicto`](#copia_conflicto): Versión del servidor que pisó un cliente al sincronizar (RN-OFF-09)
+- [`correlativo_puente`](#correlativo_puente): Último correlativo asignado a un código de puente en cada municipio (RN-INV-03)
 - [`curso`](#curso): Curso de Puentes de un ciclo, dirigido por un Catedrático
 - [`departamento`](#departamento): Departamentos de Guatemala según el INE
 - [`formulario_version`](#formulario_version): Versiones del formulario SIECA como JSON Schema (RN-FRM-01); publicada, es inmutable (RN-FRM-03)
@@ -136,6 +137,19 @@ Versión del servidor que pisó un cliente al sincronizar (RN-OFF-09)
 | `datos` | jsonb | No |  |  | Datos que tenía el servidor antes de aplicar los del cliente |
 | `creado_en` | timestamp with time zone | No | now() |  | Momento del conflicto, en UTC |
 | `actualizado_en` | timestamp with time zone | No | now() |  | Igual a creado_en: la copia no cambia |
+
+## correlativo_puente
+
+Último correlativo asignado a un código de puente en cada municipio (RN-INV-03)
+
+| Columna | Tipo | Nulo | Por defecto | Llaves | Descripción |
+|---|---|---|---|---|---|
+| `municipio_codigo` | character varying(4) | No |  | PK, FK → municipio | Municipio INE del correlativo |
+| `ultimo` | integer | No |  |  | Último número usado; el siguiente puente recibe ultimo + 1 (máximo 9999) |
+
+**Restricciones**
+
+- `CHECK (((ultimo >= 0) AND (ultimo <= 9999)))`
 
 ## curso
 
