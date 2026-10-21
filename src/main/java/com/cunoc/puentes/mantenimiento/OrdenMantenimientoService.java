@@ -18,6 +18,7 @@ public class OrdenMantenimientoService {
   private final InicioEjecucionOrdenService inicio;
   private final CierreOrdenService cierre;
   private final DescarteOrdenService descarte;
+  private final AjustePrioridadOrdenService prioridades;
   private final OrdenMantenimientoMapper mapper;
 
   OrdenMantenimientoService(
@@ -27,6 +28,7 @@ public class OrdenMantenimientoService {
       InicioEjecucionOrdenService inicio,
       CierreOrdenService cierre,
       DescarteOrdenService descarte,
+      AjustePrioridadOrdenService prioridades,
       OrdenMantenimientoMapper mapper) {
     this.ordenes = ordenes;
     this.origen = origen;
@@ -34,6 +36,7 @@ public class OrdenMantenimientoService {
     this.inicio = inicio;
     this.cierre = cierre;
     this.descarte = descarte;
+    this.prioridades = prioridades;
     this.mapper = mapper;
   }
 
@@ -75,6 +78,16 @@ public class OrdenMantenimientoService {
   public OrdenMantenimientoDTO descartar(UUID puenteId, UUID ordenId, String motivo) {
     OrdenMantenimiento orden = obtenerBloqueada(puenteId, ordenId);
     descarte.descartar(orden, motivo);
+    return mapper.aDTO(orden);
+  }
+
+  /** RN-MTO-06: ajuste manual de la vigente, conservando sugerida y demás datos. */
+  @Transactional
+  @PreAuthorize("hasAnyRole('CATEDRATICO', 'ADMINISTRADOR')")
+  public OrdenMantenimientoDTO ajustarPrioridad(
+      UUID puenteId, UUID ordenId, Prioridad prioridad, String justificacion) {
+    OrdenMantenimiento orden = obtenerBloqueada(puenteId, ordenId);
+    prioridades.ajustar(orden, prioridad, justificacion);
     return mapper.aDTO(orden);
   }
 

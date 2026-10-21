@@ -7,8 +7,8 @@ Actualizado: 20/10/2026. Describe el código disponible; la integración complet
 | Pieza | Disponible | Pendiente |
 |---|---|---|
 | `indice/` | Núcleo puro, pesos normalizados, repositorios, creación Java autorizada/auditada, tres GET Admin | Adaptación real P4, publicación P5, confirmación/recálculos y creación HTTP |
-| `mantenimiento/` | Máquina, origen orden/puente/inspección, consultas de historial/detalle/propuestas, ajuste justificado de prioridad y POST de aceptación/inicio/cierre/descarte y carga/consulta paginada de evidencia P1 | Programación de fecha, ajuste HTTP, cancelación, generación por catálogo y jobs |
-| Frontend P8 | Componente de condición, consulta de pesos, revisión/aceptación, bandeja, contenedor HTTP de propuestas e historial/detalle con inicio, evidencia, cierre y descarte opcionales | Sesión/guardias P2, rutas y conexiones pendientes; las piezas no aparecen aún en la página inicial |
+| `mantenimiento/` | Máquina, origen orden/puente/inspección, consultas de historial/detalle/propuestas, PATCH autorizado/auditado de prioridad y POST de aceptación/inicio/cierre/descarte y carga/consulta paginada de evidencia P1 | Programación de fecha, cancelación, sugerencia automática, generación por catálogo y jobs |
+| Frontend P8 | Componente de condición, consulta de pesos, revisión/aceptación, bandeja, contenedor HTTP de propuestas e historial/detalle con inicio, evidencia, cierre, descarte y ajuste de prioridad opcionales | Sesión/guardias P2, rutas y conexiones pendientes; las piezas no aparecen aún en la página inicial |
 
 Se emplean DTO y MapStruct; las entidades JPA no se exponen por HTTP. La autorización efectiva vive en backend. La existencia de una validación interna o una columna no equivale a una operación HTTP habilitada.
 
@@ -71,6 +71,7 @@ En local: API `http://localhost:8080`; Swagger `http://localhost:8080/api/docs/s
 | `GET /api/v1/puentes/{puenteId}/ordenes-mantenimiento/{ordenId}/evidencias` | CATEDRATICO o ADMINISTRADOR | Página de JPEG/WebP no purgadas, incluso después de cerrar |
 | `POST /api/v1/puentes/{puenteId}/ordenes-mantenimiento/{ordenId}/cierre` | CATEDRATICO o ADMINISTRADOR | JSON fecha_ejecucion/responsable, 200 DTO EJECUTADA; requiere foto guardada de esta orden |
 | `POST /api/v1/puentes/{puenteId}/ordenes-mantenimiento/{ordenId}/descarte` | CATEDRATICO o ADMINISTRADOR | JSON motivo obligatorio, 200 DTO DESCARTADA; solo PROPUESTA, sin borrar historial |
+| `PATCH /api/v1/puentes/{puenteId}/ordenes-mantenimiento/{ordenId}/prioridad` | CATEDRATICO o ADMINISTRADOR | JSON prioridad/justificacion, 200 DTO persistido; solo estados abiertos, conserva sugerida |
 
 Los GET paginados aceptan `page` desde 0 y `size` entre 1 y 100; valores predeterminados 0/20. La salida tiene `content`, `page`, `size`, `total_elements`, `total_pages`. Una colección existente sin registros devuelve página vacía; recurso inexistente, 404.
 
@@ -88,7 +89,7 @@ Errores en RFC 7807, con `type`, `title`, `status`, `detail` e `instance`:
 | 413 | Archivo/petición supera el límite HTTP configurado |
 | 422 | Origen incompatible, firma de foto inválida, falta de fotografía guardada o responsable mayor de 150 caracteres Unicode |
 
-Propuestas, historial completo y detalle tienen GET para Catedrático y Administrador, con confirmaciones del grupo comunicadas por el usuario. Añade `puente_id` al contrato de página. También se confirmaron los actores de evidencia y cierre y su carga en PROGRAMADA/EN_EJECUCION; están implementados. El grupo confirmó también Catedrático/Admin para descarte, ya implementado. Siguen pendientes creación HTTP de pesos, ajuste de prioridad, cancelación, programación de fecha y recálculo HTTP. El permiso de lectura no asigna actores de escritura. El permiso de aceptación de RN-MTO-02 no se convierte automáticamente en una matriz completa de lectura o ejecución.
+Propuestas, historial completo y detalle tienen GET para Catedrático y Administrador, con confirmaciones del grupo comunicadas por el usuario. Añade `puente_id` al contrato de página. También se confirmaron los actores de evidencia y cierre y su carga en PROGRAMADA/EN_EJECUCION; están implementados. El grupo confirmó también Catedrático/Admin para descarte, ya implementado. El usuario adoptó actores/estados para ajuste manual de prioridad, también implementado. Siguen pendientes creación HTTP de pesos, sugerencia automática de prioridad, cancelación, programación de fecha y recálculo HTTP. El permiso de lectura no asigna actores de escritura. El permiso de aceptación de RN-MTO-02 no se convierte automáticamente en una matriz completa de lectura o ejecución.
 
 Detalle: [ADR 0020](adr/0020-consulta-paginada-de-juegos-de-pesos.md), [ADR 0025](adr/0025-aceptacion-autorizada-y-auditada-de-propuestas.md).
 
@@ -139,6 +140,21 @@ Con sesión real Catedrático/Admin, consulta primero una orden en PROPUESTA del
 
 Comprueba 200, DESCARTADA y el motivo persistido. El GET de detalle/historial conserva la orden; el GET de propuestas ya no la incluye. Repetir da 409 sin añadir auditoría. Un motivo ausente/vacío da 400. No se fija máximo por el límite de otra columna: el motivo de la orden es TEXT y se incluye en la instantánea auditada del cambio. No se habilita CANCELADA. [ADR 0031](adr/0031-descarte-auditado-de-propuestas.md).
 
+### Prueba de ajuste manual de prioridad con Postman
+
+Usa una orden real PROPUESTA/PROGRAMADA/EN_EJECUCION del puente con sesión Catedrático/Admin. Envía `PATCH .../ordenes-mantenimiento/{ordenId}/prioridad`, Body → raw → JSON:
+
+```json
+{
+  "prioridad": "ALTA",
+  "justificacion": "Se requiere atención urgente a la intervención."
+}
+```
+
+Elige un valor distinto del vigente para comprobar el cambio. Verifica 200, prioridad/justificacion_prioridad persistidas y prioridad_sugerida/estado/demás datos conservados. Un cambio sin justificación devuelve 422. Repetir la vigente devuelve lo guardado sin reescribir la razón ni crear auditoría. Una orden ejecutada/descartada/cancelada devuelve 409, también al pedir el mismo valor. La ventana y actores proceden de la decisión del usuario donde RN-MTO-06 no los enumera; no se atribuyen literalmente al enunciado.
+
+La justificación permanece en su columna TEXT y en la instantánea auditada saneada. No se calcula prioridad sugerida ni se exige tener IC/elemento/sugerencia para realizar el ajuste manual. [ADR 0032](adr/0032-ajuste-autorizado-de-prioridad-de-ordenes.md). El frontend incorpora selector y justificación al detalle con permiso explícito; `operacionPendiente()` incluye el ajuste y `(prioridadAjustada)` informa a otros consumidores. Falta el acceso integrado P2 y conectar P8 con el inventario P3 disponible.
+
 ## 6. Conexiones pendientes del equipo
 
 | Responsable | Entrega necesaria para completar el flujo |
@@ -155,7 +171,7 @@ El evento y las políticas pendientes son acuerdos por integrar, no clases/rutas
 
 ## 7. Verificación y entrega
 
-Verificación local del 20/10/2026, paso 5a: **909 pruebas backend** sin fallos/errores/omisiones, incluidas 33 nuevas de descarte. El merge de P3 pasó primero 876; el paso 4 anterior tenía 784. Compilación limpia, formato, PMD, empaquetado y las tres reglas JaCoCo aprobados (servicios ≥70 %, núcleo IC/máquina 100 % según sus clases configuradas). El [registro del merge de Cursos](verificacion-p8-post-merge-2026-10-20.md) conserva sus 651 casos históricos. **280 pruebas frontend** (38 nuevas de descarte, sobre las 242 tras P3), lint, formato, compilación estricta y build aprobados; no se acredita recorrido con sesión P2 ni CI remoto.
+Verificación local del 20/10/2026, paso 5b: **939 pruebas backend** sin fallos/errores/omisiones, incluidas 30 nuevas de ajuste. La entrega de descarte tenía 909 y el merge de P3 pasó primero 876. Compilación limpia, formato, PMD, empaquetado y las tres reglas JaCoCo aprobados (servicios ≥70 %, núcleo IC/máquina 100 % según sus clases configuradas). El [registro del merge de Cursos](verificacion-p8-post-merge-2026-10-20.md) conserva sus 651 casos históricos. **325 pruebas frontend** (45 nuevas de ajuste sobre 280 del paso 5a), lint, formato, compilación estricta y build aprobados; no se acredita recorrido con sesión P2 ni CI remoto.
 
 Desde este repositorio, con el JDK 25 de la base y Docker disponible:
 

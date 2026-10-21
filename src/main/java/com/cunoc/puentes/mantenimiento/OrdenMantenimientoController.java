@@ -1,5 +1,6 @@
 package com.cunoc.puentes.mantenimiento;
 
+import com.cunoc.puentes.mantenimiento.dto.AjustarPrioridadDTO;
 import com.cunoc.puentes.mantenimiento.dto.DescartarOrdenDTO;
 import com.cunoc.puentes.mantenimiento.dto.OrdenMantenimientoDTO;
 import com.cunoc.puentes.mantenimiento.dto.PaginaOrdenesDTO;
@@ -13,6 +14,7 @@ import org.springdoc.core.annotations.ParameterObject;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -165,5 +167,34 @@ class OrdenMantenimientoController {
       @PathVariable UUID ordenId,
       @Valid @RequestBody DescartarOrdenDTO datos) {
     return servicio.descartar(puenteId, ordenId, datos.motivo());
+  }
+
+  @PatchMapping(path = "/{ordenId}/prioridad", consumes = "application/json")
+  @PreAuthorize("hasAnyRole('CATEDRATICO', 'ADMINISTRADOR')")
+  @Operation(
+      summary = "Ajusta la prioridad vigente con justificación (RN-MTO-06)",
+      description =
+          "Catedrático/Admin en PROPUESTA, PROGRAMADA o EN_EJECUCION, según acuerdo del usuario. "
+              + "Conserva la prioridad sugerida y los demás datos. Cada cambio real exige justificación "
+              + "y se audita. Repetir la vigente devuelve lo guardado sin reemplazar su justificación ni duplicar auditoría. "
+              + "No calcula sugerencias ni permite modificar prioridades de órdenes terminadas.")
+  @ApiResponse(responseCode = "200", description = "DTO con prioridad y justificación persistidas")
+  @ApiResponse(responseCode = "400", description = "UUID, enum o prioridad obligatoria inválidos")
+  @ApiResponse(responseCode = "401", description = "Sin sesión o token inválido")
+  @ApiResponse(
+      responseCode = "403",
+      description = "Solo Catedrático o Administrador ajusta prioridad")
+  @ApiResponse(responseCode = "404", description = "La orden no existe en el puente indicado")
+  @ApiResponse(
+      responseCode = "409",
+      description = "La orden está ejecutada, descartada o cancelada")
+  @ApiResponse(
+      responseCode = "422",
+      description = "Falta justificación del cambio u origen inconsistente")
+  OrdenMantenimientoDTO ajustarPrioridad(
+      @PathVariable UUID puenteId,
+      @PathVariable UUID ordenId,
+      @Valid @RequestBody AjustarPrioridadDTO datos) {
+    return servicio.ajustarPrioridad(puenteId, ordenId, datos.prioridad(), datos.justificacion());
   }
 }
