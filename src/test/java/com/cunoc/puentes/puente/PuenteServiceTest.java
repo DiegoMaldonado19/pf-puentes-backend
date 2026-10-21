@@ -15,6 +15,8 @@ import com.cunoc.puentes.puente.dto.DarDeBajaPuenteDTO;
 import com.cunoc.puentes.puente.dto.EditarPuenteDTO;
 import com.cunoc.puentes.puente.dto.PuenteCercanoDTO;
 import com.cunoc.puentes.puente.dto.PuenteDTO;
+import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -165,7 +167,8 @@ class PuenteServiceTest {
     @Test
     void cambiaSoloLosDatosDescriptivos() {
       Puente puente = puente(true);
-      puente.setEstadoActual(EstadoCondicion.MALO);
+      puente.actualizarCondicion(
+          EstadoCondicion.MALO, new BigDecimal("35.00"), LocalDate.of(2026, 10, 1));
       when(puentes.findConCatalogoById(ID)).thenReturn(Optional.of(puente));
       when(cercanos.buscar(14.84, -91.52, ID)).thenReturn(List.of());
 

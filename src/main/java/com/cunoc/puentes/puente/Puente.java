@@ -43,10 +43,20 @@ public class Puente extends EntidadBase {
 
   private String motivoBaja;
 
+  // RN-INV-09: sin setter; solo cambian con la inspección publicada (actualizarCondicion)
+  @Setter(AccessLevel.NONE)
   @Enumerated(EnumType.STRING)
   private EstadoCondicion estadoActual;
 
+  @Setter(AccessLevel.NONE)
   private BigDecimal indiceCondicionActual;
 
+  @Setter(AccessLevel.NONE)
   private LocalDate fechaUltimaInspeccion;
+
+  void actualizarCondicion(EstadoCondicion estado, BigDecimal indice, LocalDate fecha) {
+    this.estadoActual = estado;
+    this.indiceCondicionActual = indice;
+    this.fechaUltimaInspeccion = fecha;
+  }
 }
