@@ -1,6 +1,4 @@
 -- Fixtures aislados de persistencia, no catálogo oficial ni publicación real de P5.
-INSERT INTO departamento (codigo, nombre) VALUES ('01', 'Guatemala');
-INSERT INTO municipio (codigo, departamento_codigo, nombre) VALUES ('0101', '01', 'Guatemala');
 INSERT INTO puente (id, codigo, nombre, municipio_codigo, ruta, ubicacion) VALUES
  ('019a0022-0000-7000-8000-000000000001', 'GT-01-0101-9901', 'Puente ficticio A', '0101', 'Ruta de prueba', 'SRID=4326;POINT(-90.51 14.62)'),
  ('019a0022-0000-7000-8000-000000000002', 'GT-01-0101-9902', 'Puente ficticio B', '0101', 'Ruta de prueba', 'SRID=4326;POINT(-90.52 14.63)');

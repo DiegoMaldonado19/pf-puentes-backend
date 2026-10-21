@@ -18,13 +18,6 @@ class PuenteTest extends PruebaIntegracion {
 
   @Test
   void generaUuidV7YGuardaLaUbicacionComoGeography() {
-    em.getEntityManager()
-        .createNativeQuery(
-            """
-            INSERT INTO departamento VALUES ('09', 'Quetzaltenango');
-            INSERT INTO municipio VALUES ('0901', '09', 'Quetzaltenango');
-            """)
-        .executeUpdate();
     Puente puente = new Puente();
     puente.setCodigo("GT-09-0901-0001");
     puente.setNombre("Puente Las Rosas");
