@@ -49,6 +49,7 @@ class InvitacionControllerTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"correo\":\"prof@correo.com\",\"rol\":\"CATEDRATICO\"}"))
         .andExpect(status().isUnauthorized());
+    mvc.perform(post(BASE + "/" + INVITACION + "/revocacion")).andExpect(status().isUnauthorized());
   }
 
   @ParameterizedTest
@@ -64,6 +65,8 @@ class InvitacionControllerTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"correo\":\"prof@correo.com\",\"rol\":\"CATEDRATICO\"}")
                 .with(como(rol)))
+        .andExpect(status().isForbidden());
+    mvc.perform(post(BASE + "/" + INVITACION + "/revocacion").with(como(rol)))
         .andExpect(status().isForbidden());
   }
 

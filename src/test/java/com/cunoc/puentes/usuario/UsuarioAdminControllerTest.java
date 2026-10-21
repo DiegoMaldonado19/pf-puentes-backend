@@ -52,10 +52,16 @@ class UsuarioAdminControllerTest {
     mvc.perform(get(BASE + "/" + PROFESIONAL)).andExpect(status().isUnauthorized());
     mvc.perform(post(VERIFICAR)).andExpect(status().isUnauthorized());
     mvc.perform(
+            post(RECHAZAR)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"motivo\":\"Colegiado ilegible\"}"))
+        .andExpect(status().isUnauthorized());
+    mvc.perform(
             post(BAJA)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"motivo\":\"Baja de prueba\"}"))
         .andExpect(status().isUnauthorized());
+    mvc.perform(post(REACTIVAR)).andExpect(status().isUnauthorized());
   }
 
   @ParameterizedTest
@@ -66,13 +72,21 @@ class UsuarioAdminControllerTest {
     mvc.perform(get(BASE).with(como(rol)))
         .andExpect(status().isForbidden())
         .andExpect(jsonPath("$.status").value(403));
+    mvc.perform(get(BASE + "/" + PROFESIONAL).with(como(rol))).andExpect(status().isForbidden());
     mvc.perform(post(VERIFICAR).with(como(rol))).andExpect(status().isForbidden());
+    mvc.perform(
+            post(RECHAZAR)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"motivo\":\"Colegiado ilegible\"}")
+                .with(como(rol)))
+        .andExpect(status().isForbidden());
     mvc.perform(
             post(BAJA)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"motivo\":\"Baja de prueba\"}")
                 .with(como(rol)))
         .andExpect(status().isForbidden());
+    mvc.perform(post(REACTIVAR).with(como(rol))).andExpect(status().isForbidden());
   }
 
   @Test

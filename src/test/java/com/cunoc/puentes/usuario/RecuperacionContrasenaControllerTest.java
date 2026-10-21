@@ -62,6 +62,15 @@ class RecuperacionContrasenaControllerTest {
   void unaSesionNoCambiaLaRespuesta(Rol rol) throws Exception {
     mvc.perform(json(RECUPERAR, "{\"correo\": \"ana@correo.com\"}").with(como(rol)))
         .andExpect(status().isAccepted());
+    mvc.perform(
+            json(
+                    RESTABLECER,
+                    """
+                    {"token": "%s", "contrasena": "%s"}
+                    """
+                        .formatted(TOKEN, CONTRASENA))
+                .with(como(rol)))
+        .andExpect(status().isNoContent());
   }
 
   @Test

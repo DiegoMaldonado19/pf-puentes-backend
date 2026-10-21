@@ -1,5 +1,6 @@
 package com.cunoc.puentes.usuario;
 
+import static com.cunoc.puentes.common.seguridad.AutenticacionDePrueba.como;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
@@ -16,6 +17,8 @@ import com.cunoc.puentes.usuario.dto.InvitacionPublicaDTO;
 import java.time.Instant;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
@@ -86,6 +89,19 @@ class AceptacionInvitacionControllerTest {
         ArgumentCaptor.forClass(AceptarInvitacionDTO.class);
     verify(invitaciones).aceptar(datos.capture());
     assertThat(datos.getValue().token()).isEqualTo(TOKEN);
+  }
+
+  @ParameterizedTest
+  @EnumSource(Rol.class)
+  void unaSesionDeCualquierRolNoCambiaLaConsulta(Rol rol) throws Exception {
+    when(invitaciones.consultar(TOKEN))
+        .thenReturn(
+            new InvitacionPublicaDTO(
+                "prof@correo.com", Rol.CATEDRATICO, Instant.parse("2026-10-27T15:00:00Z")));
+
+    mvc.perform(json(CONSULTAR, "{\"token\": \"%s\"}".formatted(TOKEN)).with(como(rol)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.correo").value("prof@correo.com"));
   }
 
   @Test
