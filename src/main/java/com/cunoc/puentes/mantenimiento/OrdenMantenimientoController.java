@@ -1,5 +1,6 @@
 package com.cunoc.puentes.mantenimiento;
 
+import com.cunoc.puentes.mantenimiento.dto.DescartarOrdenDTO;
 import com.cunoc.puentes.mantenimiento.dto.OrdenMantenimientoDTO;
 import com.cunoc.puentes.mantenimiento.dto.PaginaOrdenesDTO;
 import com.cunoc.puentes.mantenimiento.dto.PaginacionOrdenesDTO;
@@ -14,6 +15,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -141,5 +143,27 @@ class OrdenMantenimientoController {
       description = "La inspección de origen pertenece a otro puente")
   OrdenMantenimientoDTO iniciarEjecucion(@PathVariable UUID puenteId, @PathVariable UUID ordenId) {
     return servicio.iniciarEjecucion(puenteId, ordenId);
+  }
+
+  @PostMapping(path = "/{ordenId}/descarte", consumes = "application/json")
+  @PreAuthorize("hasAnyRole('CATEDRATICO', 'ADMINISTRADOR')")
+  @Operation(
+      summary = "Descarta una propuesta conservando un motivo escrito (RN-MTO-04/09)",
+      description =
+          "Actores confirmados: Catedrático y Administrador. Solo PROPUESTA pasa a "
+              + "DESCARTADA. Conserva origen, intervención, prioridades y fechas; no borra la fila. "
+              + "Cambio y auditoría con motivo se confirman juntos. No habilita cancelación ni reapertura.")
+  @ApiResponse(responseCode = "200", description = "Orden persistida DESCARTADA con su motivo")
+  @ApiResponse(responseCode = "400", description = "UUID inválido o motivo ausente/vacío")
+  @ApiResponse(responseCode = "401", description = "Sin sesión o token inválido")
+  @ApiResponse(responseCode = "403", description = "Solo Catedrático o Administrador descarta")
+  @ApiResponse(responseCode = "404", description = "La orden no existe en el puente indicado")
+  @ApiResponse(responseCode = "409", description = "La orden ya no está en PROPUESTA")
+  @ApiResponse(responseCode = "422", description = "Origen incompatible con el puente")
+  OrdenMantenimientoDTO descartar(
+      @PathVariable UUID puenteId,
+      @PathVariable UUID ordenId,
+      @Valid @RequestBody DescartarOrdenDTO datos) {
+    return servicio.descartar(puenteId, ordenId, datos.motivo());
   }
 }

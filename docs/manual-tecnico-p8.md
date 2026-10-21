@@ -7,8 +7,8 @@ Actualizado: 20/10/2026. Describe el código disponible; la integración complet
 | Pieza | Disponible | Pendiente |
 |---|---|---|
 | `indice/` | Núcleo puro, pesos normalizados, repositorios, creación Java autorizada/auditada, tres GET Admin | Adaptación real P4, publicación P5, confirmación/recálculos y creación HTTP |
-| `mantenimiento/` | Máquina, origen orden/puente/inspección, consultas de historial/detalle/propuestas, ajuste justificado de prioridad y POST de aceptación/inicio/cierre y carga/consulta paginada de evidencia P1 | Programación de fecha, descarte/ajuste HTTP, generación por catálogo y jobs |
-| Frontend P8 | Componente de condición, consulta de pesos, revisión/aceptación, bandeja, contenedor HTTP de propuestas e historial/detalle con inicio, evidencia y cierre opcionales | Sesión/guardias P2, rutas y conexiones pendientes; las piezas no aparecen aún en la página inicial |
+| `mantenimiento/` | Máquina, origen orden/puente/inspección, consultas de historial/detalle/propuestas, ajuste justificado de prioridad y POST de aceptación/inicio/cierre/descarte y carga/consulta paginada de evidencia P1 | Programación de fecha, ajuste HTTP, cancelación, generación por catálogo y jobs |
+| Frontend P8 | Componente de condición, consulta de pesos, revisión/aceptación, bandeja, contenedor HTTP de propuestas e historial/detalle con inicio, evidencia, cierre y descarte opcionales | Sesión/guardias P2, rutas y conexiones pendientes; las piezas no aparecen aún en la página inicial |
 
 Se emplean DTO y MapStruct; las entidades JPA no se exponen por HTTP. La autorización efectiva vive en backend. La existencia de una validación interna o una columna no equivale a una operación HTTP habilitada.
 
@@ -70,6 +70,7 @@ En local: API `http://localhost:8080`; Swagger `http://localhost:8080/api/docs/s
 | `POST /api/v1/puentes/{puenteId}/ordenes-mantenimiento/{ordenId}/evidencias` | CATEDRATICO o ADMINISTRADOR | Multipart foto/miniatura, 201 ArchivoDTO; PROGRAMADA o EN_EJECUCION |
 | `GET /api/v1/puentes/{puenteId}/ordenes-mantenimiento/{ordenId}/evidencias` | CATEDRATICO o ADMINISTRADOR | Página de JPEG/WebP no purgadas, incluso después de cerrar |
 | `POST /api/v1/puentes/{puenteId}/ordenes-mantenimiento/{ordenId}/cierre` | CATEDRATICO o ADMINISTRADOR | JSON fecha_ejecucion/responsable, 200 DTO EJECUTADA; requiere foto guardada de esta orden |
+| `POST /api/v1/puentes/{puenteId}/ordenes-mantenimiento/{ordenId}/descarte` | CATEDRATICO o ADMINISTRADOR | JSON motivo obligatorio, 200 DTO DESCARTADA; solo PROPUESTA, sin borrar historial |
 
 Los GET paginados aceptan `page` desde 0 y `size` entre 1 y 100; valores predeterminados 0/20. La salida tiene `content`, `page`, `size`, `total_elements`, `total_pages`. Una colección existente sin registros devuelve página vacía; recurso inexistente, 404.
 
@@ -87,7 +88,7 @@ Errores en RFC 7807, con `type`, `title`, `status`, `detail` e `instance`:
 | 413 | Archivo/petición supera el límite HTTP configurado |
 | 422 | Origen incompatible, firma de foto inválida, falta de fotografía guardada o responsable mayor de 150 caracteres Unicode |
 
-Propuestas, historial completo y detalle tienen GET para Catedrático y Administrador, con confirmaciones del grupo comunicadas por el usuario. Añade `puente_id` al contrato de página. También se confirmaron los actores de evidencia y cierre y su carga en PROGRAMADA/EN_EJECUCION; están implementados. Siguen pendientes creación HTTP de pesos, descarte/ajuste, programación de fecha y recálculo HTTP. El permiso de lectura no asigna actores de escritura. El permiso de aceptación de RN-MTO-02 no se convierte automáticamente en una matriz completa de lectura o ejecución.
+Propuestas, historial completo y detalle tienen GET para Catedrático y Administrador, con confirmaciones del grupo comunicadas por el usuario. Añade `puente_id` al contrato de página. También se confirmaron los actores de evidencia y cierre y su carga en PROGRAMADA/EN_EJECUCION; están implementados. El grupo confirmó también Catedrático/Admin para descarte, ya implementado. Siguen pendientes creación HTTP de pesos, ajuste de prioridad, cancelación, programación de fecha y recálculo HTTP. El permiso de lectura no asigna actores de escritura. El permiso de aceptación de RN-MTO-02 no se convierte automáticamente en una matriz completa de lectura o ejecución.
 
 Detalle: [ADR 0020](adr/0020-consulta-paginada-de-juegos-de-pesos.md), [ADR 0025](adr/0025-aceptacion-autorizada-y-auditada-de-propuestas.md).
 
@@ -126,13 +127,25 @@ Con Bearer de Catedrático/Admin y una orden real PROGRAMADA o EN_EJECUCION del 
 
 Subida y cierre comparten bloqueo de fila; un cierre espera la carga en curso y evalúa su resultado confirmado. Cambio y bitácora SQL son atómicos. MinIO/S3 no participa en la transacción SQL de P1: fallos entre objetos o posteriores pueden dejar objetos sin fila confirmada; no se cuentan como evidencia. No hay máximo de fotos por orden, restricción temporal de ejecución ni notificación de cierre añadidos por P8. [ADR 0030](adr/0030-evidencia-y-cierre-autorizado-de-ordenes.md).
 
+### Prueba de descarte con Postman
+
+Con sesión real Catedrático/Admin, consulta primero una orden en PROPUESTA del puente. Envía `POST .../ordenes-mantenimiento/{ordenId}/descarte`, Body → raw → JSON:
+
+```json
+{
+  "motivo": "La intervención ya está incluida en otra propuesta."
+}
+```
+
+Comprueba 200, DESCARTADA y el motivo persistido. El GET de detalle/historial conserva la orden; el GET de propuestas ya no la incluye. Repetir da 409 sin añadir auditoría. Un motivo ausente/vacío da 400. No se fija máximo por el límite de otra columna: el motivo de la orden es TEXT y se incluye en la instantánea auditada del cambio. No se habilita CANCELADA. [ADR 0031](adr/0031-descarte-auditado-de-propuestas.md).
+
 ## 6. Conexiones pendientes del equipo
 
 | Responsable | Entrega necesaria para completar el flujo |
 |---|---|
 | P4 | JSON Schema real, respuestas de ejemplo, referencias/metadatos de daño, severidades y portantes; acuerdo de versiones con pesos |
-| P5 | Publicación que invoca el IC, guarda su resultado/versiones y emite el evento acordado en la misma transacción |
-| P3 | Integrar estado/Sin evaluar en lista, ficha y mapa mediante datos de inventario |
+| P5 | El record InspeccionPublicada ya llegó con P3; faltan publicación real que calcula/guarda IC/versiones y emisor en esa transacción |
+| P3 | Inventario/listado/mapa/ficha y uso de estado P8 ya recibidos; conectar los contenedores P8 al puente seleccionado disponible |
 | P2 | Sesión, interceptores y guardias frontend; aplicar los mecanismos backend existentes en cada nueva operación de P8 |
 | P1 | Almacenamiento/captura reutilizados para evidencia de órdenes; conservar contrato 16 |
 | P9 | Emisor `NotificacionService` ya recibido y verificado; P8 debe integrar jobs con destinatarios/repetición acordados |
@@ -142,7 +155,7 @@ El evento y las políticas pendientes son acuerdos por integrar, no clases/rutas
 
 ## 7. Verificación y entrega
 
-Verificación local del 20/10/2026, paso 4: **784 pruebas backend** sin fallos/errores/omisiones, incluidas 29 nuevas de evidencia/cierre. La entrega anterior tenía 755, con 22 de inicio y 68 de Notificaciones recibidas. Compilación limpia, formato, PMD, empaquetado y las tres reglas JaCoCo aprobados (servicios ≥70 %, núcleo IC/máquina 100 % según sus clases configuradas). El [registro del merge de Cursos](verificacion-p8-post-merge-2026-10-20.md) conserva sus 651 casos históricos. **186 pruebas frontend** (28 nuevas), lint, formato, compilación estricta y build aprobados; no se acredita recorrido con sesión P2 ni CI remoto.
+Verificación local del 20/10/2026, paso 5a: **909 pruebas backend** sin fallos/errores/omisiones, incluidas 33 nuevas de descarte. El merge de P3 pasó primero 876; el paso 4 anterior tenía 784. Compilación limpia, formato, PMD, empaquetado y las tres reglas JaCoCo aprobados (servicios ≥70 %, núcleo IC/máquina 100 % según sus clases configuradas). El [registro del merge de Cursos](verificacion-p8-post-merge-2026-10-20.md) conserva sus 651 casos históricos. **280 pruebas frontend** (38 nuevas de descarte, sobre las 242 tras P3), lint, formato, compilación estricta y build aprobados; no se acredita recorrido con sesión P2 ni CI remoto.
 
 Desde este repositorio, con el JDK 25 de la base y Docker disponible:
 
@@ -152,6 +165,7 @@ Desde este repositorio, con el JDK 25 de la base y Docker disponible:
 
 Los reportes están en `target/surefire-reports` y `target/site/jacoco/index.html`. Las pruebas de integración reutilizan PostgreSQL/PostGIS y MinIO de `PruebaIntegracion`, sin H2. No se deben editar archivos generados de `target/`.
 
-La última fusión local verificada es `566aaa0`: incorpora Notificaciones de P9 (`661231f`) y conserva el historial/detalle de P8 (`cb34b51`), sobre el merge previo de Cursos de P7. La corrección previa de P1 (`0fbe842`) descarga por `GITHUB_SHA` en el deploy. Este merge no incorpora los contratos de P4/P5 ni la sesión frontend de P2. La conexión de propuestas se documenta en [ADR 0026](adr/0026-consulta-autorizada-de-propuestas.md); las verificaciones locales no acreditan CI remoto.
+La última fusión local verificada es backend `6915578` (P3, develop `adddcca`) y frontend `514c884`. Aporta inventario, catálogo INE, CRUD/solicitudes/bajas, actualización derivada por evento, mapa/ficha públicos y uso del componente de estado P8. El record `InspeccionPublicada` no acredita un servicio P5 que lo emita ni la integración de daños P4. El token frontend `ROL_PUENTES` sigue con null por defecto y no sustituye sesión/interceptores/guardias de P2. El backend conserva la autorización de mantenimiento. Esta entrega no cambia workflow, migraciones ni módulos P3/P5/P7/P9; los resultados locales no acreditan CI remoto.
+
 
 Para cerrar la entrega faltan integración real, pruebas pertinentes de rol/fila, manual de usuario con capturas del recorrido disponible, exportación OpenAPI de entrega y revisión/CI/fusión del trabajo pendiente. El diccionario existente se genera desde migraciones; este documento no modifica el esquema.

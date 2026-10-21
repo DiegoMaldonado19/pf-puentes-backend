@@ -17,6 +17,7 @@ public class OrdenMantenimientoService {
   private final AceptacionOrdenService aceptacion;
   private final InicioEjecucionOrdenService inicio;
   private final CierreOrdenService cierre;
+  private final DescarteOrdenService descarte;
   private final OrdenMantenimientoMapper mapper;
 
   OrdenMantenimientoService(
@@ -25,12 +26,14 @@ public class OrdenMantenimientoService {
       AceptacionOrdenService aceptacion,
       InicioEjecucionOrdenService inicio,
       CierreOrdenService cierre,
+      DescarteOrdenService descarte,
       OrdenMantenimientoMapper mapper) {
     this.ordenes = ordenes;
     this.origen = origen;
     this.aceptacion = aceptacion;
     this.inicio = inicio;
     this.cierre = cierre;
+    this.descarte = descarte;
     this.mapper = mapper;
   }
 
@@ -63,6 +66,15 @@ public class OrdenMantenimientoService {
     }
     OrdenMantenimiento orden = obtenerBloqueada(puenteId, ordenId);
     cierre.cerrar(orden, datos);
+    return mapper.aDTO(orden);
+  }
+
+  /** RN-MTO-04/09: descarta una propuesta con motivo y conserva la fila histórica. */
+  @Transactional
+  @PreAuthorize("hasAnyRole('CATEDRATICO', 'ADMINISTRADOR')")
+  public OrdenMantenimientoDTO descartar(UUID puenteId, UUID ordenId, String motivo) {
+    OrdenMantenimiento orden = obtenerBloqueada(puenteId, ordenId);
+    descarte.descartar(orden, motivo);
     return mapper.aDTO(orden);
   }
 
