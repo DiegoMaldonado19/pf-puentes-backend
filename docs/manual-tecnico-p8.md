@@ -7,7 +7,7 @@ Actualizado: 21/10/2026. Describe el código disponible; la integración complet
 | Pieza | Disponible | Pendiente |
 |---|---|---|
 | `indice/` | Núcleo puro, pesos normalizados, repositorios, creación Java autorizada/auditada, tres GET Admin | Adaptación real P4, publicación P5, confirmación/recálculos y creación HTTP |
-| `mantenimiento/` | Máquina, origen orden/puente/inspección, consultas de historial/detalle/propuestas, PATCH autorizados/auditados de prioridad y fecha programada y POST de aceptación/inicio/cierre/descarte y carga/consulta paginada de evidencia P1 | Cancelación, sugerencia automática, generación por catálogo y jobs |
+| `mantenimiento/` | Máquina, origen orden/puente/inspección, consultas de historial/detalle/propuestas, PATCH autorizados/auditados de prioridad y fecha programada y POST de aceptación/inicio/cierre/descarte y carga/consulta paginada de evidencia P1; alerta diaria de inspección vencida mediante P9 | Cancelación, sugerencia automática, generación por catálogo y job rutinario anual |
 | Frontend P8 | Componente de condición, consulta de pesos, revisión/aceptación, bandeja, contenedor HTTP de propuestas e historial/detalle con inicio, evidencia, cierre, descarte, ajuste de prioridad y programación de fecha opcionales | Sesión/guardias P2, rutas y conexiones pendientes; las piezas no aparecen aún en la página inicial |
 
 Se emplean DTO y MapStruct; las entidades JPA no se exponen por HTTP. La autorización efectiva vive en backend. La existencia de una validación interna o una columna no equivale a una operación HTTP habilitada.
@@ -181,12 +181,28 @@ En frontend, `ConsultaOrdenes` recibe `puedeProgramar` de la sesión (false por 
 | P3 | Inventario/listado/mapa/ficha y uso de estado P8 ya recibidos; conectar los contenedores P8 al puente seleccionado disponible |
 | P2 | Sesión, interceptores y guardias frontend; aplicar los mecanismos backend existentes en cada nueva operación de P8 |
 | P1 | Almacenamiento/captura reutilizados para evidencia de órdenes; conservar contrato 16 |
-| P9 | Emisor `NotificacionService` ya recibido y verificado; P8 debe integrar jobs con destinatarios/repetición acordados |
+| P9 | Emisor ya integrado con alerta de inspección vencida; falta su presentación frontend y la integración independiente del rutinario anual |
 | Equipo/catedrático | Actores pendientes de otras operaciones, catálogo daño → intervención, calibración/acta, prioridad, precisión/anulaciones y reglas temporales no especificadas |
 
-El evento y las políticas pendientes son acuerdos por integrar, no clases/rutas ya disponibles. La generación de propuestas, recálculo, confirmación y jobs no se dan por implementados por existir tablas o enum.
+El evento y las políticas pendientes son acuerdos por integrar, no clases/rutas ya disponibles. La generación de propuestas, recálculo, confirmación y job rutinario anual no se dan por implementados por existir tablas o enum. El job de inspección vencida sí está implementado, según la sección siguiente.
+
+### Alerta por inspección vencida (RN-MTO-08)
+
+P8 ejecuta `AlertasInspeccionJob` diariamente a las 06:00 America/Guatemala, con ShedLock y lotes de 100 puentes/destinatarios. El usuario adoptó: Catedrático/Admin activos; doce meses desde la última publicación; desde el registro si nunca hubo una; un aviso por puente/destinatario mientras ese período permanezca vencido. Una nueva publicación inicia otro plazo. Se suman meses de calendario en UTC y se compara estrictamente; el límite exacto y los borradores no provocan/reinician el aviso. No se usa fecha_ultima_inspeccion ni se presupone que represente publicada_en.
+
+La notificación de P9 contiene tipo INSPECCION_VENCIDA, código/nombre del puente y ruta `/puentes/{id}` de P3. Para consultar con Postman: inicia sesión con el destinatario activo, usa su Bearer y solicita `GET /api/v1/notificaciones?page=0&size=20`; la lista se llama **contenido**, con campos tipo/mensaje/enlace. El servidor identifica al destinatario a partir de su sesión. Leer el aviso con el PATCH de lectura de P9 no habilita otro envío del mismo período.
+
+No hay endpoint nuevo de alerta ni se modifican datos/fechas de producción para simular vencimientos. Las pruebas usan PostgreSQL y reloj controlado; pueden ejecutarse con `./mvnw -B -ntp -Dtest=AlertasInspeccionTest test`. Incluyen el GET real autenticado de P9. La presentación de notificaciones corresponde a P9; en el checkout frontend aún no existe esa pantalla. La ficha enlazada de P3 sí existe. No se creó una pantalla duplicada ni una sesión alternativa.
+
+La migración `V2026_10_21_0100__crear_aviso_inspeccion_vencida.sql` añade marcas de envío y un índice de última publicación. Notificación y marca comparten transacción por puente: fallo revierte ambos, no bloquea otros puentes y se reintenta al día siguiente. Unicidad incluye el caso nunca publicado; concurrencia se protege con bloqueo por puente más ShedLock. No hay generación de órdenes, cambio de IC o correo añadido. [ADR 0034](adr/0034-alertas-de-inspeccion-vencida.md).
+
+La política autorizada no incluye un filtro adicional de puentes por activo: se recorre el inventario permanente. La garantía de programación rutinaria anual (RN-MTO-07) conserva su incremento independiente y no se considera satisfecha por esta alerta.
 
 ## 7. Verificación y entrega
+
+Verificación de **alerta de inspección vencida, 21/10/2026**: **1089 pruebas backend**, 17 nuevas sobre 1072; ninguna falla, error u omisión. Pasaron compilación limpia, Spotless, PMD, empaquetado y tres reglas JaCoCo: servicios 95.16 % de líneas, núcleo IC/máquina 100 % según clases configuradas y servicio de alertas 100 % de líneas/ramas. Incluye migración, PostgreSQL, P9, JWT, ShedLock real y escenarios de calendario, repetición, concurrencia, fallos y lotes. Verificada copia temporal de fuentes/pruebas idénticas sin interferencia del IDE, con reportes en `/tmp/p8-alertas-verificacion/target`. No se editan generados ni se rebajan controles. La primera corrida ajustó exclusivamente fixtures de baja P2 y expectativa JSON de P9; no cambió contratos o pruebas ajenas.
+
+Frontend sin cambios en esta entrega: no se repiten sus pruebas/build; la última verificación del paso 6 sigue siendo 366 pruebas. Falta presentación P9 y recorrido con sesión P2/publicación P5 reales; resultados locales no acreditan CI remoto.
 
 Verificación local del **21/10/2026, paso 6**: **1072 pruebas backend aprobadas**, 31 nuevas de programación sobre 1041 tras P2. Pasaron compilación limpia, Spotless, PMD, empaquetado y las tres reglas JaCoCo: servicios 95.07 % de líneas (mínimo 70 %) y núcleo IC/máquina 100 % según sus clases configuradas; el servicio nuevo de programación tiene 100 % de líneas y ramas. Las pruebas de programación incluyen JWT real, rol vigente y baja P2, estados/datos/fechas, auditoría/no-op, rollback, concurrencia y aceptación seguida de fecha. **366 frontend**, 41 nuevas sobre 325: pruebas DOM/HTTP del formulario, cliente y contenedor; lint, formato, compilación estricta y build aprobados (transferencia inicial ~90.36 kB, MapLibre diferido). No acredita recorrido con sesión frontend P2 ni CI remoto. La entrega previa de prioridad conserva su evidencia histórica de 939/325.
 
