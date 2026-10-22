@@ -7,7 +7,7 @@ Actualizado: 21/10/2026. Describe el código disponible; la integración complet
 | Pieza | Disponible | Pendiente |
 |---|---|---|
 | `indice/` | Núcleo puro, pesos normalizados, repositorios, creación Java autorizada/auditada, tres GET Admin | Adaptación real P4, publicación P5, confirmación/recálculos y creación HTTP |
-| `mantenimiento/` | Máquina, origen orden/puente/inspección, consultas de historial/detalle/propuestas, PATCH autorizados/auditados de prioridad y fecha programada y POST de aceptación/inicio/cierre/descarte y carga/consulta paginada de evidencia P1 | Cancelación, sugerencia automática, generación por catálogo y jobs |
+| `mantenimiento/` | Máquina, origen orden/puente/inspección, consultas de historial/detalle/propuestas, PATCH autorizados/auditados de prioridad y fecha programada y POST de aceptación/inicio/cierre/descarte y carga/consulta paginada de evidencia P1; alerta de inspección vencida y recordatorio rutinario anual diarios mediante P9 | Cancelación, sugerencia automática, generación por catálogo y programación efectiva anual |
 | Frontend P8 | Componente de condición, consulta de pesos, revisión/aceptación, bandeja, contenedor HTTP de propuestas e historial/detalle con inicio, evidencia, cierre, descarte, ajuste de prioridad y programación de fecha opcionales | Sesión/guardias P2, rutas y conexiones pendientes; las piezas no aparecen aún en la página inicial |
 
 Se emplean DTO y MapStruct; las entidades JPA no se exponen por HTTP. La autorización efectiva vive en backend. La existencia de una validación interna o una columna no equivale a una operación HTTP habilitada.
@@ -168,7 +168,7 @@ Verifica 200 y la fecha exacta en el DTO y en GET de detalle; conserva PROGRAMAD
 
 Fecha ausente/nula/vacía, inexistente o formato incorrecto: 400. Orden de otro puente/ausente: 404. Cualquier estado distinto de PROGRAMADA: 409, incluso al repetir una fecha. Origen inconsistente: 422. Sin sesión/token inválido/cuenta inactiva: 401; rol vigente ajeno: 403. No hay mínimo ni máximo temporal adicional: la decisión del usuario admite fechas pasadas o futuras. No permite borrar la fecha.
 
-Este PATCH resuelve la edición de programación de MTO-03. RN-MTO-07 requiere además asegurar la programación rutinaria anual por puente; todavía faltan consultas, políticas y automatización correspondientes. No confundir aceptar sin fecha, registrar una fecha o emitir recordatorio con garantizar esa periodicidad. [ADR 0033](adr/0033-programacion-auditada-de-fecha-de-ordenes.md).
+Este PATCH resuelve la edición de programación de MTO-03. RN-MTO-07 requiere además asegurar la programación rutinaria anual por puente; ya existen consulta/vista y recordatorios diarios, descritos más abajo. No confundir aceptar sin fecha, registrar una fecha o emitir recordatorio con garantizar esa periodicidad. [ADR 0033](adr/0033-programacion-auditada-de-fecha-de-ordenes.md).
 
 En frontend, `ConsultaOrdenes` recibe `puedeProgramar` de la sesión (false por defecto), incorpora el formulario y emite `fechaProgramada` confirmado; `operacionPendiente()` bloquea las otras acciones mientras guarda. El inventario P3 existe; aún falta conectar los componentes privados con su selección y la sesión/guardias frontend de P2.
 
@@ -181,12 +181,56 @@ En frontend, `ConsultaOrdenes` recibe `puedeProgramar` de la sesión (false por 
 | P3 | Inventario/listado/mapa/ficha y uso de estado P8 ya recibidos; conectar los contenedores P8 al puente seleccionado disponible |
 | P2 | Sesión, interceptores y guardias frontend; aplicar los mecanismos backend existentes en cada nueva operación de P8 |
 | P1 | Almacenamiento/captura reutilizados para evidencia de órdenes; conservar contrato 16 |
-| P9 | Emisor `NotificacionService` ya recibido y verificado; P8 debe integrar jobs con destinatarios/repetición acordados |
+| P9 | Emisor integrado con alerta de inspección vencida y recordatorio rutinario anual; falta su presentación frontend |
 | Equipo/catedrático | Actores pendientes de otras operaciones, catálogo daño → intervención, calibración/acta, prioridad, precisión/anulaciones y reglas temporales no especificadas |
 
-El evento y las políticas pendientes son acuerdos por integrar, no clases/rutas ya disponibles. La generación de propuestas, recálculo, confirmación y jobs no se dan por implementados por existir tablas o enum.
+El evento y las políticas pendientes son acuerdos por integrar, no clases/rutas ya disponibles. La generación de propuestas, recálculo y confirmación no se dan por implementados por existir tablas o enum. Los procesos de inspección vencida y recordatorio rutinario anual sí están implementados, según las secciones siguientes; el segundo no crea ni acepta órdenes.
+
+### Alerta por inspección vencida (RN-MTO-08)
+
+P8 ejecuta `AlertasInspeccionJob` diariamente a las 06:00 America/Guatemala, con ShedLock y lotes de 100 puentes/destinatarios. El usuario adoptó: Catedrático/Admin activos; doce meses desde la última publicación; desde el registro si nunca hubo una; un aviso por puente/destinatario mientras ese período permanezca vencido. Una nueva publicación inicia otro plazo. Se suman meses de calendario en UTC y se compara estrictamente; el límite exacto y los borradores no provocan/reinician el aviso. No se usa fecha_ultima_inspeccion ni se presupone que represente publicada_en.
+
+La notificación de P9 contiene tipo INSPECCION_VENCIDA, código/nombre del puente y ruta `/puentes/{id}` de P3. Para consultar con Postman: inicia sesión con el destinatario activo, usa su Bearer y solicita `GET /api/v1/notificaciones?page=0&size=20`; la lista se llama **contenido**, con campos tipo/mensaje/enlace. El servidor identifica al destinatario a partir de su sesión. Leer el aviso con el PATCH de lectura de P9 no habilita otro envío del mismo período.
+
+No hay endpoint nuevo de alerta ni se modifican datos/fechas de producción para simular vencimientos. Las pruebas usan PostgreSQL y reloj controlado; pueden ejecutarse con `./mvnw -B -ntp -Dtest=AlertasInspeccionTest test`. Incluyen el GET real autenticado de P9. La presentación de notificaciones corresponde a P9; en el checkout frontend aún no existe esa pantalla. La ficha enlazada de P3 sí existe. No se creó una pantalla duplicada ni una sesión alternativa.
+
+La migración `V2026_10_21_0100__crear_aviso_inspeccion_vencida.sql` añade marcas de envío y un índice de última publicación. Notificación y marca comparten transacción por puente: fallo revierte ambos, no bloquea otros puentes y se reintenta al día siguiente. Unicidad incluye el caso nunca publicado; concurrencia se protege con bloqueo por puente más ShedLock. No hay generación de órdenes, cambio de IC o correo añadido. [ADR 0034](adr/0034-alertas-de-inspeccion-vencida.md).
+
+La política autorizada no incluye un filtro adicional de puentes por activo: se recorre el inventario permanente. La garantía de programación rutinaria anual (RN-MTO-07) conserva su incremento independiente y no se considera satisfecha por esta alerta.
 
 ## 7. Verificación y entrega
+
+### Recordatorios rutinarios anuales: proceso diario y consulta P9
+
+El usuario aprobó destinatarios Catedráticos/Admin activos, aviso ante ausencia de programación en plazo incluso antes de vencer y una entrega por puente/destinatario/período. La fecha base ya confirmada por el grupo se conserva: última ejecución RUTINARIO o fecha civil UTC del registro sin ejecuciones. El período se identifica por esa fecha; otra ejecución en una fecha distinta permite otro aviso si vuelve a faltar programación válida.
+
+`RecordatoriosRutinariosJob` ejecuta diariamente a las 06:15 America/Guatemala con @Scheduled y ShedLock (`recordatorios-rutinario-anual`). Recorre puentes por cursor/lotes de 100. `RecordatoriosRutinariosService` revalida bajo bloqueo del puente, entrega mediante P9 y persiste `aviso_rutinario_anual` en la misma transacción. Reintenta al día siguiente lo revertido, continúa con otros puentes y no repite avisos confirmados. Destinatarios nuevos activos pueden recibir su propio aviso. Leerlo o volver a perder la programación dentro del mismo período no lo repite.
+
+Para comprobar entrega, consultar con JWT del destinatario `GET /api/v1/notificaciones?page=0&size=20`: `contenido` incluye tipo `RUTINARIO_SIN_PROGRAMAR`, mensaje con código/nombre/fecha límite y enlace `/puentes/{id}`. Las pruebas ejecutan el job y servicio reales con reloj controlado, sin esperar al horario diario ni exponer un endpoint para forzarlo. La presentación frontend de avisos sigue en P9. No hace falta una segunda pantalla P8 para este emisor.
+
+Este proceso no crea, acepta, cambia fechas ni cierra órdenes. MTO-08 sigue parcial: un recordatorio no garantiza programación efectiva. La generación adicional de propuestas requiere su decisión pendiente. [ADR 0036](adr/0036-recordatorios-de-programacion-rutinaria-anual.md).
+
+**Corrección del PR:** se incorpora el diccionario generado que faltó tras crear `aviso_inspeccion_vencida`, junto con la nueva tabla anual. Generar mediante `DiccionarioDeDatosTest` contra PostgreSQL, versionar `docs/diccionario-de-datos.md` y comprobar una nueva generación sin diferencias. Si la verificación usa una copia temporal, trasladar ese artefacto al repositorio: Maven aprobado por sí solo no cubre la comprobación posterior de Git en CI.
+
+Verificación global: **1127 pruebas backend**, 17 nuevas, sin fallos/errores/omisiones; `clean spotless:check verify pmd:check` aprobado con Java 25, PostgreSQL/PostGIS y MinIO reales. Tres reglas JaCoCo aprobadas; servicio nuevo con 100 % de líneas/ramas. Fuentes/pruebas idénticas verificadas en `/tmp/p8-recordatorios-verificacion`, sin modificar generados del IDE. Pruebas cubren avisos antes/después del límite, revalidación de programación, nuevos períodos/destinatarios, lectura sin reenvío, roles activos, rollback/reintento, concurrencia, unicidad, más de cien destinatarios/puentes, aislamiento de fallos, ShedLock real y consulta P9 con JWT. Frontend sin cambios; no se repiten sus controles. No acredita CI remoto.
+
+La segunda ejecución focalizada de `DiccionarioDeDatosTest` aprobó y produjo contenido idéntico tanto a la generación anterior como al archivo incluido en el repositorio. Esto comprueba localmente la estabilidad requerida por CI una vez versionado el cambio; no se ha ejecutado el workflow remoto.
+
+### Seguimiento rutinario anual: consulta y acciones existentes
+
+`SeguimientoRutinarioRepository.sinProgramacion(cursor, hoy)` detecta en lotes de 100 e ID ascendente, con la misma base/calendario/ventana del resumen. Una rutina válida excluye al puente; propuesta o fecha ausente/fuera de la ventana no lo excluyen. Ahora lo consume el job de recordatorios descrito abajo. Crear propuestas adicionales conserva su decisión pendiente. La preparación del detector pasó 1110 pruebas backend; evidencia histórica en `/tmp/p8-deteccion-rutinario-verificacion/target`.
+
+Con una sesión Catedrático/Admin, usa Postman para `GET /api/v1/puentes/{puenteId}/ordenes-mantenimiento/rutinario-anual?page=0&size=20`. Devuelve `fecha_evaluacion`, `fecha_referencia`, `origen_referencia` (EJECUCION_RUTINARIA o REGISTRO_PUENTE), `fecha_limite`, `programadas_en_plazo`, `sin_fecha`, `fechas_pasadas`, `posteriores_al_limite` y página `ordenes` con el contrato existente. Conteos globales independientes de la página, máximo 100 filas; 400 por UUID/página inválidos, 401/403 acceso y 404 puente ausente.
+
+La base confirmada por el grupo es la última ejecución RUTINARIO/EJECUTADA o el registro sin ejecuciones. Otras tipologías, propuestas y fechas programadas no reinician el año. Se suma un año de calendario y se evalúa la ventana inclusiva hoy–límite. Registro/reloj UTC y fechas civiles sin segunda conversión de zona. Fecha pasada no equivale automáticamente a incumplimiento anual. Los indicadores de pasada y posterior al límite pueden coincidir; no se suman como un total. La consulta no confirma ejecución.
+
+`ConsultaOrdenes` incorpora el panel con `[mostrarSeguimientoRutinario]="true"`, conservando `puedeConsultar` de la sesión. Seleccionar abre el detalle y sus acciones existentes; fecha guardada, inicio y cierre recargan el resumen desde el servidor. No se añade ruta pública: host con sesión/interceptores/guardias P2 y conexión privada P3 pendientes. MTO-08 queda en progreso. [ADR 0035](adr/0035-consulta-del-seguimiento-rutinario-anual.md).
+
+Verificación: **1105 pruebas backend**, 16 nuevas, sin fallos/errores/omisiones; compilación limpia, Spotless, PMD, empaquetado y tres reglas JaCoCo aprobados (servicios 95.28 %, núcleo IC/máquina 100 % según clases configuradas). **387 frontend**, 21 nuevas, lint, Prettier, compilación estricta y build aprobados (~90.73 kB iniciales). Fuentes/pruebas idénticas verificadas en `/tmp/p8-rutinario-verificacion`, sin editar generados; no acredita CI remoto ni recorrido frontend autenticado completo. Los párrafos siguientes conservan evidencia histórica.
+
+Verificación de **alerta de inspección vencida, 21/10/2026**: **1089 pruebas backend**, 17 nuevas sobre 1072; ninguna falla, error u omisión. Pasaron compilación limpia, Spotless, PMD, empaquetado y tres reglas JaCoCo: servicios 95.16 % de líneas, núcleo IC/máquina 100 % según clases configuradas y servicio de alertas 100 % de líneas/ramas. Incluye migración, PostgreSQL, P9, JWT, ShedLock real y escenarios de calendario, repetición, concurrencia, fallos y lotes. Verificada copia temporal de fuentes/pruebas idénticas sin interferencia del IDE, con reportes en `/tmp/p8-alertas-verificacion/target`. No se editan generados ni se rebajan controles. La primera corrida ajustó exclusivamente fixtures de baja P2 y expectativa JSON de P9; no cambió contratos o pruebas ajenas.
+
+Frontend sin cambios en esta entrega: no se repiten sus pruebas/build; la última verificación del paso 6 sigue siendo 366 pruebas. Falta presentación P9 y recorrido con sesión P2/publicación P5 reales; resultados locales no acreditan CI remoto.
 
 Verificación local del **21/10/2026, paso 6**: **1072 pruebas backend aprobadas**, 31 nuevas de programación sobre 1041 tras P2. Pasaron compilación limpia, Spotless, PMD, empaquetado y las tres reglas JaCoCo: servicios 95.07 % de líneas (mínimo 70 %) y núcleo IC/máquina 100 % según sus clases configuradas; el servicio nuevo de programación tiene 100 % de líneas y ramas. Las pruebas de programación incluyen JWT real, rol vigente y baja P2, estados/datos/fechas, auditoría/no-op, rollback, concurrencia y aceptación seguida de fecha. **366 frontend**, 41 nuevas sobre 325: pruebas DOM/HTTP del formulario, cliente y contenedor; lint, formato, compilación estricta y build aprobados (transferencia inicial ~90.36 kB, MapLibre diferido). No acredita recorrido con sesión frontend P2 ni CI remoto. La entrega previa de prioridad conserva su evidencia histórica de 939/325.
 
