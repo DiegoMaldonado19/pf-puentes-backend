@@ -1,6 +1,6 @@
 # 0035. Consulta del seguimiento rutinario anual
 
-- Estado: implementado; acceso frontend integrado, automatización y revisión/entrega pendientes
+- Estado: consulta y componentes implementados; host con acceso protegido e integración final pendientes. Recordatorios añadidos en ADR 0036
 - Fecha: 21/10/2026
 - Trazabilidad: HU-P8-MTO-08, RN-MTO-07, DT-BE-04/08/09/10, DT-BD-07
 
@@ -32,7 +32,7 @@ El panel bloquea navegación/selección/recarga mientras el host escribe, cancel
 
 `SeguimientoRutinarioRepository.sinProgramacion(despues, hoy)` recorre los puentes sin rutina fechada dentro de la ventana acordada, por cursor UUID ascendente y lotes de 100. Usa la misma base, tipos, estados y límites inclusivos del resumen. Una orden propuesta, sin fecha, pasada o posterior al límite no excluye al puente; basta una rutina válida para excluirlo. Puede detectar falta de programación antes del vencimiento del año, sin etiquetarla por sí sola como incumplimiento.
 
-El método es interno y solo lee. No crea endpoint, planificador, órdenes o notificaciones. DT-BE-14 menciona recordatorios y Backend/04 concreta revisión diaria; siguen pendientes destinatarios, momento de envío y repetición. Crear además propuestas automáticas es otra decisión. La fecha base no se vuelve a consultar ni se presume aprobada una política de avisos por preparar la detección. Cinco pruebas nuevas comparan detector y resumen, bisiestos, límites y recorrido de más de cien puentes, sin duplicados ni omisiones. SQL acotado sin cargar relaciones JPA ni listados globales completos.
+El método es interno y solo lee. Cinco pruebas nuevas comparan detector y resumen, bisiestos, límites y recorrido de más de cien puentes, sin duplicados ni omisiones. SQL acotado sin cargar relaciones JPA ni listados globales completos. El incremento posterior [ADR 0036](0036-recordatorios-de-programacion-rutinaria-anual.md) incorpora el job y la política de avisos aprobada por el usuario; crear propuestas automáticas conserva su decisión propia. El detector por sí solo no crea órdenes ni notificaciones.
 
 Verificación final de esta preparación: **1110 pruebas backend**, cinco nuevas, sin fallos/errores/omisiones. Pasan compilación limpia, Spotless, PMD, empaquetado y las tres reglas JaCoCo. Sin cambios frontend; no se repiten sus controles. No se acredita CI remoto.
 

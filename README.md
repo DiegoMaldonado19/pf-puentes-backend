@@ -2,7 +2,11 @@
 
 ### Seguimiento rutinario anual (P8, 21/10/2026)
 
-La detección interna permite recorrer, en lotes de 100 y con cursor, los puentes sin programación dentro del plazo, con la misma regla del resumen. DT-BE-14 respalda recordatorios y Backend/04 revisión diaria; destinatarios/disparo/repetición siguen pendientes. No activa el job ni genera avisos/propuestas, endpoint o cambio frontend. Verificación: **1110 pruebas backend**, cinco nuevas, más compilación limpia, Spotless, PMD, empaquetado y tres reglas JaCoCo aprobados.
+El proceso diario de las 06:15 America/Guatemala usa @Scheduled/ShedLock y recorre lotes de 100. Cuando falta una rutina PROGRAMADA/EN_EJECUCION fechada entre hoy y el límite anual, avisa por P9 a Catedráticos y Administradores activos, incluso antes del vencimiento. Un aviso por puente, destinatario y fecha de referencia; lectura sin reenvío, nuevo período tras nueva ejecución rutinaria. Esta política fue aprobada por el usuario para los detalles no expresos del enunciado. Revalida bajo bloqueo y confirma notificación/marca en la misma transacción; un fallo se reintenta sin repetir envíos confirmados. [ADR 0036](docs/adr/0036-recordatorios-de-programacion-rutinaria-anual.md). El recordatorio no crea ni acepta órdenes y no acredita por sí solo programación efectiva anual.
+
+El diccionario generado incorpora `aviso_inspeccion_vencida` y `aviso_rutinario_anual`: corrige la omisión que hacía fallar la comprobación del PR. Si se verifica en una copia temporal, trasladar `docs/diccionario-de-datos.md` generado al repositorio y comprobar que una nueva generación lo conserva idéntico, además de aprobar Maven.
+
+Verificación local: **1127 pruebas backend**, 17 nuevas, sin fallos/errores/omisiones; compilación limpia, Spotless, PMD, empaquetado y tres reglas JaCoCo aprobados. Servicio de recordatorios con 100 % de líneas y ramas. Segunda generación focalizada del diccionario aprobada y contenido idéntico al incluido en el repositorio. Frontend sin cambios; presentación P9 e integración de acceso P2 siguen pendientes.
 
 `GET /api/v1/puentes/{puenteId}/ordenes-mantenimiento/rutinario-anual?page=0&size=20` entrega a Catedrático/Admin la referencia (última ejecución rutinaria o registro sin ejecuciones), límite de un año y página de rutinarias PROGRAMADA/EN_EJECUCION. Base confirmada por el grupo según reporte del usuario; roles/criterio de consulta adoptados por delegación del usuario para los detalles no precisados en RN-MTO-07.
 

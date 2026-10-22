@@ -5,6 +5,8 @@
 - [`archivo`](#archivo): Fotos y documentos; el contenido está en MinIO (DT-BE-13, DT-ALM-01)
 - [`asignacion`](#asignacion): Puente que un estudiante puede inspeccionar dentro de su curso (RN-INS-14)
 - [`auditoria`](#auditoria): Bitácora de toda acción sobre datos (RN-USR-09); sin contraseñas, tokens ni datos personales completos (DT-SEC-12)
+- [`aviso_inspeccion_vencida`](#aviso_inspeccion_vencida): Marca interna de notificación de inspección vencida, atómica con P9; no se borra al leer el aviso
+- [`aviso_rutinario_anual`](#aviso_rutinario_anual): Marca de recordatorio rutinario anual enviada atómicamente con P9, una por destinatario y período
 - [`comentario`](#comentario): Comentario de un hilo; un solo nivel de respuesta (RN-FOR-04)
 - [`copia_conflicto`](#copia_conflicto): Versión del servidor que pisó un cliente al sincronizar (RN-OFF-09)
 - [`correlativo_puente`](#correlativo_puente): Último correlativo asignado a un código de puente en cada municipio (RN-INV-03)
@@ -101,6 +103,41 @@ Bitácora de toda acción sobre datos (RN-USR-09); sin contraseñas, tokens ni d
 - `CHECK (((accion)::text ~ '^[A-Z][A-Z0-9_]*$'::text)) NOT VALID`
 - `CHECK (((entidad)::text ~ '^[a-z][a-z0-9_]*$'::text)) NOT VALID`
 - `CHECK (((motivo IS NULL) OR (btrim((motivo)::text) <> ''::text)))`
+
+## aviso_inspeccion_vencida
+
+Marca interna de notificación de inspección vencida, atómica con P9; no se borra al leer el aviso
+
+| Columna | Tipo | Nulo | Por defecto | Llaves | Descripción |
+|---|---|---|---|---|---|
+| `id` | uuid | No |  | PK | UUID v7 |
+| `puente_id` | uuid | No |  | FK → puente | Puente objeto del aviso |
+| `usuario_id` | uuid | No |  | FK → usuario | Destinatario avisado: Catedrático o Administrador activo al evaluar |
+| `inspeccion_id` | uuid | Sí |  | FK → inspeccion | Última publicación del período; NULL si nunca tuvo una publicada |
+| `referencia_en` | timestamp with time zone | No |  |  | Fecha UTC de publicación o, si no hubo, registro del puente |
+| `creado_en` | timestamp with time zone | No | now() |  | Fecha UTC del envío confirmado |
+| `actualizado_en` | timestamp with time zone | No | now() |  | Marca UTC de la fila interna |
+
+**Restricciones**
+
+- `UNIQUE NULLS NOT DISTINCT (puente_id, usuario_id, inspeccion_id)`
+
+## aviso_rutinario_anual
+
+Marca de recordatorio rutinario anual enviada atómicamente con P9, una por destinatario y período
+
+| Columna | Tipo | Nulo | Por defecto | Llaves | Descripción |
+|---|---|---|---|---|---|
+| `id` | uuid | No |  | PK | UUID v7 |
+| `puente_id` | uuid | No |  | FK → puente | Puente sin rutina programada dentro del plazo anual |
+| `usuario_id` | uuid | No |  | FK → usuario | Catedrático o Administrador activo destinatario del recordatorio |
+| `fecha_referencia` | date | No |  |  | Fecha de última ejecución rutinaria o registro inicial sin ejecuciones, origen del período |
+| `creado_en` | timestamp with time zone | No | now() |  | Fecha UTC del recordatorio confirmado |
+| `actualizado_en` | timestamp with time zone | No | now() |  | Marca UTC de la fila interna |
+
+**Restricciones**
+
+- `UNIQUE (puente_id, usuario_id, fecha_referencia)`
 
 ## comentario
 
