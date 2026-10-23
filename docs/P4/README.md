@@ -120,6 +120,7 @@ public interface FormularioValidacionService {
 ## 5. Mapeo y Trazabilidad con otros Módulos
 
 * **P3 (Inventario):** Pre-carga de atributos permanentes en Secciones 1 y 2 identificados por `x-permanente: true`. Las claves coinciden con `PuenteDTO` (`codigo`, `nombre`, `ruta`, `anio_construccion`, `latitud`, `longitud`, `utm`).
-* **P5 (Inspecciones):** Cada entidad `Inspeccion` guarda obligatoriamente `formulario_version_id` (FK inmutable) y valida `datos` contra este motor.
-* **P8 (Índice de Condición):** `ConfiguracionPesosService` se vincula a una `formulario_version_id` y extrae los elementos de daño identificados con `x-dano: true` (Contrato 1).
+* **P5 (Inspecciones):** Cada entidad `Inspeccion` guarda obligatoriamente `formulario_version_id` (FK inmutable) y valida `datos` contra este motor. La sección 3 (`tramos`) se modela como arreglo de objetos dinámicos.
+* **P8 (Índice de Condición):** `ConfiguracionPesosService` se vincula a una `formulario_version_id` y extrae los elementos de daño identificados con `x-dano: true` (Contrato 1). Los campos con `x-anulacion-critica: true` corresponden a las 4 causales de anulación crítica del manual regional.
 * **P1, P7, P9:** Usan la sintaxis canónica de `elemento_ref` (Contrato 2) para anclar fotos, observaciones académicas e hilos de discusión.
+* **Ordenamiento Canónico (PostgreSQL JSONB):** El esquema oficial `formulario-sieca-v1.json` incluye metadatos `x-orden` tanto a nivel de sección (1..8) como en sus propiedades internas para garantizar que el cliente frontend renderice la secuencia correcta sin sufrir por el ordenamiento arbitrario de claves propio del tipo `jsonb`.
