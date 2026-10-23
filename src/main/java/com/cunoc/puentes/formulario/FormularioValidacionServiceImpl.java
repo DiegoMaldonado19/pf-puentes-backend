@@ -13,6 +13,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 
@@ -24,10 +25,15 @@ public class FormularioValidacionServiceImpl implements FormularioValidacionServ
   private final JsonSchemaFactory schemaFactory;
   private final Map<UUID, JsonSchema> cacheEsquemas = new ConcurrentHashMap<>();
 
+  @Autowired
+  public FormularioValidacionServiceImpl(FormularioVersionRepository repository) {
+    this(repository, new ObjectMapper());
+  }
+
   public FormularioValidacionServiceImpl(
       FormularioVersionRepository repository, ObjectMapper objectMapper) {
     this.repository = repository;
-    this.objectMapper = objectMapper;
+    this.objectMapper = objectMapper != null ? objectMapper : new ObjectMapper();
     this.schemaFactory = JsonSchemaFactory.getInstance(SpecVersion.VersionFlag.V7);
   }
 
@@ -70,10 +76,10 @@ public class FormularioValidacionServiceImpl implements FormularioValidacionServ
           validationMessages.stream()
               .map(
                   msg -> {
-                    String ruta = msg.getPath();
+                    String ruta = msg.getInstanceLocation().toString();
                     if (ruta.startsWith("$.") || ruta.startsWith("$[")) {
                       ruta = ruta.substring(2);
-                    } else if (ruta.equals("$")) {
+                    } else if (ruta.equals("$") || ruta.isEmpty()) {
                       ruta = "datos";
                     }
                     return new ErrorCampo(ruta, msg.getMessage());

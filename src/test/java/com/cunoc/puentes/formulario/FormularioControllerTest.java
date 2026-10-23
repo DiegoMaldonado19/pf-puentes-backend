@@ -34,7 +34,7 @@ import org.springframework.test.web.servlet.MockMvc;
 class FormularioControllerTest {
 
   @Autowired private MockMvc mvc;
-  @Autowired private ObjectMapper objectMapper;
+  private final ObjectMapper objectMapper = new ObjectMapper();
 
   @MockitoBean private FormularioVersionService servicio;
 

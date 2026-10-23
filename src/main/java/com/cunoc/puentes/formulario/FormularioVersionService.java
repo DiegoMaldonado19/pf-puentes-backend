@@ -129,7 +129,6 @@ public class FormularioVersionService {
     validacionService.validarConEsquema(datos.esquema(), java.util.Map.of());
 
     version.setEsquema(datos.esquema());
-    version.setActualizadoEn(Instant.now());
     validacionService.invalidarCache(id);
 
     return mapper.aDTO(repository.save(version));
@@ -164,13 +163,11 @@ public class FormularioVersionService {
     activaPrevia.ifPresent(
         activa -> {
           activa.retirar();
-          activa.setActualizadoEn(Instant.now());
           repository.save(activa);
           validacionService.invalidarCache(activa.getId());
         });
 
     versionAPublicar.publicar(datos != null ? datos.mapeo() : null);
-    versionAPublicar.setActualizadoEn(Instant.now());
     validacionService.invalidarCache(id);
 
     return mapper.aDTO(repository.save(versionAPublicar));

@@ -69,6 +69,13 @@ class FormularioValidacionServiceTest {
   }
 
   @Test
+  @DisplayName("Constructor con repositorio por defecto inicializa correctamente")
+  void constructorPorDefecto_inicializaCorrectamente() {
+    FormularioValidacionServiceImpl impl = new FormularioValidacionServiceImpl(repository);
+    assertThat(impl).isNotNull();
+  }
+
+  @Test
   @DisplayName("Datos válidos deben pasar la validación sin lanzar excepción")
   void validarConEsquema_datosValidos_noLanzaExcepcion() {
     Map<String, Object> datos =
