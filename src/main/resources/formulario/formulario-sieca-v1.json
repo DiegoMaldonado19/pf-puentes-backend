@@ -16,7 +16,13 @@
       "type": "object",
       "title": "Sección 1: Identificación del Puente",
       "description": "Datos de localización física, clasificación vial y división político-administrativa (RN-INV-01 / RN-INS-09).",
-      "required": ["codigo", "nombre", "ruta", "departamento", "municipio"],
+      "required": [
+        "codigo",
+        "nombre",
+        "ruta",
+        "departamento",
+        "municipio"
+      ],
       "properties": {
         "codigo": {
           "type": "string",
@@ -70,7 +76,13 @@
         "tipo_pavimento": {
           "type": "string",
           "title": "Tipo de Pavimento de la Ruta",
-          "enum": ["Asfalto", "Concreto Hidráulico", "Adoquín", "Terracería", "Mixto"],
+          "enum": [
+            "Asfalto",
+            "Concreto Hidráulico",
+            "Adoquín",
+            "Terracería",
+            "Mixto"
+          ],
           "x-permanente": true,
           "x-elemento-ref": "identificacion.tipo_pavimento",
           "x-orden": 7
@@ -78,7 +90,10 @@
         "alineamiento_horizontal": {
           "type": "string",
           "title": "Alineamiento Horizontal",
-          "enum": ["Tangente", "Curva"],
+          "enum": [
+            "Tangente",
+            "Curva"
+          ],
           "x-permanente": true,
           "x-elemento-ref": "identificacion.alineamiento_horizontal",
           "x-orden": 8
@@ -104,13 +119,18 @@
           "x-elemento-ref": "identificacion.poblacion_posterior",
           "x-orden": 11
         }
-      }
+      },
+      "x-orden": 1
     },
     "datos_generales": {
       "type": "object",
       "title": "Sección 2: Datos Generales y Geometría",
       "description": "Dimensiones físicas principales del puente y tipología constructiva.",
-      "required": ["longitud_total", "numero_tramos", "ancho_rodadura"],
+      "required": [
+        "longitud_total",
+        "numero_tramos",
+        "ancho_rodadura"
+      ],
       "properties": {
         "longitud_total": {
           "type": "number",
@@ -159,7 +179,15 @@
         "tipo_estructura": {
           "type": "string",
           "title": "Tipo de Estructura Principal",
-          "enum": ["Vigas", "Losa", "Arco", "Armadura", "Atirantado", "Colgante", "Cajón"],
+          "enum": [
+            "Vigas",
+            "Losa",
+            "Arco",
+            "Armadura",
+            "Atirantado",
+            "Colgante",
+            "Cajón"
+          ],
           "x-permanente": true,
           "x-elemento-ref": "datos_generales.tipo_estructura",
           "x-orden": 6
@@ -167,12 +195,20 @@
         "material_predominante": {
           "type": "string",
           "title": "Material Predominante",
-          "enum": ["Concreto Reforzado", "Concreto Presforzado", "Acero Estructural", "Madera", "Mampostería", "Mixto"],
+          "enum": [
+            "Concreto Reforzado",
+            "Concreto Presforzado",
+            "Acero Estructural",
+            "Madera",
+            "Mampostería",
+            "Mixto"
+          ],
           "x-permanente": true,
           "x-elemento-ref": "datos_generales.material_predominante",
           "x-orden": 7
         }
-      }
+      },
+      "x-orden": 2
     },
     "tramos": {
       "type": "array",
@@ -180,7 +216,10 @@
       "description": "Detalle geométrico y estructural por cada tramo o claro del puente.",
       "items": {
         "type": "object",
-        "required": ["numero_tramo", "longitud"],
+        "required": [
+          "numero_tramo",
+          "longitud"
+        ],
         "properties": {
           "numero_tramo": {
             "type": "integer",
@@ -198,7 +237,12 @@
           "tipo_tramo": {
             "type": "string",
             "title": "Tipo de Tramo",
-            "enum": ["Simplemente Apoyado", "Continuo", "Voladizo", "Empotrado"],
+            "enum": [
+              "Simplemente Apoyado",
+              "Continuo",
+              "Voladizo",
+              "Empotrado"
+            ],
             "x-elemento-ref": "tramos.tipo_tramo"
           },
           "galibo_vertical": {
@@ -209,7 +253,8 @@
             "x-elemento-ref": "tramos.galibo_vertical"
           }
         }
-      }
+      },
+      "x-orden": 3
     },
     "subestructura": {
       "type": "object",
@@ -302,7 +347,8 @@
           "x-anulacion-critica": "asentamiento_estructura",
           "x-orden": 7
         }
-      }
+      },
+      "x-orden": 4
     },
     "superestructura": {
       "type": "object",
@@ -381,13 +427,18 @@
           "x-elemento-ref": "superestructura.apoyos.deterioro",
           "x-orden": 6
         }
-      }
+      },
+      "x-orden": 5
     },
     "elementos_no_estructurales": {
       "type": "object",
       "title": "Sección 6: Elementos No Estructurales",
       "description": "Barandas de protección, aceras peatonales, drenajes y accesos.",
-      "required": ["barandas_danos", "aceras_danos", "drenajes_danos"],
+      "required": [
+        "barandas_danos",
+        "aceras_danos",
+        "drenajes_danos"
+      ],
       "properties": {
         "barandas_danos": {
           "type": "integer",
@@ -419,13 +470,18 @@
           "x-elemento-ref": "elementos_no_estructurales.drenajes.danos",
           "x-orden": 3
         }
-      }
+      },
+      "x-orden": 6
     },
     "caracteristicas_cauce": {
       "type": "object",
       "title": "Sección 7: Características del Cauce y Protección Hidráulica",
       "description": "Comportamiento del flujo de agua, encauzamiento y estabilidad de laderas.",
-      "required": ["obstruccion_cauce", "alineamiento_flujo", "proteccion_margenes"],
+      "required": [
+        "obstruccion_cauce",
+        "alineamiento_flujo",
+        "proteccion_margenes"
+      ],
       "properties": {
         "obstruccion_cauce": {
           "type": "integer",
@@ -458,7 +514,8 @@
           "x-elemento-ref": "caracteristicas_cauce.proteccion_margenes",
           "x-orden": 3
         }
-      }
+      },
+      "x-orden": 7
     },
     "otros": {
       "type": "object",
@@ -485,7 +542,8 @@
           "x-elemento-ref": "otros.recomendaciones",
           "x-orden": 3
         }
-      }
+      },
+      "x-orden": 8
     }
   }
 }
