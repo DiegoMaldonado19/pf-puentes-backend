@@ -1,5 +1,6 @@
 package com.cunoc.puentes.indice;
 
+import com.cunoc.puentes.indice.dto.FormularioConPesosDTO;
 import com.cunoc.puentes.indice.dto.JuegoPesosDTO;
 import com.cunoc.puentes.indice.dto.PesoElementoDTO;
 import org.mapstruct.Mapper;
@@ -7,6 +8,8 @@ import org.mapstruct.Mapping;
 
 @Mapper
 interface PesosMapper {
+
+  FormularioConPesosDTO aDTO(VersionPesosRepository.FormularioConPesos formulario);
 
   JuegoPesosDTO aDTO(VersionPesos version);
 

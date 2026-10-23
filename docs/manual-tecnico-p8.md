@@ -1,14 +1,22 @@
 # Manual técnico de P8 — Índice de Condición y mantenimiento
 
-Actualizado: 21/10/2026. Describe el código disponible; la integración completa sigue pendiente. Trazabilidad: RN-IC-01–08, RN-MTO-01–09 y DT-CAL-08. Las HU/documentos personales fuera de este repositorio no acompañan al código cuando el equipo lo descarga; este manual sí puede compartirse mediante el commit/PR.
+Actualizado: 23/10/2026. Describe el código disponible; la integración completa sigue pendiente. Trazabilidad: RN-IC-01–08, RN-MTO-01–09 y DT-CAL-08. Las HU/documentos personales fuera de este repositorio no acompañan al código cuando el equipo lo descarga; este manual sí puede compartirse mediante el commit/PR.
 
 ## 1. Módulos y límites actuales
 
 | Pieza | Disponible | Pendiente |
 |---|---|---|
-| `indice/` | Núcleo puro, pesos normalizados, repositorios, creación Java autorizada/auditada, tres GET Admin | Adaptación real P4, publicación P5, confirmación/recálculos y creación HTTP |
+| `indice/` | Núcleo puro, pesos normalizados, repositorios, creación Java autorizada/auditada, cuatro GET Admin (incluido catálogo de versiones con pesos) | Adaptación real P4, publicación P5, confirmación/recálculos y creación HTTP |
 | `mantenimiento/` | Máquina, origen orden/puente/inspección, consultas de historial/detalle/propuestas, PATCH autorizados/auditados de prioridad y fecha programada y POST de aceptación/inicio/cierre/descarte y carga/consulta paginada de evidencia P1; alerta de inspección vencida y recordatorio rutinario anual diarios mediante P9 | Cancelación, sugerencia automática, generación por catálogo y programación efectiva anual |
-| Frontend P8 | Componente de condición, consulta de pesos, revisión/aceptación, bandeja, contenedor HTTP de propuestas e historial/detalle con inicio, evidencia, cierre, descarte, ajuste de prioridad y programación de fecha opcionales | Sesión/guardias P2, rutas y conexiones pendientes; las piezas no aparecen aún en la página inicial |
+| Frontend P8 | Condición integrada en inventario; `/admin/pesos` con catálogo/consulta, `/puentes/:id/mantenimiento` con propuestas, historial, seguimiento y acciones existentes; sesión/guardias/interceptores P2 conectados | Creación de pesos, daños/publicación reales P4/P5 y recorridos finales; sin presentación P9 de avisos |
+
+### Acceso a pesos con P2 recibido — 23/10/2026
+
+En navegador: iniciar sesión como Administrador → **Pesos del índice de condición** (`/admin/pesos`) → seleccionar código de versión → **Ver pesos** en un juego. El catálogo muestra únicamente versiones con configuraciones guardadas, incluidas históricas/borradores; vacío real si no hay ninguna. La consulta no crea ni edita juegos, no selecciona automáticamente una versión activa y no certifica acta/calibración.
+
+En Postman: usar JWT de Administrador para `GET /api/v1/juegos-pesos/formularios?page=0&size=20`; elegir un `id` de `content` para el GET existente `.../formularios/{id}/juegos-pesos`, y después `.../juegos-pesos/{id}/pesos`. Orden código/ID, página desde 0 y máximo 100. Parámetros inválidos y desplazamiento superior al admitido por JPA → 400; sin sesión → 401; otro rol → 403. Proyección acotada y MapStruct, sin entidad P4, esquema/mapeo, migraciones o escrituras. [ADR 0037](adr/0037-catalogo-administrativo-de-formularios-con-pesos.md).
+
+Verificación de este incremento: **1134 pruebas backend**, siete escenarios nuevos, sin fallos/errores/omisiones; Java 25 y PostgreSQL/PostGIS/MinIO reales. `clean spotless:check verify pmd:check` y tres reglas JaCoCo aprobados; 28 casos de consulta de pesos incluyen límites/extremos, unicidad/paginación, catálogo vacío, roles/servicio y lectura sin auditoría. Fuentes/pruebas idénticas en `/tmp/p8-acceso-pesos-verificacion`, diccionario generado idéntico al versionado. Frontend: **495 pruebas**, 16 nuevas, Prettier, ESLint, TypeScript estricto y build aprobados (98.68 kB comprimidos iniciales). Respuestas HTTP de pruebas frontend controladas; no acredita navegador con backend real ni CI remoto.
 
 Se emplean DTO y MapStruct; las entidades JPA no se exponen por HTTP. La autorización efectiva vive en backend. La existencia de una validación interna o una columna no equivale a una operación HTTP habilitada.
 

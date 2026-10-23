@@ -1,5 +1,6 @@
 package com.cunoc.puentes.indice;
 
+import com.cunoc.puentes.indice.dto.FormularioConPesosDTO;
 import com.cunoc.puentes.indice.dto.JuegoPesosDTO;
 import com.cunoc.puentes.indice.dto.PaginaPesosDTO;
 import com.cunoc.puentes.indice.dto.PaginacionPesosDTO;
@@ -31,6 +32,19 @@ class PesosController {
 
   PesosController(ConsultaPesosService consulta) {
     this.consulta = consulta;
+  }
+
+  @GetMapping("/juegos-pesos/formularios")
+  @Operation(
+      summary = "Lista versiones de formulario con juegos de pesos guardados",
+      description =
+          "Solo referencias id/codigo, una por versión; incluye históricas, sin certificar calibración. Orden por codigo e id, page desde 0 y size máximo 100.")
+  @ApiResponse(
+      responseCode = "200",
+      description = "Página de versiones con configuraciones, vacía si no hay")
+  PaginaPesosDTO<FormularioConPesosDTO> formularios(
+      @Valid @ModelAttribute @ParameterObject PaginacionPesosDTO pagina) {
+    return PaginaPesosDTO.de(consulta.listarFormularios(pagina.page(), pagina.size()));
   }
 
   @GetMapping("/formularios/{formularioId}/juegos-pesos")

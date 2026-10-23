@@ -1,5 +1,13 @@
 # pf-puentes-backend
 
+### Consulta administrativa de pesos (P8, 23/10/2026)
+
+`GET /api/v1/juegos-pesos/formularios?page=0&size=20` devuelve referencias `id`/`codigo` de versiones con juegos guardados, sin duplicados, ordenadas por código e ID y con máximo 100 filas. Solo Administrador, tanto en controlador como servicio; 400 por paginación inválida/desplazamiento excesivo y 401/403 por acceso. Sin versiones con pesos, devuelve página vacía. No expone esquema/mapeo ni certifica calibración. [ADR 0037](docs/adr/0037-catalogo-administrativo-de-formularios-con-pesos.md).
+
+Frontend `/admin/pesos` usa la sesión/interceptores/guardia ya recibidos de P2: elegir código de versión → juego → elementos. La creación HTTP y los metadatos P4 siguen pendientes. Mantenimiento también tiene acceso protegido desde ficha P3. Las menciones históricas a esperar otra entrega de autenticación P2 quedan superadas para esas consultas.
+
+Verificación local: **1134 pruebas backend**, siete escenarios nuevos, sin fallos/errores/omisiones; compilación limpia, Spotless, PMD, empaquetado y tres reglas JaCoCo aprobados. Diccionario regenerado idéntico al versionado. Sin migraciones ni cambios del workflow. Frontend: 495 pruebas y controles aprobados, según su README. No acredita CI remoto ni navegador con backend real.
+
 ### Seguimiento rutinario anual (P8, 21/10/2026)
 
 El proceso diario de las 06:15 America/Guatemala usa @Scheduled/ShedLock y recorre lotes de 100. Cuando falta una rutina PROGRAMADA/EN_EJECUCION fechada entre hoy y el límite anual, avisa por P9 a Catedráticos y Administradores activos, incluso antes del vencimiento. Un aviso por puente, destinatario y fecha de referencia; lectura sin reenvío, nuevo período tras nueva ejecución rutinaria. Esta política fue aprobada por el usuario para los detalles no expresos del enunciado. Revalida bajo bloqueo y confirma notificación/marca en la misma transacción; un fallo se reintenta sin repetir envíos confirmados. [ADR 0036](docs/adr/0036-recordatorios-de-programacion-rutinaria-anual.md). El recordatorio no crea ni acepta órdenes y no acredita por sí solo programación efectiva anual.
