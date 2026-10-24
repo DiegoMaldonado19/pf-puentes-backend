@@ -96,10 +96,6 @@ class FormularioIntegracionTest extends PruebaIntegracion {
     Optional<FormularioVersion> previa = repository.findByCodigo("V1.0.0");
     assertThat(previa).isPresent();
     assertThat(previa.get().getEstado()).isEqualTo(EstadoFormulario.RETIRADA);
-
-    // Restaurar V1.0.0 como ACTIVA para aislar otras pruebas
-    previa.get().setEstado(EstadoFormulario.ACTIVA);
-    repository.save(previa.get());
   }
 
   @Test

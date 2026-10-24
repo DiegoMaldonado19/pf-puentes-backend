@@ -121,7 +121,8 @@ class FormularioVersionServiceTest {
 
     when(repository.findById(idNueva)).thenReturn(Optional.of(borrador));
     when(repository.findByEstado(EstadoFormulario.ACTIVA)).thenReturn(Optional.of(activaPrevia));
-    when(repository.save(any(FormularioVersion.class))).thenAnswer(inv -> inv.getArgument(0));
+    when(repository.saveAndFlush(any(FormularioVersion.class)))
+        .thenAnswer(inv -> inv.getArgument(0));
 
     Map<String, Object> mapeo = Map.of("campo", "campo_renombrado");
     FormularioVersionDTO publicada =
@@ -130,7 +131,7 @@ class FormularioVersionServiceTest {
     assertThat(publicada.estado()).isEqualTo(EstadoFormulario.ACTIVA);
     assertThat(publicada.mapeo()).isEqualTo(mapeo);
     assertThat(activaPrevia.getEstado()).isEqualTo(EstadoFormulario.RETIRADA);
-    verify(repository).save(activaPrevia);
-    verify(repository).save(borrador);
+    verify(repository).saveAndFlush(activaPrevia);
+    verify(repository).saveAndFlush(borrador);
   }
 }
