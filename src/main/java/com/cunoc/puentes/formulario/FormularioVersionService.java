@@ -157,18 +157,18 @@ public class FormularioVersionService {
               + versionAPublicar.getEstado());
     }
 
-    // Si existe una versión activa previa, se retira
+    // Si existe una versión activa previa, se retira y se guarda inmediatamente en BD
     Optional<FormularioVersion> activaPrevia = repository.findByEstado(EstadoFormulario.ACTIVA);
-    activaPrevia.ifPresent(
-        activa -> {
-          activa.retirar();
-          repository.save(activa);
-          validacionService.invalidarCache(activa.getId());
-        });
+    if (activaPrevia.isPresent()) {
+      FormularioVersion activa = activaPrevia.get();
+      activa.retirar();
+      repository.saveAndFlush(activa);
+      validacionService.invalidarCache(activa.getId());
+    }
 
     versionAPublicar.publicar(datos != null ? datos.mapeo() : null);
     validacionService.invalidarCache(id);
 
-    return mapper.aDTO(repository.save(versionAPublicar));
+    return mapper.aDTO(repository.saveAndFlush(versionAPublicar));
   }
 }
