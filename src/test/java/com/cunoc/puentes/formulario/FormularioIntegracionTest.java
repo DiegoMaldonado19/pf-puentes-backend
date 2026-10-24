@@ -10,6 +10,7 @@ import com.cunoc.puentes.formulario.dto.PublicarFormularioVersionDTO;
 import java.util.Map;
 import java.util.Optional;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -29,10 +30,15 @@ class FormularioIntegracionTest extends PruebaIntegracion {
   @Autowired private FormularioVersionRepository repository;
   @Autowired private JdbcTemplate jdbc;
 
+  @BeforeEach
   @AfterEach
   void limpiarPruebas() {
+    // Aislar la bitácora de auditoría para no afectar otras suites de integración
+    jdbc.update("DELETE FROM auditoria WHERE entidad = 'formulario_version'");
     // Eliminar versiones creadas por las pruebas para dejar solo la semilla original
     jdbc.update("DELETE FROM formulario_version WHERE codigo LIKE 'V%-TEST%'");
+    // Restaurar la versión semilla oficial V1.0.0 como ACTIVA
+    jdbc.update("UPDATE formulario_version SET estado = 'ACTIVA' WHERE codigo = 'V1.0.0'");
   }
 
   @Test
