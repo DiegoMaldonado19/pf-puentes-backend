@@ -6,7 +6,8 @@ import java.util.UUID;
 public interface FormularioValidacionService {
 
   /**
-   * Valida autoritativamente el contenido capturado de una inspección contra el esquema de su versión.
+   * Valida autoritativamente el contenido capturado de una inspección contra el esquema de su
+   * versión.
    *
    * @param versionId Identificador de la versión del formulario.
    * @param datosPayload Respuestas capturadas en la inspección (JSONB).

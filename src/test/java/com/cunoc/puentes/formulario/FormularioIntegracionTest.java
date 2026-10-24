@@ -9,7 +9,6 @@ import com.cunoc.puentes.formulario.dto.FormularioVersionDTO;
 import com.cunoc.puentes.formulario.dto.PublicarFormularioVersionDTO;
 import java.util.Map;
 import java.util.Optional;
-import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -19,8 +18,9 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 /**
- * Prueba de integración real con Testcontainers (PostgreSQL 17 + PostGIS y MinIO reales) (DT-CAL-02).
- * Verifica persistencia JSONB, migración Flyway semilla V1.0.0 y el índice único parcial condicional.
+ * Prueba de integración real con Testcontainers (PostgreSQL 17 + PostGIS y MinIO reales)
+ * (DT-CAL-02). Verifica persistencia JSONB, migración Flyway semilla V1.0.0 y el índice único
+ * parcial condicional.
  */
 @SpringBootTest
 class FormularioIntegracionTest extends PruebaIntegracion {
@@ -36,7 +36,8 @@ class FormularioIntegracionTest extends PruebaIntegracion {
   }
 
   @Test
-  @DisplayName("Migración Flyway inicial carga la versión semilla V1.0.0 oficial en estado ACTIVA (RN-FRM-04)")
+  @DisplayName(
+      "Migración Flyway inicial carga la versión semilla V1.0.0 oficial en estado ACTIVA (RN-FRM-04)")
   void migracionSemilla_formularioSiecaV1Activo() {
     Optional<FormularioVersion> activa = repository.findByEstado(EstadoFormulario.ACTIVA);
 
@@ -64,7 +65,8 @@ class FormularioIntegracionTest extends PruebaIntegracion {
   }
 
   @Test
-  @DisplayName("Ciclo completo de creación y publicación inmutable sobre base de datos real (RN-FRM-03)")
+  @DisplayName(
+      "Ciclo completo de creación y publicación inmutable sobre base de datos real (RN-FRM-03)")
   void crearYPublicar_transicionAtomicaEnBaseDeDatos() {
     Map<String, Object> esquemaNuevo =
         Map.of(
@@ -101,7 +103,8 @@ class FormularioIntegracionTest extends PruebaIntegracion {
   }
 
   @Test
-  @DisplayName("Índice parcial condicional formulario_version_activa_uk impide dos activas simultáneas")
+  @DisplayName(
+      "Índice parcial condicional formulario_version_activa_uk impide dos activas simultáneas")
   void indiceUnicoParcial_impideDosVersionesActivas() {
     FormularioVersion duplicada =
         new FormularioVersion("V-DUPLICADA-TEST", Map.of("type", "object"));

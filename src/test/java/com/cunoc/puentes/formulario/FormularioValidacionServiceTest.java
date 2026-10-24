@@ -79,9 +79,7 @@ class FormularioValidacionServiceTest {
   @DisplayName("Datos válidos deben pasar la validación sin lanzar excepción")
   void validarConEsquema_datosValidos_noLanzaExcepcion() {
     Map<String, Object> datos =
-        Map.of(
-            "codigo_puente", "GT-09-0901-0001",
-            "subestructura", Map.of("dano_estribo", 2));
+        Map.of("codigo_puente", "GT-09-0901-0001", "subestructura", Map.of("dano_estribo", 2));
 
     assertThatCode(() -> service.validarConEsquema(esquemaPrueba, datos))
         .doesNotThrowAnyException();
@@ -106,9 +104,7 @@ class FormularioValidacionServiceTest {
   @DisplayName("Calificación de daño mayor a 4 debe fallar con 422")
   void validarConEsquema_danoFueraDeRango_lanza422() {
     Map<String, Object> datos =
-        Map.of(
-            "codigo_puente", "GT-09-0901-0001",
-            "subestructura", Map.of("dano_estribo", 5));
+        Map.of("codigo_puente", "GT-09-0901-0001", "subestructura", Map.of("dano_estribo", 5));
 
     assertThatThrownBy(() -> service.validarConEsquema(esquemaPrueba, datos))
         .isInstanceOf(NegocioException.class)
@@ -142,9 +138,7 @@ class FormularioValidacionServiceTest {
     when(repository.findById(versionId)).thenReturn(Optional.of(version));
 
     Map<String, Object> datosValidos =
-        Map.of(
-            "codigo_puente", "GT-09-0901-0001",
-            "subestructura", Map.of("dano_estribo", 0));
+        Map.of("codigo_puente", "GT-09-0901-0001", "subestructura", Map.of("dano_estribo", 0));
 
     assertThatCode(() -> service.validar(versionId, datosValidos)).doesNotThrowAnyException();
   }

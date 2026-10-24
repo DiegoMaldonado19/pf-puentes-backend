@@ -61,7 +61,9 @@ class FormularioVersionServiceTest {
     assertThatThrownBy(() -> service.obtenerActivo())
         .isInstanceOf(NegocioException.class)
         .satisfies(
-            ex -> assertThat(((NegocioException) ex).getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND));
+            ex ->
+                assertThat(((NegocioException) ex).getStatusCode())
+                    .isEqualTo(HttpStatus.NOT_FOUND));
   }
 
   @Test
@@ -73,15 +75,15 @@ class FormularioVersionServiceTest {
     assertThatThrownBy(() -> service.crearBorrador(dto))
         .isInstanceOf(NegocioException.class)
         .satisfies(
-            ex -> assertThat(((NegocioException) ex).getStatusCode()).isEqualTo(HttpStatus.CONFLICT));
+            ex ->
+                assertThat(((NegocioException) ex).getStatusCode()).isEqualTo(HttpStatus.CONFLICT));
   }
 
   @Test
   @DisplayName("crearBorrador debe guardar un nuevo borrador cuando el código es único")
   void crearBorrador_codigoUnico_guardaBorrador() {
     when(repository.existsByCodigo("V2.0.0")).thenReturn(false);
-    when(repository.save(any(FormularioVersion.class)))
-        .thenAnswer(inv -> inv.getArgument(0));
+    when(repository.save(any(FormularioVersion.class))).thenAnswer(inv -> inv.getArgument(0));
 
     CrearFormularioVersionDTO dto = new CrearFormularioVersionDTO("V2.0.0", esquemaBase);
     FormularioVersionDTO creado = service.crearBorrador(dto);
@@ -103,11 +105,13 @@ class FormularioVersionServiceTest {
     assertThatThrownBy(() -> service.editarBorrador(id, dto))
         .isInstanceOf(NegocioException.class)
         .satisfies(
-            ex -> assertThat(((NegocioException) ex).getStatusCode()).isEqualTo(HttpStatus.CONFLICT));
+            ex ->
+                assertThat(((NegocioException) ex).getStatusCode()).isEqualTo(HttpStatus.CONFLICT));
   }
 
   @Test
-  @DisplayName("publicar debe retirar la versión activa previa y activar la nueva con su mapeo (RN-FRM-06)")
+  @DisplayName(
+      "publicar debe retirar la versión activa previa y activar la nueva con su mapeo (RN-FRM-06)")
   void publicar_conActivaPrevia_retiraPreviaYActivaNueva() {
     UUID idNueva = UUID.randomUUID();
     FormularioVersion borrador = new FormularioVersion("V2.0.0", esquemaBase);
@@ -120,7 +124,8 @@ class FormularioVersionServiceTest {
     when(repository.save(any(FormularioVersion.class))).thenAnswer(inv -> inv.getArgument(0));
 
     Map<String, Object> mapeo = Map.of("campo", "campo_renombrado");
-    FormularioVersionDTO publicada = service.publicar(idNueva, new PublicarFormularioVersionDTO(mapeo));
+    FormularioVersionDTO publicada =
+        service.publicar(idNueva, new PublicarFormularioVersionDTO(mapeo));
 
     assertThat(publicada.estado()).isEqualTo(EstadoFormulario.ACTIVA);
     assertThat(publicada.mapeo()).isEqualTo(mapeo);

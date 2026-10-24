@@ -6,6 +6,5 @@ import java.util.Map;
 
 @Schema(description = "Datos para editar el esquema de un borrador existente")
 public record EditarFormularioVersionDTO(
-    @NotNull
-        @Schema(description = "Estructura JSON Schema canónica actualizada")
+    @NotNull @Schema(description = "Estructura JSON Schema canónica actualizada")
         Map<String, Object> esquema) {}

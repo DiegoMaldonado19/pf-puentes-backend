@@ -12,6 +12,5 @@ public record CrearFormularioVersionDTO(
         @Size(max = 20)
         @Schema(example = "V2.0.0", description = "Código único de la versión")
         String codigo,
-    @NotNull
-        @Schema(description = "Estructura JSON Schema canónica")
+    @NotNull @Schema(description = "Estructura JSON Schema canónica")
         Map<String, Object> esquema) {}

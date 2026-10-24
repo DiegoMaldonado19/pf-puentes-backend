@@ -36,15 +36,13 @@ public class FormularioController {
 
   @GetMapping("/activo")
   @Operation(
-      summary =
-          "Obtiene la versión activa del formulario para nuevas inspecciones y caché offline")
+      summary = "Obtiene la versión activa del formulario para nuevas inspecciones y caché offline")
   public ResponseEntity<FormularioVersionDTO> obtenerActivo() {
     return ResponseEntity.ok(servicio.obtenerActivo());
   }
 
   @GetMapping("/versiones/{codigo}")
-  @Operation(
-      summary = "Obtiene una versión de formulario por su código para consulta histórica")
+  @Operation(summary = "Obtiene una versión de formulario por su código para consulta histórica")
   public ResponseEntity<FormularioVersionDTO> obtenerPorCodigo(@PathVariable String codigo) {
     return ResponseEntity.ok(servicio.obtenerPorCodigo(codigo));
   }
@@ -59,8 +57,7 @@ public class FormularioController {
   @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'CATEDRATICO')")
   @Operation(summary = "Lista paginada de versiones de formularios registradas")
   public ResponseEntity<PaginaFormularioVersionDTO> listar(
-      @RequestParam(defaultValue = "0") int page,
-      @RequestParam(defaultValue = "20") int size) {
+      @RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "20") int size) {
     Pageable pageable = PageRequest.of(Math.max(0, page), Math.min(Math.max(1, size), 100));
     return ResponseEntity.ok(servicio.listar(pageable));
   }
@@ -77,8 +74,7 @@ public class FormularioController {
   @PutMapping("/{id}")
   @PreAuthorize("hasRole('ADMINISTRADOR')")
   @Operation(
-      summary =
-          "Modifica el esquema de un borrador de formulario (solo si no está publicado)")
+      summary = "Modifica el esquema de un borrador de formulario (solo si no está publicado)")
   public ResponseEntity<FormularioVersionDTO> editarBorrador(
       @PathVariable UUID id, @Valid @RequestBody EditarFormularioVersionDTO datos) {
     return ResponseEntity.ok(servicio.editarBorrador(id, datos));
@@ -87,8 +83,7 @@ public class FormularioController {
   @PostMapping("/{id}/publicar")
   @PreAuthorize("hasRole('ADMINISTRADOR')")
   @Operation(
-      summary =
-          "Publica la versión haciéndola ACTIVA, retirando la previa y registrando el mapeo")
+      summary = "Publica la versión haciéndola ACTIVA, retirando la previa y registrando el mapeo")
   public ResponseEntity<FormularioVersionDTO> publicar(
       @PathVariable UUID id, @RequestBody(required = false) PublicarFormularioVersionDTO datos) {
     return ResponseEntity.ok(servicio.publicar(id, datos));
