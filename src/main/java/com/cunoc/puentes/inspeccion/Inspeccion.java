@@ -2,6 +2,7 @@ package com.cunoc.puentes.inspeccion;
 
 import com.cunoc.puentes.indice.Anulacion;
 import com.cunoc.puentes.indice.EstadoCondicion;
+import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
@@ -9,6 +10,7 @@ import jakarta.persistence.FetchType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
+import jakarta.persistence.Version;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -40,9 +42,18 @@ public class Inspeccion {
 
   private UUID formularioVersionId;
 
+  private UUID cursoId;
+
+  private UUID precargadaDeId;
+
+  private Instant datosPermanentesConfirmadosEn;
+
   @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumn(name = "supersede_a_id")
   private Inspeccion supersedeA;
+
+  @Column(length = 500)
+  private String motivoCorreccion;
 
   // DT-BE-07: solo la máquina de estados del servicio lo cambia
   @Setter(AccessLevel.PACKAGE)
@@ -57,7 +68,12 @@ public class Inspeccion {
   @JdbcTypeCode(SqlTypes.GEOGRAPHY)
   private Point ubicacionInicio;
 
+  @Column(name = "distancia_a_puente_m", precision = 10, scale = 2)
+  private BigDecimal distanciaAPuenteM;
+
   private String dispositivoId;
+
+  private Instant creadaEnDispositivo;
 
   private Instant enviadaEn;
 
@@ -78,9 +94,20 @@ public class Inspeccion {
   @Enumerated(EnumType.STRING)
   private EstadoCondicion estadoConfirmado;
 
+  private UUID estadoConfirmadoPor;
+
   private String justificacionEstado;
 
   private Instant eliminadoEn;
+
+  private Instant ultimaActividadEn = Instant.now();
+
+  private Instant avisoAbandonoEn;
+
+  @Setter(AccessLevel.NONE)
+  @Version
+  @Column(nullable = false)
+  private Long version;
 
   @CreationTimestamp private Instant creadoEn;
 
