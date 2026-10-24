@@ -125,3 +125,30 @@ public interface FormularioValidacionService {
 * **P8 (Índice de Condición):** `ConfiguracionPesosService` se vincula a una `formulario_version_id` y extrae los elementos de daño identificados con `x-dano: true` (Contrato 1). Los campos con `x-anulacion-critica: true` corresponden a las 4 causales de anulación crítica del manual regional.
 * **P1, P7, P9:** Usan la sintaxis canónica de `elemento_ref` (Contrato 2) para anclar fotos, observaciones académicas e hilos de discusión.
 * **Ordenamiento Canónico (PostgreSQL JSONB):** El esquema oficial `formulario-sieca-v1.json` incluye metadatos `x-orden` tanto a nivel de sección (1..8) como en sus propiedades internas para garantizar que el cliente frontend renderice la secuencia correcta sin sufrir por el ordenamiento arbitrario de claves propio del tipo `jsonb`.
+
+---
+
+## 6. Pruebas Automatizadas del Módulo (23 pruebas pasando)
+
+El módulo cuenta con una suite completa de pruebas unitarias y de integración que satisfacen las directrices técnicas de calidad del proyecto:
+
+1. **`FormularioValidacionServiceTest` (6 pruebas):**
+   * Validación autoritativa contra JSON Schema Draft 7 con `networknt`.
+   * Rechazo de campos obligatorios ausentes con `HTTP 422 Unprocessable Entity` y lista de `ErrorCampo`.
+   * Rechazo de calificaciones de daño fuera del rango `[0, 4]` (RN-FRM-08).
+   * Manejo de versión no encontrada (404 Not Found).
+2. **`FormularioVersionServiceTest` (6 pruebas):**
+   * Consulta de versión `ACTIVA` (`RN-FRM-04`) y excepción 404 si no existe.
+   * Creación de borradores con validación de código único (rechazo 409 Conflict si existe).
+   * Protección estricta de inmutabilidad (`RN-FRM-03`): rechazo de edición de versiones `ACTIVA` o `RETIRADA`.
+   * Publicación atómica transaccional: retiro de la versión activa previa, activación de la nueva y registro del mapeo de equivalencias (`RN-FRM-06`).
+3. **`FormularioControllerTest` (4 pruebas con `MockMvc` y seguridad):**
+   * `DT-CAL-03`: Autorización por roles en cada endpoint.
+   * `GET /api/v1/formularios/activo` accesible para cualquier rol autenticado (`ESTUDIANTE`, `CATEDRATICO`, `ADMINISTRADOR`).
+   * `POST /api/v1/formularios` y `POST /api/v1/formularios/{id}/publicar` restringidos exclusivamente a `ADMINISTRADOR` (rechazo 403 Forbidden para estudiantes y catedráticos).
+4. **`FormularioVersionEntidadTest` (4 pruebas):**
+   * `DT-CAL-01`: Cobertura del 100% en la máquina de estados `EstadoFormulario` (`BORRADOR` ➔ `ACTIVA` ➔ `RETIRADA`) y entidad `FormularioVersion`.
+5. **`FormularioIntegracionTest` (3 pruebas con Testcontainers y PostgreSQL real):**
+   * `DT-CAL-02`: Integración sobre PostgreSQL 17 + PostGIS real.
+   * Verificación de la migración Flyway semilla `V1.0.0` activa y persistencia de las 8 secciones en columna `jsonb`.
+   * Verificación de la restricción e índice parcial condicional `formulario_version_activa_uk` a nivel de base de datos.
