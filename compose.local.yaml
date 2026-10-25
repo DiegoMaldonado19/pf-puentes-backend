@@ -4,6 +4,7 @@ name: puentes-local-backend
 services:
   postgres:
     extends: { file: compose.yaml, service: postgres }
+    platform: linux/amd64
     ports: ["5432:5432"]
 
   minio:
