@@ -14,9 +14,9 @@ Regresión de navegador del 24/10 aprobada: cinco escenarios Playwright y un orq
 
 | Pieza | Disponible | Pendiente |
 |---|---|---|
-| `indice/` | Núcleo puro, pesos normalizados, metadatos P4, creación completa HTTP autorizada/auditada y cinco GET Admin (incluidos catálogo de versiones con pesos y referencias de daño) | Calibración, selección de juego, adaptación de respuestas/condiciones críticas P4, publicación P5 y confirmación/recálculos |
-| `mantenimiento/` | Máquina, origen orden/puente/inspección, consultas de historial/detalle/propuestas, PATCH autorizados/auditados de prioridad y fecha programada y POST de aceptación/inicio/cierre/descarte y carga/consulta paginada de evidencia P1; alerta de inspección vencida y recordatorio rutinario anual diarios mediante P9 | Cancelación, sugerencia automática, generación por catálogo y programación efectiva anual |
-| Frontend P8 | Condición en inventario; `/admin/pesos` con catálogo, consulta y creación de juegos completos; `/puentes/:id/mantenimiento` con propuestas, historial, seguimiento y acciones; sesión/guardias/interceptores P2 conectados | Calibración, daños/publicación reales P4/P5 y recorridos finales; presentación de avisos P9 |
+| `indice/` | Núcleo puro, pesos normalizados, metadatos P4, preparación de calificaciones desde respuestas reales, creación completa HTTP autorizada/auditada y cinco GET Admin (incluidos catálogo de versiones con pesos y referencias de daño) | Calibración, selección de juego, condiciones críticas P4, publicación P5 y confirmación/recálculos |
+| `mantenimiento/` | Máquina, origen orden/puente/inspección, consultas de historial/detalle/propuestas, PATCH autorizados/auditados de prioridad y fecha programada y POST de aceptación/inicio/cierre/descarte/cancelación y carga/consulta paginada de evidencia P1; alerta de inspección vencida y recordatorio rutinario anual diarios mediante P9 | Sugerencia automática, generación por catálogo y programación efectiva anual |
+| Frontend P8 | Condición en inventario; `/admin/pesos` con catálogo, consulta y creación de juegos completos; `/puentes/:id/mantenimiento` con propuestas, historial, seguimiento y acciones (incluida cancelación con motivo); sesión/guardias/interceptores P2 conectados | Calibración, daños/publicación reales P4/P5 y recorridos finales; presentación de avisos P9 |
 
 ### Acceso a pesos con P2 recibido — 23/10/2026
 
@@ -138,6 +138,7 @@ En local: API `http://localhost:8080`; Swagger `http://localhost:8080/api/docs/s
 | `GET /api/v1/puentes/{puenteId}/ordenes-mantenimiento/{ordenId}/evidencias` | CATEDRATICO o ADMINISTRADOR | Página de JPEG/WebP no purgadas, incluso después de cerrar |
 | `POST /api/v1/puentes/{puenteId}/ordenes-mantenimiento/{ordenId}/cierre` | CATEDRATICO o ADMINISTRADOR | JSON fecha_ejecucion/responsable, 200 DTO EJECUTADA; requiere foto guardada de esta orden |
 | `POST /api/v1/puentes/{puenteId}/ordenes-mantenimiento/{ordenId}/descarte` | CATEDRATICO o ADMINISTRADOR | JSON motivo obligatorio, 200 DTO DESCARTADA; solo PROPUESTA, sin borrar historial |
+| `POST /api/v1/puentes/{puenteId}/ordenes-mantenimiento/{ordenId}/cancelacion` | CATEDRATICO o ADMINISTRADOR | JSON motivo obligatorio, 200 DTO CANCELADA; solo PROGRAMADA, sin borrar historial ni evidencias |
 | `PATCH /api/v1/puentes/{puenteId}/ordenes-mantenimiento/{ordenId}/prioridad` | CATEDRATICO o ADMINISTRADOR | JSON prioridad/justificacion, 200 DTO persistido; solo estados abiertos, conserva sugerida |
 | `PATCH /api/v1/puentes/{puenteId}/ordenes-mantenimiento/{ordenId}/fecha-programada` | CATEDRATICO o ADMINISTRADOR | JSON fecha_programada obligatoria, 200 DTO persistido; solo PROGRAMADA, conserva estado |
 
@@ -163,7 +164,7 @@ Detalle: [ADR 0020](adr/0020-consulta-paginada-de-juegos-de-pesos.md), [ADR 0025
 
 ## 5. Órdenes, transacciones y evidencia
 
-La máquina interna admite PROPUESTA → PROGRAMADA, PROPUESTA → DESCARTADA, PROGRAMADA → EN_EJECUCION y EN_EJECUCION → EJECUTADA. CANCELADA puede leerse como histórico, pero su origen sigue pendiente y ninguna transición hacia ella está habilitada. `OrdenMantenimiento.cambiarEstado` valida antes de mutar; no existe setter público de estado.
+La máquina interna admite PROPUESTA → PROGRAMADA, PROPUESTA → DESCARTADA, PROGRAMADA → EN_EJECUCION, PROGRAMADA → CANCELADA y EN_EJECUCION → EJECUTADA. `OrdenMantenimiento.cambiarEstado` valida antes de mutar; no existe setter público de estado.
 
 Cerrar exige fecha, responsable no vacío y una foto guardada. El contador de `DatosTransicionOrden` es interno: la fachada lo obtiene con `ArchivoService.contarEvidencias(ordenId)`, exclusivamente JPEG/WebP no purgadas de esa orden. P8 conecta autorización, estado, subida, consulta paginada y cierre; conserva las firmas públicas del contrato 16 y añade la consulta paginada. Una foto seleccionada cuya carga no terminó no satisface el mínimo.
 
@@ -206,7 +207,19 @@ Con sesión real Catedrático/Admin, consulta primero una orden en PROPUESTA del
 }
 ```
 
-Comprueba 200, DESCARTADA y el motivo persistido. El GET de detalle/historial conserva la orden; el GET de propuestas ya no la incluye. Repetir da 409 sin añadir auditoría. Un motivo ausente/vacío da 400. No se fija máximo por el límite de otra columna: el motivo de la orden es TEXT y se incluye en la instantánea auditada del cambio. No se habilita CANCELADA. [ADR 0031](adr/0031-descarte-auditado-de-propuestas.md).
+Comprueba 200, DESCARTADA y el motivo persistido. El GET de detalle/historial conserva la orden; el GET de propuestas ya no la incluye. Repetir da 409 sin añadir auditoría. Un motivo ausente/vacío da 400. No se fija máximo por el límite de otra columna: el motivo de la orden es TEXT y se incluye en la instantánea auditada del cambio. [ADR 0031](adr/0031-descarte-auditado-de-propuestas.md).
+
+### Prueba de cancelación con Postman
+
+Con sesión real Catedrático/Admin, consulta primero una orden en PROGRAMADA del puente. Envía `POST .../ordenes-mantenimiento/{ordenId}/cancelacion`, Body → raw → JSON:
+
+```json
+{
+  "motivo": "La intervención programada se reprogramará en otro período."
+}
+```
+
+Comprueba 200, CANCELADA y el motivo persistido. Se conservan intervención, prioridades, fecha programada y evidencias previas en solo lectura; no permite iniciar ejecución ni reabrir la orden. Repetir o intentar cancelar desde otro estado responde 409 sin duplicar auditoría. [ADR 0042](adr/0042-cancelacion-auditada-de-ordenes-programadas.md) y [ADR frontend 0029](../../pf-puentes-frontend/docs/adr/0029-cancelacion-con-motivo-desde-el-detalle.md).
 
 ### Prueba de ajuste manual de prioridad con Postman
 

@@ -1,5 +1,9 @@
 # pf-puentes-backend
 
+### Cancelar órdenes programadas con motivo (P8, 25/10/2026)
+
+`POST /api/v1/puentes/{puenteId}/ordenes-mantenimiento/{ordenId}/cancelacion`, solo Catedrático y Administrador (política adoptada por el responsable P8 para la transición hacia `CANCELADA` de `RN-MTO-04/09`): recibe JSON `{"motivo":"..."}` y mueve exclusivamente `PROGRAMADA → CANCELADA` conservando motivo, intervención, prioridades, fecha programada y evidencias previas en modo solo lectura. Unifica el servicio transaccional y auditado `DecisionConMotivoOrdenService` con el descarte de propuestas. Estados distintos o repetición responden `409` sin duplicar auditoría; motivo ausente o en blanco responde `400`. [ADR 0042](docs/adr/0042-cancelacion-auditada-de-ordenes-programadas.md) y [manual técnico](docs/manual-tecnico-p8.md).
+
 ### Preparar calificaciones desde respuestas reales (P8, 25/10/2026)
 
 `PreparacionCalificacionesService.preparar(formularioId, juegoId, datos)` es una operación interna de solo lectura que entrega entradas inmutables para la calculadora IC existente. Reutiliza el extractor P4, los repositorios, MapStruct y las validaciones del dominio. Lee cada daño por su ruta real, comprueba versión/cobertura completa del juego indicado y obtiene todos los pesos. Ausentes, null, no aplicables y daños repetidos sin contrato producen error; cero sigue siendo válido. No interpreta condiciones críticas ni produce un IC oficial. [Contrato y límites: ADR 0041](docs/adr/0041-preparacion-de-calificaciones-desde-respuestas-reales.md), [manual técnico](docs/manual-tecnico-p8.md).
