@@ -74,7 +74,7 @@ public class OrdenMantenimiento extends EntidadBase {
         fechaEjecucion = datos.fechaEjecucion();
         responsable = datos.responsable();
       }
-      case DESCARTADA -> motivo = datos.motivo();
+      case DESCARTADA, CANCELADA -> motivo = datos.motivo();
       default -> {
         // Programar e iniciar conservan los datos ya registrados de la intervención.
       }

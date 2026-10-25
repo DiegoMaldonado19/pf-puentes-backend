@@ -97,6 +97,44 @@ class OrdenMantenimientoTest {
   }
 
   @Test
+  void cancelarConservaFechaYMotivoSinPermitirReapertura() {
+    var orden = new OrdenMantenimiento();
+    var fecha = LocalDate.of(2026, 10, 25);
+    orden.setFechaProgramada(fecha);
+    orden.cambiarEstado(EstadoOrden.PROGRAMADA, SIN_DATOS);
+    assertThatThrownBy(() -> orden.cambiarEstado(EstadoOrden.CANCELADA, SIN_DATOS))
+        .isInstanceOf(NegocioException.class);
+    assertThat(orden.getEstado()).isEqualTo(EstadoOrden.PROGRAMADA);
+    assertThat(orden.getMotivo()).isNull();
+    orden.cambiarEstado(
+        EstadoOrden.CANCELADA,
+        new DatosTransicionOrden(null, null, 0, "  Cancelación documentada  "));
+    assertThat(orden.getMotivo()).isEqualTo("  Cancelación documentada  ");
+    assertThat(orden.getFechaProgramada()).isEqualTo(fecha);
+    assertThatThrownBy(() -> orden.cambiarEstado(EstadoOrden.PROGRAMADA, SIN_DATOS))
+        .isInstanceOf(NegocioException.class);
+    assertThat(orden.getEstado()).isEqualTo(EstadoOrden.CANCELADA);
+  }
+
+  @Test
+  void servicioDeMotivoNoEsUnaPuertaParaCambiosDeEstadoArbitrarios() {
+    for (var destino :
+        new EstadoOrden[] {
+          EstadoOrden.PROPUESTA,
+          EstadoOrden.PROGRAMADA,
+          EstadoOrden.EN_EJECUCION,
+          EstadoOrden.EJECUTADA,
+          null
+        }) {
+      assertThatThrownBy(
+              () ->
+                  new DecisionConMotivoOrdenService()
+                      .decidir(new OrdenMantenimiento(), destino, "motivo"))
+          .isInstanceOf(IllegalArgumentException.class);
+    }
+  }
+
+  @Test
   void saltoDeEstadoNoGuardaLosDatosDeCierreAunqueEstenCompletos() {
     OrdenMantenimiento orden = new OrdenMantenimiento();
 
