@@ -15,7 +15,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.test.context.jdbc.Sql;
 
 @DataJpaTest
-@Import(ConsultaFormularioProvisional.class)
+@Import(PuertosInspeccionConfig.class)
 class ConsultaFormularioProvisionalTest extends PruebaIntegracion {
 
   private static final UUID VERSION = UUID.fromString("0199b000-0000-7000-8000-00000000f001");
