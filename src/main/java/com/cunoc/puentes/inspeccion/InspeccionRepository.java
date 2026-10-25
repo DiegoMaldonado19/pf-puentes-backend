@@ -49,4 +49,10 @@ interface InspeccionRepository extends Repository<Inspeccion, UUID> {
   Optional<Inspeccion>
       findFirstByPuenteIdAndEstadoAndEliminadoEnIsNullOrderByFechaInspeccionDescPublicadaEnDesc(
           UUID puenteId, EstadoInspeccion estado);
+
+  @Query(value = "SELECT rol FROM usuario WHERE id = :id", nativeQuery = true)
+  Optional<String> rolDeUsuario(UUID id);
+
+  @Query(value = "SELECT estado FROM usuario WHERE id = :id", nativeQuery = true)
+  Optional<String> estadoDeUsuario(UUID id);
 }

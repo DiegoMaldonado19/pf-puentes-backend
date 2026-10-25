@@ -333,6 +333,10 @@
 								<include>**/mantenimiento/DatosTransicionOrden.class</include>
 								<include>**/mantenimiento/MaquinaEstadosOrden.class</include>
 								<include>**/mantenimiento/OrdenMantenimiento.class</include>
+								<include>**/inspeccion/EstadoInspeccion.class</include>
+								<include>**/inspeccion/DatosTransicionInspeccion.class</include>
+								<include>**/inspeccion/MaquinaEstadosInspeccion.class</include>
+								<include>**/inspeccion/Inspeccion.class</include>
 							</includes>
 							<rules>
 								<rule>
