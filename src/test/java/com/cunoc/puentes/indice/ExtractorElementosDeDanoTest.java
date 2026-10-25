@@ -44,6 +44,21 @@ class ExtractorElementosDeDanoTest {
                     objeto(Map.of("deterioro", dano("tramos.deterioro"))))));
     assertThat(extractor.extraer(VERSION, esquema).referencias())
         .containsExactly("tramos.deterioro");
+    assertThat(extractor.campos(esquema).get("tramos.deterioro"))
+        .isEqualTo(new CampoDeDano(List.of("tramos", "deterioro"), true));
+  }
+
+  @Test
+  void conservaTokensLiteralesDeRutaSinDividirPuntosNiConfundirlosConLaReferencia() {
+    var esquema =
+        objeto(
+            Map.of("seccion.con.punto", objeto(Map.of("campo[0]", dano("referencia.semantica")))));
+    var campos = extractor.campos(esquema);
+    assertThat(campos.get("referencia.semantica"))
+        .isEqualTo(new CampoDeDano(List.of("seccion.con.punto", "campo[0]"), false));
+    assertThatThrownBy(() -> campos.clear()).isInstanceOf(UnsupportedOperationException.class);
+    assertThatThrownBy(() -> campos.get("referencia.semantica").ruta().clear())
+        .isInstanceOf(UnsupportedOperationException.class);
   }
 
   @Test

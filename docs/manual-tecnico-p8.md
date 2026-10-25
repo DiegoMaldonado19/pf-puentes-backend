@@ -30,6 +30,24 @@ Se emplean DTO y MapStruct; las entidades JPA no se exponen por HTTP. La autoriz
 
 ## 2. Integración del cálculo con P5
 
+### Preparación de respuestas reales — 25/10/2026
+
+Ya existe `PreparacionCalificacionesService.preparar(UUID formularioId, UUID juegoId, Map<String, Object> datos)`. Obtiene el esquema persistido y todos los pesos del juego explícito, comprueba versión/completitud y devuelve `List<CalificacionElemento>` inmutable en orden de referencia. Mantiene las rutas reales como tokens; no usa `elemento_ref` como ruta JSON. Se reutilizan el extractor/lectura de metadatos, repositorios, MapStruct, `JuegoPesos`, `PesoConfigurado` y `CalificacionElemento`. La calculadora y la configuración HTTP conservan sus contratos.
+
+La preparación acepta enteros numéricos 0–4, incluido 2.0. Rechaza ausentes, null, texto/booleanos, fracciones, fuera de rango y no aplicables, sin reemplazarlos por cero ni ignorarlos. Daños dentro de arreglos requieren política de agregación y producen 422; los arreglos sin daños de la semilla no bloquean. Juego ajeno o incompatible → 422; formulario/juego ausente → 404; parámetros Java nulos → `IllegalArgumentException`. Los errores de respuesta usan `ErrorCampo` con la ruta afectada, sin copiar valores privados. [ADR 0041](adr/0041-preparacion-de-calificaciones-desde-respuestas-reales.md).
+
+El consumidor debe autorizar al actor y reutilizar `FormularioValidacionService` de P4 para validar la inspección completa. Esta preparación interna no verifica permisos de una inspección ni define políticas para publicar. No se llama a la sobrecarga de cálculo de estado con condiciones críticas falsas: las banderas reales siguen pendientes. No guarda IC, pesos elegidos, causas, estado del puente ni auditoría de mutación. No hay endpoint ni formulario nuevo de P8 en este incremento.
+
+Prueba focalizada reproducible (Java 25 y Docker para Testcontainers):
+
+```bash
+./mvnw -B -ntp -Dtest=AdaptadorRespuestasDanoTest,ExtractorElementosDeDanoTest,PreparacionCalificacionesTest,MetadatosDanoFormularioTest,CreacionJuegoPesosTest test
+```
+
+**Verificación final 25/10/2026:** `clean spotless:check verify pmd:check` aprobado en `/tmp/p8-respuestas-cjgx_cm7`, con Java 25 y PostgreSQL/PostGIS/MinIO reales: **1259 pruebas**, 35 nuevas, cero fallos/errores/omisiones. Adaptador y servicio nuevos: 100 % de líneas y ramas; extractor/lector de metadatos también 100 %. Pasaron empaquetado y las tres reglas JaCoCo. Fuentes/recursos y pom idénticos al repositorio; diccionario generado idéntico al versionado. Las corridas focalizadas anteriores aprobaron 57 casos unitarios y 35 de integración. Sin cambios frontend ni nueva verificación de navegador, al no haber cambio HTTP/UI; no acredita CI remoto. No se usó `.env` ni la base local.
+
+### Núcleo puro y publicación pendiente
+
 `CalculadoraIndiceCondicion` es Java puro, sin repositorios, sesión o HTTP. Recibe calificaciones enteras 0–4 y pesos positivos en `CalificacionElemento`; `CondicionesCriticas` recibe cuatro banderas normalizadas. Devuelve `ResultadoIndiceCondicion` con `indiceCondicion`, `estadoCalculado` y todas las `anulaciones`.
 
 ```java
@@ -53,7 +71,7 @@ Las cuatro banderas significan exactamente:
 
 Cualquier causa fuerza MALO y conserva el IC numérico. El conjunto contiene todas las causas, sin prioridad entre ellas. La entidad de inspección actual conserva una sola anulación: el adaptador no debe elegir una arbitrariamente para ocultar esa diferencia.
 
-La fachada conceptual `calcular(datos, versionFormulario)` del acuerdo de equipo aún requiere adaptar respuestas y precisar condiciones críticas del esquema real P4 ya recibido. La extracción de referencias descrita más abajo no interpreta respuestas. El núcleo matemático no interpreta JSON Schema ni identifica daños por rutas inventadas. P5 debe obtener entradas confiables, calcular y guardar el resultado oficial al publicar; la llamada y persistencia reales aún no están conectadas. Un borrador no debe presentarse como resultado oficial. `Sin evaluar` lo representa el componente frontend cuando no existe una evaluación aplicable; no se calcula asignando cero a datos ausentes.
+La fachada conceptual `calcular(datos, versionFormulario)` del acuerdo de equipo aún requiere precisar condiciones críticas y coordinar selección/publicación con P5. La preparación de calificaciones desde respuestas reales ya existe como se describe arriba; la API de referencias mantiene su contrato de consulta. El núcleo matemático no interpreta JSON Schema ni identifica daños por rutas inventadas. P5 debe obtener entradas confiables, calcular y guardar el resultado oficial al publicar; la llamada y persistencia reales aún no están conectadas. Un borrador no debe presentarse como resultado oficial. `Sin evaluar` lo representa el componente frontend cuando no existe una evaluación aplicable; no se calcula asignando cero a datos ausentes.
 
 Detalle: [ADR 0016](adr/0016-nucleo-puro-del-indice-de-condicion.md).
 
@@ -225,7 +243,7 @@ En frontend, `ConsultaOrdenes` recibe `puedeProgramar` de la sesión (false por 
 
 | Responsable | Entrega necesaria para completar el flujo |
 |---|---|
-| P4 | Esquema/API/motor recibidos y extracción de referencias integrada; faltan condiciones críticas explícitas, adaptación de respuestas/repetidos y acuerdo de versiones con pesos |
+| P4 | Esquema/API/motor recibidos y extracción de referencias integrada; preparación de respuestas individuales integrada; faltan condiciones críticas explícitas, política de repetidos y selección de pesos al publicar |
 | P5 | El record InspeccionPublicada ya llegó con P3; faltan publicación real que calcula/guarda IC/versiones y emisor en esa transacción |
 | P3 | Inventario/listado/mapa/ficha y estado P8 recibidos; mantenimiento ya conectado desde ficha al puente seleccionado |
 | P2 | Sesión, interceptores y guardias frontend recibidos e integrados; aplicar sus mecanismos existentes a futuras operaciones |

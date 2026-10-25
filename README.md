@@ -1,5 +1,13 @@
 # pf-puentes-backend
 
+### Preparar calificaciones desde respuestas reales (P8, 25/10/2026)
+
+`PreparacionCalificacionesService.preparar(formularioId, juegoId, datos)` es una operación interna de solo lectura que entrega entradas inmutables para la calculadora IC existente. Reutiliza el extractor P4, los repositorios, MapStruct y las validaciones del dominio. Lee cada daño por su ruta real, comprueba versión/cobertura completa del juego indicado y obtiene todos los pesos. Ausentes, null, no aplicables y daños repetidos sin contrato producen error; cero sigue siendo válido. No interpreta condiciones críticas ni produce un IC oficial. [Contrato y límites: ADR 0041](docs/adr/0041-preparacion-de-calificaciones-desde-respuestas-reales.md), [manual técnico](docs/manual-tecnico-p8.md).
+
+No hay nueva pantalla o API: el siguiente consumidor será el flujo de inspección P5, que aún debe aportar autorización, validación completa P4 y publicación. La creación completa de pesos ya está implementada; las menciones anteriores a su ausencia son históricas.
+
+**Verificación final 25/10/2026:** `clean spotless:check verify pmd:check` aprobado en `/tmp/p8-respuestas-cjgx_cm7`, con Java 25 y PostgreSQL/PostGIS/MinIO reales: **1259 pruebas**, 35 nuevas, cero fallos/errores/omisiones. Adaptador y servicio nuevos: 100 % de líneas y ramas; extractor/lector de metadatos también 100 %. Pasaron empaquetado y las tres reglas JaCoCo. Fuentes/recursos y pom idénticos al repositorio; diccionario generado idéntico al versionado. Las corridas focalizadas anteriores aprobaron 57 casos unitarios y 35 de integración. Sin cambios frontend ni nueva verificación de navegador, al no haber cambio HTTP/UI; no acredita CI remoto. No se usó `.env` ni la base local.
+
 ### Crear juegos completos de pesos (P8, 25/10/2026)
 
 `POST /api/v1/formularios/{formularioId}/juegos-pesos`, solo Administrador: `{"acta":null,"pesos":[{"elemento_ref":"referencia-real","peso":1.25}]}`. Debe incluir exactamente un peso por cada campo de daño obtenido del servidor. Devuelve 201, DTO y Location del juego nuevo; 400/401/403/404/422 documentados. Transacción, bloqueo compartido del formulario y auditoría por fila reutilizada de P2. No modifica juegos anteriores ni inspecciones, no elige un juego oficial ni recalcula. El ejemplo ilustra el formato, no valores calibrados ni un juego completo de V1.0.0.

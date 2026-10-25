@@ -4,6 +4,7 @@ import com.cunoc.puentes.indice.dto.CrearJuegoPesosDTO;
 import com.cunoc.puentes.indice.dto.FormularioConPesosDTO;
 import com.cunoc.puentes.indice.dto.JuegoPesosDTO;
 import com.cunoc.puentes.indice.dto.PesoElementoDTO;
+import java.util.List;
 import java.util.UUID;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
@@ -14,6 +15,12 @@ interface PesosMapper {
   JuegoPesos aJuego(UUID formularioVersionId, CrearJuegoPesosDTO datos);
 
   PesoConfigurado aPesoConfigurado(CrearJuegoPesosDTO.DefinicionPesoDTO datos);
+
+  PesoConfigurado aPesoConfigurado(PesoElemento peso);
+
+  @Mapping(target = "formularioVersionId", source = "version.formularioVersionId")
+  @Mapping(target = "acta", source = "version.acta")
+  JuegoPesos aJuego(VersionPesos version, List<PesoElemento> pesos);
 
   FormularioConPesosDTO aDTO(VersionPesosRepository.FormularioConPesos formulario);
 

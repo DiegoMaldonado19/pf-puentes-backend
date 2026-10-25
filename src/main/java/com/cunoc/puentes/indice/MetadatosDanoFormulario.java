@@ -27,6 +27,12 @@ public class MetadatosDanoFormulario {
   /** Sin caché: un borrador puede cambiar; una versión histórica se lee por su propio UUID. */
   @Transactional(readOnly = true)
   public ElementosDeDano obtener(UUID version) {
+    return new ElementosDeDano(version, campos(version).keySet());
+  }
+
+  /** Mismo esquema y validaciones que obtener; conserva tokens de ruta y repetición. */
+  @Transactional(readOnly = true)
+  public Map<String, CampoDeDano> campos(UUID version) {
     if (version == null) throw new IllegalArgumentException("La versión es obligatoria.");
     String esquema =
         jdbc
@@ -45,7 +51,7 @@ public class MetadatosDanoFormulario {
                         "La versión del formulario indicada no existe."));
     try {
       Map<String, Object> definicion = json.readValue(esquema, new TypeReference<>() {});
-      return extractor.extraer(version, definicion);
+      return extractor.campos(definicion);
     } catch (JsonProcessingException error) {
       throw ExtractorElementosDeDano.invalido(
           "$", "El esquema persistido debe ser un objeto JSON.");
