@@ -1,5 +1,9 @@
 # pf-puentes-backend
 
+### Recorrido P8 con navegador y API reales (23/10/2026)
+
+`./mvnw -B -ntp -Dtest=RecorridoP8Navegador test` inicia PostgreSQL/PostGIS y MinIO temporales y ejecuta Playwright contra la SPA y Spring Boot reales: login, pesos, mantenimiento, foto/cierre, descarte y permisos. **Cinco escenarios de navegador y un orquestador JUnit aprobados**. No usa `.env` ni la base local, no agrega datos a producción y no sustituye la publicación P4/P5. [Preparación, comando y resultados](docs/prueba-navegador-p8.md). Este ejecutor se invoca explícitamente y no exige navegador al CI backend normal.
+
 ### Consulta administrativa de pesos (P8, 23/10/2026)
 
 `GET /api/v1/juegos-pesos/formularios?page=0&size=20` devuelve referencias `id`/`codigo` de versiones con juegos guardados, sin duplicados, ordenadas por código e ID y con máximo 100 filas. Solo Administrador, tanto en controlador como servicio; 400 por paginación inválida/desplazamiento excesivo y 401/403 por acceso. Sin versiones con pesos, devuelve página vacía. No expone esquema/mapeo ni certifica calibración. [ADR 0037](docs/adr/0037-catalogo-administrativo-de-formularios-con-pesos.md).

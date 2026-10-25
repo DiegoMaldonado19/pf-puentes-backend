@@ -4,6 +4,8 @@ Actualizado: 23/10/2026. Describe el código disponible; la integración complet
 
 ## 1. Módulos y límites actuales
 
+**Verificación posterior 23/10/2026:** pesos y mantenimiento ya recorrieron SPA, login/cookie/JWT, HTTP real, PostgreSQL/PostGIS, MinIO y auditoría con fixtures aislados. Cinco escenarios Playwright y un orquestador JUnit aprobados; [guía reproducible](prueba-navegador-p8.md). Las notas anteriores que no acreditaban navegador corresponden a las pruebas unitarias de aquellos incrementos. Generación P4/P5 y otros pendientes normativos siguen abiertos.
+
 | Pieza | Disponible | Pendiente |
 |---|---|---|
 | `indice/` | Núcleo puro, pesos normalizados, repositorios, creación Java autorizada/auditada, cuatro GET Admin (incluido catálogo de versiones con pesos) | Adaptación real P4, publicación P5, confirmación/recálculos y creación HTTP |
