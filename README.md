@@ -1,5 +1,13 @@
 # pf-puentes-backend
 
+### Metadatos P4 para pesos de P8 (24/10/2026)
+
+`MetadatosDanoFormulario.obtener(UUID)` lee el esquema persistido de esa versión y devuelve `ElementosDeDano` con las referencias `x-elemento-ref` de los campos `x-dano: true`. La versión V1.0.0 contiene 19 referencias; la ruta del dato puede ser diferente de la referencia del peso. Valida escala integer 0–4 y referencias únicas; rechaza metadatos incompatibles con 422 y versiones inexistentes con 404. Es lectura interna sin caché, también para históricos, sin nueva ruta HTTP. [Contrato, límites y pruebas: ADR 0038](docs/adr/0038-metadatos-de-dano-desde-el-formulario-persistido.md).
+
+Este adaptador prepara la creación de pesos con metadatos obtenidos en servidor. La creación HTTP/pantalla, la lectura de respuestas y las condiciones críticas reales siguen pendientes; no se deducen umbrales del marcador crítico de P4.
+
+Verificación local de este merge: **1193 pruebas backend**, 36 nuevas; Spotless, PMD, empaquetado y tres reglas JaCoCo aprobados. Adaptador/extractor: 100 % de líneas y ramas; diccionario generado sin diferencias. Frontend: 553 pruebas y controles de formato, lint, TypeScript y build aprobados. No acredita CI remoto.
+
 ### Recorrido P8 con navegador y API reales (23/10/2026)
 
 `./mvnw -B -ntp -Dtest=RecorridoP8Navegador test` inicia PostgreSQL/PostGIS y MinIO temporales y ejecuta Playwright contra la SPA y Spring Boot reales: login, pesos, mantenimiento, foto/cierre, descarte y permisos. **Cinco escenarios de navegador y un orquestador JUnit aprobados**. No usa `.env` ni la base local, no agrega datos a producción y no sustituye la publicación P4/P5. [Preparación, comando y resultados](docs/prueba-navegador-p8.md). Este ejecutor se invoca explícitamente y no exige navegador al CI backend normal.
@@ -8,7 +16,7 @@
 
 `GET /api/v1/juegos-pesos/formularios?page=0&size=20` devuelve referencias `id`/`codigo` de versiones con juegos guardados, sin duplicados, ordenadas por código e ID y con máximo 100 filas. Solo Administrador, tanto en controlador como servicio; 400 por paginación inválida/desplazamiento excesivo y 401/403 por acceso. Sin versiones con pesos, devuelve página vacía. No expone esquema/mapeo ni certifica calibración. [ADR 0037](docs/adr/0037-catalogo-administrativo-de-formularios-con-pesos.md).
 
-Frontend `/admin/pesos` usa la sesión/interceptores/guardia ya recibidos de P2: elegir código de versión → juego → elementos. La creación HTTP y los metadatos P4 siguen pendientes. Mantenimiento también tiene acceso protegido desde ficha P3. Las menciones históricas a esperar otra entrega de autenticación P2 quedan superadas para esas consultas.
+Frontend `/admin/pesos` usa la sesión/interceptores/guardia ya recibidos de P2: elegir código de versión → juego → elementos. La creación HTTP sigue pendiente; los metadatos de referencias P4 ya se extraen en servidor desde el incremento del 24/10. Mantenimiento también tiene acceso protegido desde ficha P3. Las menciones históricas a esperar otra entrega de autenticación P2 quedan superadas para esas consultas.
 
 Verificación local: **1134 pruebas backend**, siete escenarios nuevos, sin fallos/errores/omisiones; compilación limpia, Spotless, PMD, empaquetado y tres reglas JaCoCo aprobados. Diccionario regenerado idéntico al versionado. Sin migraciones ni cambios del workflow. Frontend: 495 pruebas y controles aprobados, según su README. No acredita CI remoto ni navegador con backend real.
 

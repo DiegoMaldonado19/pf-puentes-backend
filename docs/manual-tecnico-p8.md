@@ -1,14 +1,18 @@
 # Manual técnico de P8 — Índice de Condición y mantenimiento
 
-Actualizado: 23/10/2026. Describe el código disponible; la integración completa sigue pendiente. Trazabilidad: RN-IC-01–08, RN-MTO-01–09 y DT-CAL-08. Las HU/documentos personales fuera de este repositorio no acompañan al código cuando el equipo lo descarga; este manual sí puede compartirse mediante el commit/PR.
+Actualizado: 24/10/2026. Describe el código disponible; la integración completa sigue pendiente. Trazabilidad: RN-IC-01–08, RN-MTO-01–09 y DT-CAL-08. Las HU/documentos personales fuera de este repositorio no acompañan al código cuando el equipo lo descarga; este manual sí puede compartirse mediante el commit/PR.
 
 ## 1. Módulos y límites actuales
+
+**Verificación 24/10/2026 tras P4/P2/P6:** 1193 pruebas backend aprobadas sin fallos, errores ni omisiones; 36 casos nuevos del adaptador/extractor. `clean spotless:check verify pmd:check`, empaquetado y las tres reglas JaCoCo aprobados con Java 25, PostgreSQL/PostGIS y MinIO reales. Las dos clases nuevas alcanzan 100 % de líneas y ramas. Fuentes/recursos idénticos verificados en copia temporal; diccionario generado idéntico al versionado. Frontend: 553 pruebas, Prettier, ESLint, compilación estricta TypeScript y build de producción aprobados. Estos conteos incluyen los módulos recibidos, no solo código P8.
+
+Regresión de navegador del 24/10 aprobada: cinco escenarios Playwright y un orquestador JUnit, con Chrome y API/BD/MinIO reales en entorno aislado. Confirma que la consulta de pesos, las acciones existentes de mantenimiento y sus permisos siguen funcionando tras el merge de P4 y sesión offline. El adaptador interno nuevo se verifica en los casos Java; no se presenta este recorrido como prueba de creación HTTP o publicación aún pendientes.
 
 **Verificación posterior 23/10/2026:** pesos y mantenimiento ya recorrieron SPA, login/cookie/JWT, HTTP real, PostgreSQL/PostGIS, MinIO y auditoría con fixtures aislados. Cinco escenarios Playwright y un orquestador JUnit aprobados; [guía reproducible](prueba-navegador-p8.md). Las notas anteriores que no acreditaban navegador corresponden a las pruebas unitarias de aquellos incrementos. Generación P4/P5 y otros pendientes normativos siguen abiertos.
 
 | Pieza | Disponible | Pendiente |
 |---|---|---|
-| `indice/` | Núcleo puro, pesos normalizados, repositorios, creación Java autorizada/auditada, cuatro GET Admin (incluido catálogo de versiones con pesos) | Adaptación real P4, publicación P5, confirmación/recálculos y creación HTTP |
+| `indice/` | Núcleo puro, pesos normalizados, extracción de referencias desde esquema persistido P4, repositorios, creación Java autorizada/auditada, cuatro GET Admin (incluido catálogo de versiones con pesos) | Adaptación de respuestas y condiciones críticas P4, publicación P5, confirmación/recálculos y creación HTTP |
 | `mantenimiento/` | Máquina, origen orden/puente/inspección, consultas de historial/detalle/propuestas, PATCH autorizados/auditados de prioridad y fecha programada y POST de aceptación/inicio/cierre/descarte y carga/consulta paginada de evidencia P1; alerta de inspección vencida y recordatorio rutinario anual diarios mediante P9 | Cancelación, sugerencia automática, generación por catálogo y programación efectiva anual |
 | Frontend P8 | Condición integrada en inventario; `/admin/pesos` con catálogo/consulta, `/puentes/:id/mantenimiento` con propuestas, historial, seguimiento y acciones existentes; sesión/guardias/interceptores P2 conectados | Creación de pesos, daños/publicación reales P4/P5 y recorridos finales; sin presentación P9 de avisos |
 
@@ -47,7 +51,7 @@ Las cuatro banderas significan exactamente:
 
 Cualquier causa fuerza MALO y conserva el IC numérico. El conjunto contiene todas las causas, sin prioridad entre ellas. La entidad de inspección actual conserva una sola anulación: el adaptador no debe elegir una arbitrariamente para ocultar esa diferencia.
 
-La fachada conceptual `calcular(datos, versionFormulario)` del acuerdo de equipo todavía necesita el contrato real de P4. El núcleo anterior no interpreta JSON Schema ni identifica daños por rutas inventadas. P5 debe obtener entradas confiables, calcular y guardar el resultado oficial al publicar; la llamada y persistencia reales aún no están conectadas. Un borrador no debe presentarse como resultado oficial. `Sin evaluar` lo representa el componente frontend cuando no existe una evaluación aplicable; no se calcula asignando cero a datos ausentes.
+La fachada conceptual `calcular(datos, versionFormulario)` del acuerdo de equipo aún requiere adaptar respuestas y precisar condiciones críticas del esquema real P4 ya recibido. La extracción de referencias descrita más abajo no interpreta respuestas. El núcleo matemático no interpreta JSON Schema ni identifica daños por rutas inventadas. P5 debe obtener entradas confiables, calcular y guardar el resultado oficial al publicar; la llamada y persistencia reales aún no están conectadas. Un borrador no debe presentarse como resultado oficial. `Sin evaluar` lo representa el componente frontend cuando no existe una evaluación aplicable; no se calcula asignando cero a datos ausentes.
 
 Detalle: [ADR 0016](adr/0016-nucleo-puro-del-indice-de-condicion.md).
 
@@ -55,7 +59,11 @@ Detalle: [ADR 0016](adr/0016-nucleo-puro-del-indice-de-condicion.md).
 
 `ConfiguracionPesosService.crear(JuegoPesos, ElementosDeDano)` es una operación Java transaccional solo de ADMINISTRADOR. Valida existencia de la versión del formulario y pertenencia de las referencias a metadatos normalizados de esa misma versión, crea un juego nuevo y audita juego/pesos por fila mediante P2. No modifica el juego anterior.
 
-`ElementosDeDano` debe proceder de metadatos del servidor; **no puede recibirse como lista permitida declarada por el navegador**. Falta su extracción real desde P4. Los pesos se validan positivos y exactamente representables en `NUMERIC(6,3)`, con referencias no duplicadas. La referencia de acta es opcional para datos provisionales; una referencia presente no certifica una firma.
+`ElementosDeDano` debe proceder de metadatos del servidor; **no puede recibirse como lista permitida declarada por el navegador**. Desde el 24/10, `MetadatosDanoFormulario.obtener(versionId)` obtiene esos metadatos del esquema persistido P4. Los pesos se validan positivos y exactamente representables en `NUMERIC(6,3)`, con referencias no duplicadas. La referencia de acta es opcional para datos provisionales; una referencia presente no certifica una firma.
+
+El adaptador recorre `properties` e `items`, exige daños integer 0–4 con referencias únicas de hasta 200 caracteres y produce un conjunto inmutable. La semilla V1.0.0 entrega 19 referencias. Ejemplo: el dato `subestructura.estribo_entrada_socavacion` corresponde al peso `subestructura.estribo_entrada.socavacion`; no usar una referencia semántica como ruta de respuestas. Los arreglos se recorren como definiciones de campos, sin instanciar ni agregar respuestas.
+
+La lectura incluye borradores/históricos por su propio UUID y no tiene caché. Versión ausente → 404; metadatos mal formados o estructuras no soportadas → 422. El servicio consumidor debe autorizar su operación y emplear el resultado obtenido en servidor; este paso no agrega controlador ni cambia la firma de creación. Tampoco impone completitud del juego, elige versión activa ni interpreta anulaciones. P4 debe precisar las condiciones de activación antes de adaptar respuestas críticas. [ADR 0038](adr/0038-metadatos-de-dano-desde-el-formulario-persistido.md).
 
 La API de lectura no selecciona automáticamente un juego activo ni define la política de versiones. Detalle: [ADR 0027](adr/0027-validacion-de-configuraciones-de-pesos.md), [ADR 0019](adr/0019-creacion-transaccional-y-auditada-de-pesos.md).
 
@@ -186,10 +194,10 @@ En frontend, `ConsultaOrdenes` recibe `puedeProgramar` de la sesión (false por 
 
 | Responsable | Entrega necesaria para completar el flujo |
 |---|---|
-| P4 | JSON Schema real, respuestas de ejemplo, referencias/metadatos de daño, severidades y portantes; acuerdo de versiones con pesos |
+| P4 | Esquema/API/motor recibidos y extracción de referencias integrada; faltan condiciones críticas explícitas, adaptación de respuestas/repetidos y acuerdo de versiones con pesos |
 | P5 | El record InspeccionPublicada ya llegó con P3; faltan publicación real que calcula/guarda IC/versiones y emisor en esa transacción |
-| P3 | Inventario/listado/mapa/ficha y uso de estado P8 ya recibidos; conectar los contenedores P8 al puente seleccionado disponible |
-| P2 | Sesión, interceptores y guardias frontend; aplicar los mecanismos backend existentes en cada nueva operación de P8 |
+| P3 | Inventario/listado/mapa/ficha y estado P8 recibidos; mantenimiento ya conectado desde ficha al puente seleccionado |
+| P2 | Sesión, interceptores y guardias frontend recibidos e integrados; aplicar sus mecanismos existentes a futuras operaciones |
 | P1 | Almacenamiento/captura reutilizados para evidencia de órdenes; conservar contrato 16 |
 | P9 | Emisor integrado con alerta de inspección vencida y recordatorio rutinario anual; falta su presentación frontend |
 | Equipo/catedrático | Actores pendientes de otras operaciones, catálogo daño → intervención, calibración/acta, prioridad, precisión/anulaciones y reglas temporales no especificadas |
