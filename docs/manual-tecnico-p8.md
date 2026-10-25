@@ -1,6 +1,6 @@
 # Manual técnico de P8 — Índice de Condición y mantenimiento
 
-Actualizado: 24/10/2026. Describe el código disponible; la integración completa sigue pendiente. Trazabilidad: RN-IC-01–08, RN-MTO-01–09 y DT-CAL-08. Las HU/documentos personales fuera de este repositorio no acompañan al código cuando el equipo lo descarga; este manual sí puede compartirse mediante el commit/PR.
+Actualizado: 25/10/2026. Describe el código disponible; la integración completa sigue pendiente. Trazabilidad: RN-IC-01–08, RN-MTO-01–09 y DT-CAL-08. Las HU/documentos personales fuera de este repositorio no acompañan al código cuando el equipo lo descarga; este manual sí puede compartirse mediante el commit/PR.
 
 ## 1. Módulos y límites actuales
 
@@ -56,6 +56,18 @@ La fachada conceptual `calcular(datos, versionFormulario)` del acuerdo de equipo
 Detalle: [ADR 0016](adr/0016-nucleo-puro-del-indice-de-condicion.md).
 
 ## 3. Configuración de pesos
+
+### Consulta de referencias del formulario — 24/10/2026
+
+Recorrido final del 25/10 aprobado: seis escenarios Playwright y un orquestador JUnit, con build de producción, Chrome y API/BD/MinIO reales en entorno aislado. El caso nuevo muestra las 19 referencias de V1.0.0 sin juegos previos; los otros cinco comprueban que siguen funcionando consulta de pesos, mantenimiento y permisos. [Guía reproducible](prueba-navegador-p8.md). No acredita guardado de pesos ni publicación pendientes.
+
+Verificación final del 25/10: **1203 pruebas backend**, diez nuevas, sin fallos/errores/omisiones. Spotless, PMD, empaquetado y tres reglas JaCoCo aprobados; nuevo servicio con 100 % de líneas y ramas. Fuentes verificadas en copia temporal con PostgreSQL/PostGIS y MinIO reales; diccionario generado idéntico al versionado. Frontend: 568 pruebas, 15 nuevas, y controles de lint, formato y TypeScript aprobados. Se repitió la suite frontend aislada tras una corrida concurrente con tres timeouts y un error de TestBed; no se modificaron esas suites ni sus tiempos de espera.
+
+El Administrador puede usar `GET /api/v1/formularios/{formularioId}/elementos-dano?page=0&size=20` para obtener `content: ["referencia", ...]`, `page`, `size`, `total_elements` y `total_pages`. Se ordena por referencia, página base cero y máximo 100 filas. Solo campos de daño extraídos del esquema persistido; incluso sin configuraciones guardadas y para históricos. No son rutas de respuestas ni pesos calibrados. Sin campos se devuelve página vacía. Respuestas: 400 por UUID/página inválidos, 401 sin sesión, 403 rol ajeno, 404 versión ausente, 422 metadatos incompatibles. No requiere nuevo DTO por elemento ni MapStruct para transformar cadenas; se reutiliza el DTO de página existente sin exponer entidades.
+
+Prueba manual: iniciar sesión como Administrador → **Pesos del índice de condición** → **Consultar campos de daño del formulario** → elegir una versión P4. V1.0.0 muestra 19 referencias aunque no tenga juegos de pesos. Se puede paginar versiones y campos, ocultar el panel y reintentar errores de lectura. El catálogo de juegos existente conserva su filtro y paginación. El cliente usa sesión/interceptor P2 y el servicio/listado P4 existentes. Cambiar selección/página o perder acceso cancela lecturas y retira resultados previos.
+
+El usuario prefirió consultar al grupo antes de exigir completitud del juego o habilitar su creación para formularios publicados. Guardado HTTP/UI y selección de juego al publicar siguen pendientes; esta consulta es funcional por sí misma. [ADR 0039](adr/0039-consulta-administrativa-de-referencias-de-dano.md).
 
 `ConfiguracionPesosService.crear(JuegoPesos, ElementosDeDano)` es una operación Java transaccional solo de ADMINISTRADOR. Valida existencia de la versión del formulario y pertenencia de las referencias a metadatos normalizados de esa misma versión, crea un juego nuevo y audita juego/pesos por fila mediante P2. No modifica el juego anterior.
 

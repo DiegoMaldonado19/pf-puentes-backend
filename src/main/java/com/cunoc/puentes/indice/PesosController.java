@@ -29,9 +29,24 @@ import org.springframework.web.bind.annotation.RestController;
 class PesosController {
 
   private final ConsultaPesosService consulta;
+  private final ConsultaElementosDanoService elementos;
 
-  PesosController(ConsultaPesosService consulta) {
+  PesosController(ConsultaPesosService consulta, ConsultaElementosDanoService elementos) {
     this.consulta = consulta;
+    this.elementos = elementos;
+  }
+
+  @GetMapping("/formularios/{formularioId}/elementos-dano")
+  @Operation(
+      summary = "Consulta referencias de daño de una versión, aunque no tenga pesos",
+      description =
+          "Referencias canónicas ordenadas; no son rutas de respuestas ni pesos calibrados. page desde 0, size máximo 100.")
+  @ApiResponse(responseCode = "200", description = "Página de referencias del esquema persistido")
+  @ApiResponse(responseCode = "422", description = "Metadatos de daño incompatibles")
+  PaginaPesosDTO<String> elementos(
+      @PathVariable UUID formularioId,
+      @Valid @ModelAttribute @ParameterObject PaginacionPesosDTO pagina) {
+    return PaginaPesosDTO.de(elementos.listar(formularioId, pagina.page(), pagina.size()));
   }
 
   @GetMapping("/juegos-pesos/formularios")

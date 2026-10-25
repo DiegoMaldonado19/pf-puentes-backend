@@ -1,5 +1,15 @@
 # pf-puentes-backend
 
+### Consulta de campos P4 desde pesos (P8, 24/10/2026)
+
+`GET /api/v1/formularios/{formularioId}/elementos-dano?page=0&size=20` devuelve una página de referencias canónicas ordenadas del esquema persistido. Solo Administrador en HTTP y servicio; tamaño máximo 100, errores 400/401/403/404/422. Funciona aunque la versión no tenga pesos; no crea configuraciones. Frontend: `/admin/pesos` → **Consultar campos de daño del formulario** → seleccionar versión. Reutiliza el listado P4 y mantiene separado el catálogo de versiones con juegos guardados. [ADR 0039](docs/adr/0039-consulta-administrativa-de-referencias-de-dano.md).
+
+El usuario decidió consultar al grupo la completitud del juego y la creación para versiones publicadas antes de habilitar el guardado; selección/publicación P5 y calibración siguen pendientes.
+
+Verificación 25/10/2026: **1203 pruebas backend aprobadas**, diez nuevas; Spotless, PMD, empaquetado y tres reglas JaCoCo aprobados. Servicio nuevo: 100 % de líneas y ramas. Diccionario generado sin diferencias. Frontend: 568 pruebas aprobadas y controles documentados en su README; no acredita CI remoto.
+
+Recorrido final: **seis escenarios Playwright y un orquestador JUnit aprobados**, con Chrome/build de producción y backend/BD/MinIO reales. Incluye la consulta de los 19 campos de la semilla P4 sin juegos de pesos. [Guía actualizada](docs/prueba-navegador-p8.md).
+
 ### Metadatos P4 para pesos de P8 (24/10/2026)
 
 `MetadatosDanoFormulario.obtener(UUID)` lee el esquema persistido de esa versión y devuelve `ElementosDeDano` con las referencias `x-elemento-ref` de los campos `x-dano: true`. La versión V1.0.0 contiene 19 referencias; la ruta del dato puede ser diferente de la referencia del peso. Valida escala integer 0–4 y referencias únicas; rechaza metadatos incompatibles con 422 y versiones inexistentes con 404. Es lectura interna sin caché, también para históricos, sin nueva ruta HTTP. [Contrato, límites y pruebas: ADR 0038](docs/adr/0038-metadatos-de-dano-desde-el-formulario-persistido.md).
