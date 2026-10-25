@@ -31,4 +31,20 @@ public class FormularioVersion extends EntidadBase {
   private EstadoFormulario estado = EstadoFormulario.BORRADOR;
 
   private Instant publicadaEn;
+
+  public FormularioVersion(String codigo, Map<String, Object> esquema) {
+    this.codigo = codigo;
+    this.esquema = esquema;
+    this.estado = EstadoFormulario.BORRADOR;
+  }
+
+  public void publicar(Map<String, Object> mapeo) {
+    this.estado = EstadoFormulario.ACTIVA;
+    this.mapeo = mapeo;
+    this.publicadaEn = Instant.now();
+  }
+
+  public void retirar() {
+    this.estado = EstadoFormulario.RETIRADA;
+  }
 }

@@ -31,6 +31,7 @@
 		<mapstruct.version>1.6.3</mapstruct.version>
 		<jjwt.version>0.13.0</jjwt.version>
 		<shedlock.version>7.10.1</shedlock.version>
+		<json-schema-validator.version>1.5.6</json-schema-validator.version>
 	</properties>
 	<dependencies>
 		<dependency>
@@ -119,6 +120,11 @@
 			<groupId>net.javacrumbs.shedlock</groupId>
 			<artifactId>shedlock-provider-jdbc-template</artifactId>
 			<version>${shedlock.version}</version>
+		</dependency>
+		<dependency>
+			<groupId>com.networknt</groupId>
+			<artifactId>json-schema-validator</artifactId>
+			<version>${json-schema-validator.version}</version>
 		</dependency>
 		<dependency>
 			<groupId>org.projectlombok</groupId>
