@@ -40,9 +40,20 @@ class ConsultaFormularioProvisionalTest extends PruebaIntegracion {
     assertThat(consulta.exigir(VERSION).codigo()).isEqualTo("SIECA-PRUEBA");
     assertThat(consulta.rutasPermanentes(VERSION)).contains("identificacion.tipologia");
     assertThat(consulta.rutasDeDano(VERSION)).contains("cauce.calificacion");
-    assertThat(consulta.grupos(VERSION)).isEmpty();
+    assertThat(consulta.grupos(VERSION))
+        .anySatisfy(grupo -> assertThat(grupo.id()).isEqualTo("subestructura.estribo_entrada"));
     consulta.validarParcial(Map.of(), VERSION);
     consulta.validarCompleto(Map.of(), VERSION);
+    assertThatThrownBy(
+            () ->
+                consulta.validarParcial(
+                    Map.of("identificacion", Map.of("numero_tramos", "tres")), VERSION))
+        .isInstanceOf(NegocioException.class)
+        .satisfies(
+            error -> {
+              NegocioException negocio = (NegocioException) error;
+              assertThat(negocio.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_CONTENT);
+            });
   }
 
   @Test

@@ -2,8 +2,10 @@ package com.cunoc.puentes.inspeccion;
 
 import static com.cunoc.puentes.common.seguridad.AutenticacionDePrueba.como;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.cunoc.puentes.common.seguridad.SeguridadDePrueba;
@@ -39,6 +41,8 @@ class InspeccionControllerTest {
   @Autowired MockMvc mvc;
   @MockitoBean ConsultaInspeccionService consultas;
   @MockitoBean InicioInspeccionService inicio;
+  @MockitoBean PrecargaInspeccionService precarga;
+  @MockitoBean CapturaBorradorService captura;
 
   @ParameterizedTest
   @EnumSource(
@@ -128,5 +132,72 @@ class InspeccionControllerTest {
             org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath(
                     "$.errores[0].campo")
                 .value("id"));
+  }
+
+  @ParameterizedTest
+  @EnumSource(
+      value = Rol.class,
+      names = {"ESTUDIANTE", "PROFESIONAL_EXTERNO", "CATEDRATICO"})
+  void inspectoresGuardanConfirmanYEliminanBorradores(Rol rol) throws Exception {
+    mvc.perform(
+            put("/api/v1/inspecciones/" + USUARIO)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    """
+                    {"datos":{},"version":0}
+                    """)
+                .with(csrf())
+                .with(como(rol, USUARIO)))
+        .andExpect(status().isOk());
+    mvc.perform(
+            post("/api/v1/inspecciones/" + USUARIO + "/confirmacion-datos-permanentes")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    """
+                    {"datos":{}}
+                    """)
+                .with(csrf())
+                .with(como(rol, USUARIO)))
+        .andExpect(status().isOk());
+    mvc.perform(delete("/api/v1/inspecciones/" + USUARIO).with(csrf()).with(como(rol, USUARIO)))
+        .andExpect(status().isNoContent());
+  }
+
+  @Test
+  void elAdministradorNoEditaNiPreparaSalida() throws Exception {
+    mvc.perform(
+            put("/api/v1/inspecciones/" + USUARIO)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    """
+                    {"datos":{},"version":0}
+                    """)
+                .with(csrf())
+                .with(como(Rol.ADMINISTRADOR, USUARIO)))
+        .andExpect(status().isForbidden());
+    mvc.perform(
+            get("/api/v1/puentes/" + USUARIO + "/datos-permanentes")
+                .with(como(Rol.ADMINISTRADOR, USUARIO)))
+        .andExpect(status().isForbidden());
+    mvc.perform(
+            delete("/api/v1/inspecciones/" + USUARIO)
+                .with(csrf())
+                .with(como(Rol.ADMINISTRADOR, USUARIO)))
+        .andExpect(status().isForbidden());
+  }
+
+  @Test
+  void visitanteTampocoEditaElBorrador() throws Exception {
+    mvc.perform(
+            put("/api/v1/inspecciones/" + USUARIO)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    """
+                    {"datos":{},"version":0}
+                    """)
+                .with(csrf()))
+        .andExpect(status().isUnauthorized());
+    mvc.perform(delete("/api/v1/inspecciones/" + USUARIO).with(csrf()))
+        .andExpect(status().isUnauthorized());
   }
 }
