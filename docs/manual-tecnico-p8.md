@@ -4,6 +4,8 @@ Actualizado: 25/10/2026. Describe el código disponible; la integración complet
 
 ## 1. Módulos y límites actuales
 
+**Estado vigente del 25/10:** creación HTTP y formulario frontend de pesos ya implementados. La autorización y política adoptada por el responsable P8 se registran en [ADR 0040](adr/0040-creacion-completa-y-versionada-de-pesos.md), versionado en este repositorio. Las menciones fechadas anteriores al guardado pendiente describen sus entregas históricas. Calibración académica, selección del juego al publicar y adaptación de respuestas P4/P5 siguen pendientes.
+
 **Verificación 24/10/2026 tras P4/P2/P6:** 1193 pruebas backend aprobadas sin fallos, errores ni omisiones; 36 casos nuevos del adaptador/extractor. `clean spotless:check verify pmd:check`, empaquetado y las tres reglas JaCoCo aprobados con Java 25, PostgreSQL/PostGIS y MinIO reales. Las dos clases nuevas alcanzan 100 % de líneas y ramas. Fuentes/recursos idénticos verificados en copia temporal; diccionario generado idéntico al versionado. Frontend: 553 pruebas, Prettier, ESLint, compilación estricta TypeScript y build de producción aprobados. Estos conteos incluyen los módulos recibidos, no solo código P8.
 
 Regresión de navegador del 24/10 aprobada: cinco escenarios Playwright y un orquestador JUnit, con Chrome y API/BD/MinIO reales en entorno aislado. Confirma que la consulta de pesos, las acciones existentes de mantenimiento y sus permisos siguen funcionando tras el merge de P4 y sesión offline. El adaptador interno nuevo se verifica en los casos Java; no se presenta este recorrido como prueba de creación HTTP o publicación aún pendientes.
@@ -12,9 +14,9 @@ Regresión de navegador del 24/10 aprobada: cinco escenarios Playwright y un orq
 
 | Pieza | Disponible | Pendiente |
 |---|---|---|
-| `indice/` | Núcleo puro, pesos normalizados, extracción de referencias desde esquema persistido P4, repositorios, creación Java autorizada/auditada, cuatro GET Admin (incluido catálogo de versiones con pesos) | Adaptación de respuestas y condiciones críticas P4, publicación P5, confirmación/recálculos y creación HTTP |
+| `indice/` | Núcleo puro, pesos normalizados, metadatos P4, creación completa HTTP autorizada/auditada y cinco GET Admin (incluidos catálogo de versiones con pesos y referencias de daño) | Calibración, selección de juego, adaptación de respuestas/condiciones críticas P4, publicación P5 y confirmación/recálculos |
 | `mantenimiento/` | Máquina, origen orden/puente/inspección, consultas de historial/detalle/propuestas, PATCH autorizados/auditados de prioridad y fecha programada y POST de aceptación/inicio/cierre/descarte y carga/consulta paginada de evidencia P1; alerta de inspección vencida y recordatorio rutinario anual diarios mediante P9 | Cancelación, sugerencia automática, generación por catálogo y programación efectiva anual |
-| Frontend P8 | Condición integrada en inventario; `/admin/pesos` con catálogo/consulta, `/puentes/:id/mantenimiento` con propuestas, historial, seguimiento y acciones existentes; sesión/guardias/interceptores P2 conectados | Creación de pesos, daños/publicación reales P4/P5 y recorridos finales; sin presentación P9 de avisos |
+| Frontend P8 | Condición en inventario; `/admin/pesos` con catálogo, consulta y creación de juegos completos; `/puentes/:id/mantenimiento` con propuestas, historial, seguimiento y acciones; sesión/guardias/interceptores P2 conectados | Calibración, daños/publicación reales P4/P5 y recorridos finales; presentación de avisos P9 |
 
 ### Acceso a pesos con P2 recibido — 23/10/2026
 
@@ -57,6 +59,22 @@ Detalle: [ADR 0016](adr/0016-nucleo-puro-del-indice-de-condicion.md).
 
 ## 3. Configuración de pesos
 
+### Creación HTTP completa — 25/10/2026
+
+**Recorrido final aprobado:** siete escenarios Playwright y un orquestador JUnit contra Chrome, SPA de producción, API, PostgreSQL/PostGIS y MinIO reales en entorno aislado. Crea dos juegos completos de 19 campos, consulta después de recargar y verifica en SQL conservación de juegos/pesos anteriores, esquema e inspecciones, acta/provisional y auditoría. Build de producción aprobado dentro del recorrido. No usa `.env` ni la base local del usuario; [guía del equipo](prueba-navegador-p8.md).
+
+Verificación: **1224 pruebas backend aprobadas**, incluidas 21 nuevas de creación; compilación limpia, Spotless, PMD, empaquetado y tres reglas JaCoCo aprobados. Fachada nueva: 100 % de líneas y ramas. Prueba con PostgreSQL/PostGIS y MinIO reales en copia temporal; sin cambios de esquema. Frontend: **595 pruebas aprobadas**, 27 nuevas, ESLint, Prettier y TypeScript estricto aprobados. Una corrida concurrente tuvo timeouts; la repetición aislada pasó sin ampliar tiempos ni modificar suites ajenas.
+
+`POST /api/v1/formularios/{formularioId}/juegos-pesos`, solo Administrador en controlador/fachada. Cuerpo: `acta` opcional (null → provisional), lista `pesos` con `elemento_ref` y `peso`. La versión procede de la ruta; el conjunto permitido se extrae en servidor, nunca del cliente. El juego debe cubrir exactamente todos los campos de daño, sin duplicados/ajenos/faltantes. Pesos positivos hasta 999.999 y tres decimales significativos, sin redondeo silencioso; acta hasta 300 caracteres Unicode. El DTO se transforma mediante MapStruct y el dominio valida los límites técnicos.
+
+`CreacionJuegoPesosService` toma bloqueo compartido de la fila de formulario, lee sus metadatos y llama al servicio previo de configuración en la misma transacción. Evita cambios del esquema durante la operación y reutiliza auditoría P2 por cada fila. Responde 201 con `JuegoPesosDTO` y `Location` del GET de detalle. 400 por datos/UUID inválidos, 401 sin sesión, 403 rol ajeno, 404 versión ausente y 422 por metadatos incompatibles o completitud. No requiere migración.
+
+Política adoptada con autorización explícita del responsable P8: crear juegos nuevos también en formularios publicados/retirados; conservar anteriores, esquema y resultados de inspecciones. No es una respuesta del grupo o catedrático. No se activa un juego automáticamente ni se recalcula: selección por publicación/compatibilidad tras editar borradores se coordina con P4/P5. **El acta sigue requiriendo respaldo académico real**; guardar una referencia no verifica la firma. [ADR compartido 0040](adr/0040-creacion-completa-y-versionada-de-pesos.md).
+
+Prueba manual: Administrador → `/admin/pesos` → consultar campos → elegir versión → configurar nuevo juego → introducir todos los pesos y referencia de acta si corresponde → guardar. V1.0.0 tiene 19 campos. Se consulta el juego nuevo y se conserva cada anterior; refrescar conserva los datos. No introducir valores arbitrarios en un entorno compartido para aparentar calibración. Sin valores académicos, guardar como provisional.
+
+Durante el POST se bloquean cierre, contexto y salida; al confirmar se recargan catálogo y juegos de la versión. Ante red/5xx con resultado incierto no se repite el envío: consultar juegos guardados antes de abrir otra creación. Un 400 permite corregir; 404/422 requieren recargar campos; 401/403 retirar/renovar acceso mediante P2. El frontend obtiene todas las páginas antes de ofrecer el formulario y deja los pesos vacíos.
+
 ### Consulta de referencias del formulario — 24/10/2026
 
 Recorrido final del 25/10 aprobado: seis escenarios Playwright y un orquestador JUnit, con build de producción, Chrome y API/BD/MinIO reales en entorno aislado. El caso nuevo muestra las 19 referencias de V1.0.0 sin juegos previos; los otros cinco comprueban que siguen funcionando consulta de pesos, mantenimiento y permisos. [Guía reproducible](prueba-navegador-p8.md). No acredita guardado de pesos ni publicación pendientes.
@@ -89,6 +107,7 @@ En local: API `http://localhost:8080`; Swagger `http://localhost:8080/api/docs/s
 
 | Método y ruta | Permiso | Respuesta |
 |---|---|---|
+| `POST /api/v1/formularios/{formularioId}/juegos-pesos` | ADMINISTRADOR | 201: juego completo nuevo y Location; errores 400/401/403/404/422 |
 | `GET /api/v1/formularios/{formularioId}/juegos-pesos` | ADMINISTRADOR | Página de juegos de esa versión de formulario, por ID descendente |
 | `GET /api/v1/juegos-pesos/{id}` | ADMINISTRADOR | Juego: `id`, `formulario_version_id`, `acta`, `vigente_desde` |
 | `GET /api/v1/juegos-pesos/{id}/pesos` | ADMINISTRADOR | Página de elementos: `id`, `elemento_ref`, `peso`; referencia ascendente |

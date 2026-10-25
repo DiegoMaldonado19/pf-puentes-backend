@@ -1,5 +1,15 @@
 # pf-puentes-backend
 
+### Crear juegos completos de pesos (P8, 25/10/2026)
+
+`POST /api/v1/formularios/{formularioId}/juegos-pesos`, solo Administrador: `{"acta":null,"pesos":[{"elemento_ref":"referencia-real","peso":1.25}]}`. Debe incluir exactamente un peso por cada campo de daño obtenido del servidor. Devuelve 201, DTO y Location del juego nuevo; 400/401/403/404/422 documentados. Transacción, bloqueo compartido del formulario y auditoría por fila reutilizada de P2. No modifica juegos anteriores ni inspecciones, no elige un juego oficial ni recalcula. El ejemplo ilustra el formato, no valores calibrados ni un juego completo de V1.0.0.
+
+La política de completitud y creación para borradores/activas/retiradas fue **adoptada con autorización del responsable P8**, sin atribuirla al texto literal ni a una confirmación del grupo. Queda documentada para el equipo en [ADR 0040](docs/adr/0040-creacion-completa-y-versionada-de-pesos.md) y [manual técnico](docs/manual-tecnico-p8.md). Acta null significa provisional; una referencia no certifica firma/calibración. Se superan las menciones anteriores a esperar esa decisión para habilitar el guardado.
+
+Verificación de creación: **1224 pruebas backend aprobadas**, 21 nuevas; Spotless, PMD, empaquetado y tres reglas JaCoCo aprobados. Fachada nueva: 100 % de líneas y ramas. Frontend: 595 pruebas y controles aprobados según su README. Diccionario sin migraciones; no acredita CI remoto.
+
+**Siete escenarios Playwright y un orquestador JUnit aprobados**, con build de producción, Chrome y API/BD/MinIO reales. Creación de dos juegos de 19 pesos y verificación SQL de históricos, esquema, inspecciones y auditoría. [Guía reproducible](docs/prueba-navegador-p8.md).
+
 ### Consulta de campos P4 desde pesos (P8, 24/10/2026)
 
 `GET /api/v1/formularios/{formularioId}/elementos-dano?page=0&size=20` devuelve una página de referencias canónicas ordenadas del esquema persistido. Solo Administrador en HTTP y servicio; tamaño máximo 100, errores 400/401/403/404/422. Funciona aunque la versión no tenga pesos; no crea configuraciones. Frontend: `/admin/pesos` → **Consultar campos de daño del formulario** → seleccionar versión. Reutiliza el listado P4 y mantiene separado el catálogo de versiones con juegos guardados. [ADR 0039](docs/adr/0039-consulta-administrativa-de-referencias-de-dano.md).

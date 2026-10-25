@@ -31,7 +31,7 @@ El ejecutor hereda `PruebaIntegracion`: crea PostgreSQL/PostGIS y MinIO desechab
 
 Playwright compila la aplicación de producción y un servidor Node exclusivo de pruebas sirve la SPA y reenvía `/api` al backend temporal, sin reemplazar sus respuestas. Requiere la marca del ejecutor y rechaza el puerto local habitual 8080. El navegador usa login, cookie de renovación, Bearer, guardias, servicios, transacciones, auditoría y objetos MinIO reales. La opción de cookie sin Secure y el origen de prueba solo se aplican en este contexto de pruebas. Service worker bloqueado para no reutilizar cachés; el harness offline conserva su configuración separada.
 
-Se recorren seis escenarios:
+Se recorren siete escenarios:
 
 1. Administrador: versión de formulario → juego → elementos; recargar conserva sesión.
 2. Administrador: ficha P3 → mantenimiento → aceptar, programar, justificar prioridad, iniciar, rechazar cierre sin foto, comprimir/subir una imagen a MinIO, cerrar, recargar y consultar evidencia; descartar otra propuesta y conservar el motivo.
@@ -39,12 +39,13 @@ Se recorren seis escenarios:
 4. Estudiante: rutas y API de mantenimiento/pesos denegadas.
 5. Profesional: las mismas restricciones, con cuenta profesional válida.
 6. Administrador: abrir campos de daño, seleccionar V1.0.0 desde P4 y consultar sus 19 referencias canónicas sin pesos configurados; ocultar el panel.
+7. Administrador: crear dos juegos completos de 19 pesos, uno con referencia de acta de prueba y otro provisional; comprobar consulta tras recarga y conservación del primero. SQL posterior valida valores, actas, auditoría, esquema e inspecciones anteriores sin cambios.
 
 Al terminar, Java comprueba en SQL estado, fecha, responsable, prioridad, motivo, una evidencia, auditorías y ausencia de órdenes nuevas. Los contenedores desaparecen con la JVM. El icono enviado como imagen es un archivo de prueba; no se presenta como evidencia de un puente real.
 
 ## Resultados y límites
 
-Ejecución local del 25/10 aprobada: **6 escenarios Playwright y 1 prueba orquestadora JUnit**, sin fallos ni omisiones. Google Chrome 151 instalado; en la preparación original la descarga del Chromium gestionado por Playwright agotó su tiempo de espera. Se utilizó el canal Chrome soportado por Playwright sin simular un navegador ni respuestas API. Build de producción aprobado dentro del recorrido. La nueva consulta de campos lee la semilla real de Flyway; los escenarios anteriores siguen usando sus fixtures aislados.
+Ejecución local del 25/10 aprobada: **7 escenarios Playwright y 1 prueba orquestadora JUnit**, sin fallos ni omisiones. Google Chrome 151 instalado; en la preparación original la descarga del Chromium gestionado por Playwright agotó su tiempo de espera. Se utilizó el canal Chrome soportado por Playwright sin simular un navegador ni respuestas API. Build de producción aprobado dentro del recorrido. Consulta y creación usan los 19 campos de la semilla real de Flyway; los demás escenarios conservan sus fixtures aislados. Los pesos introducidos son exclusivamente de prueba, no calibración académica.
 
 Frontend: `playwright-report/p8/index.html`, `test-results/p8/` y `test-results/p8-ejecucion.log` (ignorados por Git). Backend: `target/surefire-reports`. No se graban trazas de red porque contienen credenciales/tokens; las cuentas son exclusivamente de prueba. El proceso hijo escribe a un archivo para no interferir con el canal de Surefire.
 

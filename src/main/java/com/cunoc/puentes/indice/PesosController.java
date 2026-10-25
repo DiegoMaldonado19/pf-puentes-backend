@@ -1,5 +1,6 @@
 package com.cunoc.puentes.indice;
 
+import com.cunoc.puentes.indice.dto.CrearJuegoPesosDTO;
 import com.cunoc.puentes.indice.dto.FormularioConPesosDTO;
 import com.cunoc.puentes.indice.dto.JuegoPesosDTO;
 import com.cunoc.puentes.indice.dto.PaginaPesosDTO;
@@ -9,12 +10,16 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import java.net.URI;
 import java.util.UUID;
 import org.springdoc.core.annotations.ParameterObject;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -30,10 +35,30 @@ class PesosController {
 
   private final ConsultaPesosService consulta;
   private final ConsultaElementosDanoService elementos;
+  private final CreacionJuegoPesosService creacion;
 
-  PesosController(ConsultaPesosService consulta, ConsultaElementosDanoService elementos) {
+  PesosController(
+      ConsultaPesosService consulta,
+      ConsultaElementosDanoService elementos,
+      CreacionJuegoPesosService creacion) {
     this.consulta = consulta;
     this.elementos = elementos;
+    this.creacion = creacion;
+  }
+
+  @PostMapping("/formularios/{formularioId}/juegos-pesos")
+  @Operation(
+      summary = "Crea un juego completo nuevo sin modificar los históricos",
+      description =
+          "Solo Admin. Un peso por cada campo de daño obtenido en servidor; admite formularios publicados. Acta null identifica provisionales; una referencia no certifica firma. No recalcula inspecciones.")
+  @ApiResponse(responseCode = "201", description = "Juego creado y auditado con sus pesos")
+  @ApiResponse(
+      responseCode = "422",
+      description = "Campos incompletos, ajenos o esquema incompatible")
+  ResponseEntity<JuegoPesosDTO> crear(
+      @PathVariable UUID formularioId, @Valid @RequestBody CrearJuegoPesosDTO datos) {
+    var juego = creacion.crear(formularioId, datos);
+    return ResponseEntity.created(URI.create("/api/v1/juegos-pesos/" + juego.id())).body(juego);
   }
 
   @GetMapping("/formularios/{formularioId}/elementos-dano")

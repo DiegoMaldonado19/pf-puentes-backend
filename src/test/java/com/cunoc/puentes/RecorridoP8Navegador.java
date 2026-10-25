@@ -52,6 +52,11 @@ class RecorridoP8Navegador extends PruebaIntegracion {
         id(22),
         id(1));
     Long ordenesAntes = jdbc.queryForObject("SELECT count(*) FROM orden_mantenimiento", Long.class);
+    UUID sieca = UUID.fromString("0192b000-0000-7000-8000-000000000001");
+    var esquemaAntes = jdbc.queryForMap("SELECT * FROM formulario_version WHERE id=?", sieca);
+    var juegosAntes = jdbc.queryForList("SELECT * FROM version_pesos");
+    var pesosAntes = jdbc.queryForList("SELECT * FROM peso_elemento");
+    var inspeccionesAntes = jdbc.queryForList("SELECT * FROM inspeccion");
     Files.createDirectories(frontend.resolve("test-results"));
     var constructor =
         new ProcessBuilder(
@@ -100,6 +105,44 @@ class RecorridoP8Navegador extends PruebaIntegracion {
         .isGreaterThanOrEqualTo(5L);
     assertThat(jdbc.queryForObject("SELECT count(*) FROM orden_mantenimiento", Long.class))
         .isEqualTo(ordenesAntes);
+    assertThat(jdbc.queryForMap("SELECT * FROM formulario_version WHERE id=?", sieca))
+        .isEqualTo(esquemaAntes);
+    assertThat(jdbc.queryForList("SELECT * FROM inspeccion"))
+        .containsExactlyInAnyOrderElementsOf(inspeccionesAntes);
+    assertThat(
+            jdbc.queryForList("SELECT * FROM version_pesos WHERE formulario_version_id<>?", sieca))
+        .containsExactlyInAnyOrderElementsOf(juegosAntes);
+    assertThat(
+            jdbc.queryForList(
+                "SELECT p.* FROM peso_elemento p JOIN version_pesos v ON v.id=p.version_pesos_id WHERE v.formulario_version_id<>?",
+                sieca))
+        .containsExactlyInAnyOrderElementsOf(pesosAntes);
+    var creados =
+        jdbc.queryForList(
+            "SELECT id,acta FROM version_pesos WHERE formulario_version_id=? ORDER BY id", sieca);
+    assertThat(creados).hasSize(2);
+    assertThat(creados.getFirst().get("acta")).isEqualTo("Referencia de prueba del navegador");
+    assertThat(creados.getLast().get("acta")).isNull();
+    for (int i = 0; i < creados.size(); i++) {
+      UUID juego = (UUID) creados.get(i).get("id");
+      assertThat(
+              jdbc.queryForObject(
+                  "SELECT count(*) FROM peso_elemento WHERE version_pesos_id=?", Long.class, juego))
+          .isEqualTo(19L);
+      assertThat(
+              jdbc.queryForObject(
+                  "SELECT count(*) FROM peso_elemento WHERE version_pesos_id=? AND peso=?",
+                  Long.class,
+                  juego,
+                  i == 0 ? new java.math.BigDecimal("2.125") : new java.math.BigDecimal("3.5")))
+          .isEqualTo(19L);
+      assertThat(
+              jdbc.queryForObject(
+                  "SELECT count(*) FROM auditoria WHERE entidad='version_pesos' AND entidad_id=?",
+                  Long.class,
+                  juego))
+          .isEqualTo(1L);
+    }
     assertThat(Files.exists(frontend.resolve("playwright-report/p8/index.html"))).isTrue();
   }
 
