@@ -1,9 +1,13 @@
 package com.cunoc.puentes.inspeccion.puerto;
 
+import com.cunoc.puentes.common.ErrorCampo;
 import com.cunoc.puentes.common.NegocioException;
 import com.cunoc.puentes.formulario.EstadoFormulario;
 import com.cunoc.puentes.formulario.FormularioVersion;
 import jakarta.persistence.EntityManager;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -16,8 +20,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Sustituto de P4 mientras el motor de formularios no esté en {@code develop}. Lee la versión
- * {@code ACTIVA} de {@code formulario_version} y las rutas de {@code sgp.formulario.*}. No valida
- * JSON Schema: {@code validarParcial} y {@code validarCompleto} son no-op a propósito (fase 0).
+ * {@code ACTIVA} de {@code formulario_version} y las rutas de {@code sgp.formulario.*}. {@code
+ * validarParcial} comprueba tipos y rangos de las rutas conocidas; {@code validarCompleto} sigue
+ * siendo no-op hasta el envío (US-P5-07).
  */
 class ConsultaFormularioProvisional implements ConsultaFormulario {
 
@@ -75,19 +80,94 @@ class ConsultaFormularioProvisional implements ConsultaFormulario {
   @Override
   public List<GrupoElemento> grupos(UUID versionId) {
     Objects.requireNonNull(versionId, "La versión del formulario es obligatoria.");
-    return List.of();
+    Map<String, Set<String>> porGrupo = new LinkedHashMap<>();
+    for (String ruta : danos) {
+      int punto = ruta.lastIndexOf('.');
+      String grupo = punto < 0 ? ruta : ruta.substring(0, punto);
+      porGrupo.computeIfAbsent(grupo, ignorado -> new LinkedHashSet<>()).add(ruta);
+    }
+    return porGrupo.entrySet().stream()
+        .map(entrada -> new GrupoElemento(entrada.getKey(), entrada.getValue()))
+        .toList();
   }
 
   @Override
   public void validarParcial(Map<String, Object> datos, UUID versionId) {
     Objects.requireNonNull(datos, "Los datos del formulario son obligatorios.");
     Objects.requireNonNull(versionId, "La versión del formulario es obligatoria.");
+    List<ErrorCampo> errores = new ArrayList<>();
+    for (String ruta : permanentes) {
+      validarRuta(datos, ruta, false, errores);
+    }
+    for (String ruta : danos) {
+      validarRuta(datos, ruta, true, errores);
+    }
+    if (!errores.isEmpty()) {
+      throw new NegocioException(
+              HttpStatus.UNPROCESSABLE_CONTENT,
+              "datos-invalidos",
+              "Los datos no cumplen el esquema",
+              "Hay valores con tipo o rango inválido.")
+          .conErrores(List.copyOf(errores));
+    }
   }
 
   @Override
   public void validarCompleto(Map<String, Object> datos, UUID versionId) {
     Objects.requireNonNull(datos, "Los datos del formulario son obligatorios.");
     Objects.requireNonNull(versionId, "La versión del formulario es obligatoria.");
+  }
+
+  private static void validarRuta(
+      Map<String, Object> datos, String ruta, boolean dano, List<ErrorCampo> errores) {
+    Object valor = RutasDatos.leer(datos, ruta);
+    if (valor == null) {
+      return;
+    }
+    String cola = cola(ruta);
+    if (dano || "calificacion".equals(cola)) {
+      if (!enteroEnRango(valor, 0, 4)) {
+        errores.add(
+            new ErrorCampo(ruta, "La calificación de daño debe ser un entero entre 0 y 4."));
+      }
+      return;
+    }
+    if ("numero_tramos".equals(cola) || "anio_construccion".equals(cola)) {
+      if (!enteroEnRango(valor, 1, 3000)) {
+        errores.add(new ErrorCampo(ruta, "Debe ser un número entero."));
+      }
+      return;
+    }
+    if (cola.endsWith("_m")) {
+      if (!numeroPositivo(valor)) {
+        errores.add(new ErrorCampo(ruta, "Debe ser un número positivo."));
+      }
+      return;
+    }
+    if (!(valor instanceof String) && !(valor instanceof Number) && !(valor instanceof Boolean)) {
+      errores.add(new ErrorCampo(ruta, "El valor no coincide con el tipo esperado."));
+    }
+  }
+
+  private static String cola(String ruta) {
+    int punto = ruta.lastIndexOf('.');
+    return punto < 0 ? ruta : ruta.substring(punto + 1);
+  }
+
+  private static boolean enteroEnRango(Object valor, int minimo, int maximo) {
+    if (!(valor instanceof Number numero)) {
+      return false;
+    }
+    double crudo = numero.doubleValue();
+    if (crudo != Math.rint(crudo)) {
+      return false;
+    }
+    long entero = numero.longValue();
+    return entero >= minimo && entero <= maximo;
+  }
+
+  private static boolean numeroPositivo(Object valor) {
+    return valor instanceof Number numero && numero.doubleValue() > 0;
   }
 
   private VersionFormularioVista vista(FormularioVersion version) {
@@ -102,6 +182,6 @@ class ConsultaFormularioProvisional implements ConsultaFormulario {
         .filter(Objects::nonNull)
         .map(String::strip)
         .filter(ruta -> !ruta.isEmpty())
-        .collect(Collectors.toUnmodifiableSet());
+        .collect(Collectors.toCollection(LinkedHashSet::new));
   }
 }

@@ -9,6 +9,7 @@ import java.util.UUID;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.EntityGraph;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.Repository;
 
@@ -94,4 +95,17 @@ interface InspeccionRepository extends Repository<Inspeccion, UUID> {
         and i.eliminadoEn is null
       """)
   List<Inspeccion> findPublicadasQueCorrigen(Collection<UUID> ids);
+
+  @Modifying(clearAutomatically = true)
+  @Query(
+      """
+      update Inspeccion i
+      set i.ultimaActividadEn = :ahora, i.avisoAbandonoEn = null
+      where i.id = :id
+      """)
+  int marcarActividadAutor(UUID id, Instant ahora);
+
+  @Modifying(clearAutomatically = true)
+  @Query("update Inspeccion i set i.avisoAbandonoEn = :ahora where i.id = :id")
+  int marcarAvisoAbandono(UUID id, Instant ahora);
 }

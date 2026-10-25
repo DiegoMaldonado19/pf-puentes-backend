@@ -1,11 +1,15 @@
 package com.cunoc.puentes.inspeccion;
 
+import com.cunoc.puentes.inspeccion.dto.ConfirmarDatosPermanentesDTO;
 import com.cunoc.puentes.inspeccion.dto.CrearInspeccionDTO;
+import com.cunoc.puentes.inspeccion.dto.DatosPermanentesDTO;
+import com.cunoc.puentes.inspeccion.dto.GuardarAvanceDTO;
 import com.cunoc.puentes.inspeccion.dto.HistorialTransicionDTO;
 import com.cunoc.puentes.inspeccion.dto.InspeccionDTO;
 import com.cunoc.puentes.inspeccion.dto.InspeccionResumenDTO;
 import com.cunoc.puentes.inspeccion.dto.PaginaDTO;
 import com.cunoc.puentes.inspeccion.dto.PuenteInspeccionableDTO;
+import com.cunoc.puentes.inspeccion.dto.ReemplazarAcompanantesDTO;
 import com.cunoc.puentes.usuario.Rol;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -21,10 +25,13 @@ import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
@@ -32,16 +39,27 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/api/v1")
-@Tag(name = "Inspecciones", description = "Consulta e inicio de inspecciones (P5)")
+@Tag(name = "Inspecciones", description = "Consulta, inicio y captura de inspecciones (P5)")
 @ApiResponse(responseCode = "401", description = "Sin autenticación")
 class InspeccionController {
 
+  static final String IDEMPOTENCIA = "Idempotency-Key";
+  static final String SYNC = "X-Sgp-Sync";
+
   private final ConsultaInspeccionService consultas;
   private final InicioInspeccionService inicio;
+  private final PrecargaInspeccionService precarga;
+  private final CapturaBorradorService captura;
 
-  InspeccionController(ConsultaInspeccionService consultas, InicioInspeccionService inicio) {
+  InspeccionController(
+      ConsultaInspeccionService consultas,
+      InicioInspeccionService inicio,
+      PrecargaInspeccionService precarga,
+      CapturaBorradorService captura) {
     this.consultas = consultas;
     this.inicio = inicio;
+    this.precarga = precarga;
+    this.captura = captura;
   }
 
   @GetMapping("/puentes-inspeccionables")
@@ -98,6 +116,35 @@ class InspeccionController {
     return consultas.detalle(id, id(usuario), rol(autenticacion));
   }
 
+  @PutMapping("/inspecciones/{id}")
+  @PreAuthorize("hasAnyRole('ESTUDIANTE', 'PROFESIONAL_EXTERNO', 'CATEDRATICO')")
+  @Operation(summary = "Guarda el avance de un borrador propio")
+  @ApiResponse(responseCode = "200", description = "Avance guardado")
+  @ApiResponse(responseCode = "404", description = "Inexistente, ajena o eliminada")
+  @ApiResponse(responseCode = "409", description = "No es borrador o la versión está vieja")
+  @ApiResponse(responseCode = "413", description = "Cuerpo demasiado grande")
+  @ApiResponse(responseCode = "422", description = "Datos, fecha o campos inmutables inválidos")
+  InspeccionDTO guardar(
+      Principal usuario,
+      Authentication autenticacion,
+      @PathVariable UUID id,
+      @RequestHeader(value = IDEMPOTENCIA, required = false) String idempotencia,
+      @RequestHeader(value = SYNC, defaultValue = "false") boolean sync,
+      @Valid @RequestBody GuardarAvanceDTO datos) {
+    return captura.guardar(id, id(usuario), rol(autenticacion), datos, idempotencia, sync);
+  }
+
+  @DeleteMapping("/inspecciones/{id}")
+  @ResponseStatus(HttpStatus.NO_CONTENT)
+  @PreAuthorize("hasAnyRole('ESTUDIANTE', 'PROFESIONAL_EXTERNO', 'CATEDRATICO')")
+  @Operation(summary = "Elimina lógicamente un borrador propio")
+  @ApiResponse(responseCode = "204", description = "Borrador dado de baja")
+  @ApiResponse(responseCode = "404", description = "Inexistente, ajena, eliminada o no visible")
+  @ApiResponse(responseCode = "409", description = "No es un borrador")
+  void eliminar(Principal usuario, @PathVariable UUID id) {
+    captura.eliminar(id, id(usuario));
+  }
+
   @GetMapping("/inspecciones/{id}/historial")
   @PreAuthorize("hasAnyRole('ESTUDIANTE', 'PROFESIONAL_EXTERNO', 'CATEDRATICO', 'ADMINISTRADOR')")
   @Operation(summary = "Historial de estados de una inspección visible")
@@ -108,6 +155,45 @@ class InspeccionController {
     return consultas.historial(id, id(usuario), rol(autenticacion));
   }
 
+  @GetMapping("/inspecciones/{id}/datos-permanentes")
+  @PreAuthorize("hasAnyRole('ESTUDIANTE', 'PROFESIONAL_EXTERNO', 'CATEDRATICO', 'ADMINISTRADOR')")
+  @Operation(summary = "Precarga de datos permanentes del borrador")
+  @ApiResponse(responseCode = "200", description = "Campos permanentes sin daños")
+  @ApiResponse(responseCode = "404", description = "Inexistente, ajena o eliminada")
+  DatosPermanentesDTO datosPermanentesDeInspeccion(Principal usuario, @PathVariable UUID id) {
+    return precarga.deInspeccion(id, id(usuario));
+  }
+
+  @PostMapping("/inspecciones/{id}/confirmacion-datos-permanentes")
+  @PreAuthorize("hasAnyRole('ESTUDIANTE', 'PROFESIONAL_EXTERNO', 'CATEDRATICO')")
+  @Operation(summary = "Confirma o corrige los datos permanentes del borrador")
+  @ApiResponse(responseCode = "200", description = "Permanentes guardados")
+  @ApiResponse(responseCode = "404", description = "Inexistente, ajena o eliminada")
+  @ApiResponse(responseCode = "409", description = "No es un borrador")
+  @ApiResponse(responseCode = "422", description = "Daños en el cuerpo o valores inválidos")
+  InspeccionDTO confirmarPermanentes(
+      Principal usuario,
+      Authentication autenticacion,
+      @PathVariable UUID id,
+      @Valid @RequestBody ConfirmarDatosPermanentesDTO datos) {
+    return precarga.confirmar(id, id(usuario), rol(autenticacion), datos);
+  }
+
+  @PutMapping("/inspecciones/{id}/acompanantes")
+  @PreAuthorize("hasAnyRole('ESTUDIANTE', 'PROFESIONAL_EXTERNO', 'CATEDRATICO')")
+  @Operation(summary = "Reemplaza la lista de acompañantes del borrador")
+  @ApiResponse(responseCode = "200", description = "Lista reemplazada")
+  @ApiResponse(responseCode = "404", description = "Inexistente, ajena o eliminada")
+  @ApiResponse(responseCode = "409", description = "No es un borrador")
+  @ApiResponse(responseCode = "422", description = "El autor no puede ser acompañante")
+  InspeccionDTO acompanantes(
+      Principal usuario,
+      Authentication autenticacion,
+      @PathVariable UUID id,
+      @Valid @RequestBody ReemplazarAcompanantesDTO datos) {
+    return captura.reemplazarAcompanantes(id, id(usuario), rol(autenticacion), datos);
+  }
+
   @GetMapping("/puentes/{puenteId}/inspecciones")
   @PreAuthorize("hasAnyRole('ESTUDIANTE', 'PROFESIONAL_EXTERNO', 'CATEDRATICO', 'ADMINISTRADOR')")
   @Operation(summary = "Inspecciones publicadas de un puente y los borradores propios")
@@ -116,6 +202,17 @@ class InspeccionController {
   PaginaDTO<InspeccionResumenDTO> delPuente(
       Principal usuario, @PathVariable UUID puenteId, Pageable pagina) {
     return PaginaDTO.de(consultas.listarDelPuente(puenteId, id(usuario), pagina));
+  }
+
+  @GetMapping("/puentes/{puenteId}/datos-permanentes")
+  @PreAuthorize("hasAnyRole('ESTUDIANTE', 'PROFESIONAL_EXTERNO', 'CATEDRATICO')")
+  @Operation(summary = "Precarga del puente para preparar la salida (P6)")
+  @ApiResponse(responseCode = "200", description = "Campos permanentes de la última publicada")
+  @ApiResponse(responseCode = "403", description = "Sin asignación vigente o rol no inspector")
+  @ApiResponse(responseCode = "404", description = "El puente no existe")
+  DatosPermanentesDTO datosPermanentesDePuente(
+      Principal usuario, Authentication autenticacion, @PathVariable UUID puenteId) {
+    return precarga.dePuente(puenteId, id(usuario), rol(autenticacion));
   }
 
   private static UUID id(Principal usuario) {
