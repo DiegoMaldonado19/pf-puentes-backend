@@ -11,10 +11,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.http.HttpStatus;
-import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
@@ -22,8 +19,6 @@ import org.springframework.transaction.annotation.Transactional;
  * {@code ACTIVA} de {@code formulario_version} y las rutas de {@code sgp.formulario.*}. No valida
  * JSON Schema: {@code validarParcial} y {@code validarCompleto} son no-op a propósito (fase 0).
  */
-@Component
-@ConditionalOnMissingBean(ConsultaFormulario.class)
 class ConsultaFormularioProvisional implements ConsultaFormulario {
 
   private final EntityManager em;
@@ -31,9 +26,7 @@ class ConsultaFormularioProvisional implements ConsultaFormulario {
   private final Set<String> danos;
 
   ConsultaFormularioProvisional(
-      EntityManager em,
-      @Value("${sgp.formulario.rutas-permanentes:}") List<String> rutasPermanentes,
-      @Value("${sgp.formulario.rutas-dano:}") List<String> rutasDano) {
+      EntityManager em, List<String> rutasPermanentes, List<String> rutasDano) {
     this.em = em;
     this.permanentes = copiar(rutasPermanentes);
     this.danos = copiar(rutasDano);

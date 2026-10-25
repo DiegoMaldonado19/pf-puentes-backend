@@ -4,16 +4,12 @@ import com.cunoc.puentes.common.NegocioException;
 import com.cunoc.puentes.indice.ResultadoIndiceCondicion;
 import java.util.Map;
 import java.util.UUID;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.http.HttpStatus;
-import org.springframework.stereotype.Component;
 
 /**
  * Stub del contrato 3. No inventa un IC: US-P5-08 conectará {@code CalculadoraIndiceCondicion}
  * cuando existan metadatos de daño y pesos vigentes.
  */
-@Component
-@ConditionalOnMissingBean(CalculoIndice.class)
 class CalculoIndiceProvisional implements CalculoIndice {
 
   @Override

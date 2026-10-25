@@ -1,6 +1,8 @@
 package com.cunoc.puentes.inspeccion;
 
 import java.time.Instant;
+import java.time.LocalDate;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -55,4 +57,41 @@ interface InspeccionRepository extends Repository<Inspeccion, UUID> {
 
   @Query(value = "SELECT estado FROM usuario WHERE id = :id", nativeQuery = true)
   Optional<String> estadoDeUsuario(UUID id);
+
+  @Query(
+      """
+      select i from Inspeccion i
+      where i.autorId = :autorId
+        and i.eliminadoEn is null
+        and (cast(:puenteId as uuid) is null or i.puenteId = :puenteId)
+        and (cast(:estado as string) is null or i.estado = :estado)
+        and (cast(:desde as date) is null or i.fechaInspeccion >= :desde)
+        and (cast(:hasta as date) is null or i.fechaInspeccion <= :hasta)
+      """)
+  Page<Inspeccion> buscarMias(
+      UUID autorId,
+      UUID puenteId,
+      EstadoInspeccion estado,
+      LocalDate desde,
+      LocalDate hasta,
+      Pageable pagina);
+
+  @Query(
+      """
+      select i from Inspeccion i
+      where i.puenteId = :puenteId
+        and i.eliminadoEn is null
+        and (i.estado = com.cunoc.puentes.inspeccion.EstadoInspeccion.PUBLICADA
+          or i.autorId = :autorId)
+      """)
+  Page<Inspeccion> buscarDelPuente(UUID puenteId, UUID autorId, Pageable pagina);
+
+  @Query(
+      """
+      select i from Inspeccion i join fetch i.supersedeA
+      where i.supersedeA.id in :ids
+        and i.estado = com.cunoc.puentes.inspeccion.EstadoInspeccion.PUBLICADA
+        and i.eliminadoEn is null
+      """)
+  List<Inspeccion> findPublicadasQueCorrigen(Collection<UUID> ids);
 }
