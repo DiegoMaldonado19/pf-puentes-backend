@@ -22,6 +22,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
@@ -33,6 +35,7 @@ import tools.jackson.databind.json.JsonMapper;
 @Service
 class CapturaBorradorService {
 
+  private static final Logger LOG = LoggerFactory.getLogger(CapturaBorradorService.class);
   private static final TypeReference<Map<String, Object>> MAPA = new TypeReference<>() {};
 
   private final InspeccionService contrato;
@@ -181,7 +184,9 @@ class CapturaBorradorService {
       idempotencias.save(
           Idempotencia.de(actorId, limpia, HttpStatus.OK.value(), json.convertValue(dto, MAPA)));
     } catch (DataIntegrityViolationException e) {
-      // El reintento concurrente ya guardó la respuesta.
+      LOG.debug(
+          "Idempotencia ya persistida por un reintento concurrente ({})",
+          e.getClass().getSimpleName());
     }
   }
 
