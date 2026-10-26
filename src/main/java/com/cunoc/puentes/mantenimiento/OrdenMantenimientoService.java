@@ -18,7 +18,7 @@ public class OrdenMantenimientoService {
   private final AceptacionOrdenService aceptacion;
   private final InicioEjecucionOrdenService inicio;
   private final CierreOrdenService cierre;
-  private final DescarteOrdenService descarte;
+  private final DecisionConMotivoOrdenService decisiones;
   private final AjustePrioridadOrdenService prioridades;
   private final ProgramacionOrdenService programacion;
   private final OrdenMantenimientoMapper mapper;
@@ -29,7 +29,7 @@ public class OrdenMantenimientoService {
       AceptacionOrdenService aceptacion,
       InicioEjecucionOrdenService inicio,
       CierreOrdenService cierre,
-      DescarteOrdenService descarte,
+      DecisionConMotivoOrdenService decisiones,
       AjustePrioridadOrdenService prioridades,
       ProgramacionOrdenService programacion,
       OrdenMantenimientoMapper mapper) {
@@ -38,7 +38,7 @@ public class OrdenMantenimientoService {
     this.aceptacion = aceptacion;
     this.inicio = inicio;
     this.cierre = cierre;
-    this.descarte = descarte;
+    this.decisiones = decisiones;
     this.prioridades = prioridades;
     this.programacion = programacion;
     this.mapper = mapper;
@@ -81,7 +81,16 @@ public class OrdenMantenimientoService {
   @PreAuthorize("hasAnyRole('CATEDRATICO', 'ADMINISTRADOR')")
   public OrdenMantenimientoDTO descartar(UUID puenteId, UUID ordenId, String motivo) {
     OrdenMantenimiento orden = obtenerBloqueada(puenteId, ordenId);
-    descarte.descartar(orden, motivo);
+    decisiones.decidir(orden, EstadoOrden.DESCARTADA, motivo);
+    return mapper.aDTO(orden);
+  }
+
+  /** RN-MTO-04/09: política adoptada de cancelación solo desde PROGRAMADA, con motivo. */
+  @Transactional
+  @PreAuthorize("hasAnyRole('CATEDRATICO', 'ADMINISTRADOR')")
+  public OrdenMantenimientoDTO cancelar(UUID puenteId, UUID ordenId, String motivo) {
+    OrdenMantenimiento orden = obtenerBloqueada(puenteId, ordenId);
+    decisiones.decidir(orden, EstadoOrden.CANCELADA, motivo);
     return mapper.aDTO(orden);
   }
 

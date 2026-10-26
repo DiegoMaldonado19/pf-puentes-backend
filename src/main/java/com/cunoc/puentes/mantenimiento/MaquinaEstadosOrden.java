@@ -20,12 +20,13 @@ final class MaquinaEstadosOrden {
     if (destino == EstadoOrden.EJECUTADA) {
       validarCierre(datos);
     }
-    if (destino == EstadoOrden.DESCARTADA && (datos.motivo() == null || datos.motivo().isBlank())) {
+    if ((destino == EstadoOrden.DESCARTADA || destino == EstadoOrden.CANCELADA)
+        && (datos.motivo() == null || datos.motivo().isBlank())) {
       throw new NegocioException(
           HttpStatus.UNPROCESSABLE_CONTENT,
           "motivo-de-orden-requerido",
           "Motivo requerido",
-          "Debe documentarse el motivo para descartar una orden.");
+          "Debe documentarse el motivo para descartar o cancelar una orden.");
     }
   }
 
