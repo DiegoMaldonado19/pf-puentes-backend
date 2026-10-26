@@ -21,4 +21,3 @@ public record ResultadoOriginalIcDTO(
     @JsonProperty("estado_confirmado") EstadoCondicion estadoConfirmado,
     @JsonProperty("justificacion_estado") String justificacionEstado,
     @JsonProperty("publicada_en") Instant publicadaEn) {}
-

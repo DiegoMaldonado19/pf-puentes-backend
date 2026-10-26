@@ -19,4 +19,3 @@ public record RecalculoIcDTO(
     @JsonProperty("estado_calculado") EstadoCondicion estadoCalculado,
     Anulacion anulacion,
     @JsonProperty("creado_en") Instant creadoEn) {}
-

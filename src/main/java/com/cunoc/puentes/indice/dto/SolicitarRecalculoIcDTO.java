@@ -7,4 +7,3 @@ import java.util.UUID;
 /** Solicitud de recálculo explícito bajo un juego de pesos de la misma versión de formulario. */
 public record SolicitarRecalculoIcDTO(
     @NotNull @JsonProperty("version_pesos_id") UUID versionPesosId) {}
-

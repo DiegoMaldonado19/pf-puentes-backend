@@ -67,4 +67,3 @@ class RecalculoIcController {
     return servicio.recalcular(inspeccionId, datos.versionPesosId());
   }
 }
-

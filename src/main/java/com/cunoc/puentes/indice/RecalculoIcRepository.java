@@ -18,4 +18,3 @@ interface RecalculoIcRepository extends Repository<RecalculoIc, UUID> {
   @EntityGraph(attributePaths = "versionPesos")
   Page<RecalculoIc> findByInspeccionId(UUID inspeccionId, Pageable pageable);
 }
-

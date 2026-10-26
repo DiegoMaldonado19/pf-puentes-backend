@@ -190,4 +190,3 @@ public class RecalculoIcService {
   private record InspeccionParaRecalculo(
       boolean publicada, ResultadoOriginalIcDTO original, String datosJson) {}
 }
-

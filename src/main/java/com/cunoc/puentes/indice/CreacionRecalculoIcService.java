@@ -34,4 +34,3 @@ class CreacionRecalculoIcService {
         mapper.aRecalculo(inspeccionId, version, indiceCondicion, estadoCalculado, anulacion));
   }
 }
-

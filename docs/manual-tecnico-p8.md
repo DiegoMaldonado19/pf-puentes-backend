@@ -14,9 +14,9 @@ Regresión de navegador del 24/10 aprobada: cinco escenarios Playwright y un orq
 
 | Pieza | Disponible | Pendiente |
 |---|---|---|
-| `indice/` | Núcleo puro, pesos normalizados, metadatos P4, preparación de calificaciones desde respuestas reales, creación completa HTTP autorizada/auditada, cinco GET Admin (incluidos catálogo de versiones con pesos y referencias de daño) y consulta/registro de recálculos fechados (`GET/POST /api/v1/inspecciones/{inspeccionId}/recalculos-ic`) | Calibración, selección de juego, condiciones críticas P4, publicación P5 y confirmación |
+| `indice/` | Núcleo puro, pesos normalizados, metadatos P4, preparación de calificaciones desde respuestas reales, creación completa HTTP autorizada/auditada, cinco GET Admin (incluidos catálogo de versiones con pesos y referencias de daño), consulta/registro de recálculos fechados (`GET/POST /api/v1/inspecciones/{inspeccionId}/recalculos-ic`), estimación dinámica de IC preliminar para borradores (`POST .../ic-preliminar`, RN-IC-07) y validación de confirmación de estado con justificación obligatoria ante discrepancia (`POST .../confirmacion-estado/validacion`, RN-IC-06) | Calibración oficial, selección de juego en publicación P5 y activación de condiciones críticas desde respuestas P4 |
 | `mantenimiento/` | Máquina, origen orden/puente/inspección, consultas de historial/detalle/propuestas, PATCH autorizados/auditados de prioridad y fecha programada y POST de aceptación/inicio/cierre/descarte/cancelación y carga/consulta paginada de evidencia P1; alerta de inspección vencida y recordatorio rutinario anual diarios mediante P9 | Sugerencia automática, generación por catálogo y programación efectiva anual |
-| Frontend P8 | Condición en inventario; `/admin/pesos` con catálogo, consulta y creación de juegos completos; componente `<app-recalculo-ic>` de comparación y solicitud de recálculos fechados; `/puentes/:id/mantenimiento` con propuestas, historial, seguimiento y acciones (incluida cancelación con motivo); sesión/guardias/interceptores P2 conectados | Calibración, daños/publicación reales P4/P5 y recorridos finales; presentación de avisos P9 |
+| Frontend P8 | Condición en inventario; `/admin/pesos` con catálogo, consulta y creación de juegos completos; componente `<app-recalculo-ic>` de comparación y solicitud de recálculos fechados; componentes `<app-ic-preliminar>` y `<app-confirmacion-estado>` listos para empotrarse en P5; `/puentes/:id/mantenimiento` con propuestas, historial, seguimiento y acciones (incluida cancelación con motivo); sesión/guardias/interceptores P2 conectados | Calibración, daños/publicación reales P4/P5 y recorridos finales; presentación de avisos P9 |
 
 ### Acceso a pesos con P2 recibido — 23/10/2026
 
@@ -75,6 +75,16 @@ La fachada conceptual `calcular(datos, versionFormulario)` del acuerdo de equipo
 
 Detalle: [ADR 0016](adr/0016-nucleo-puro-del-indice-de-condicion.md).
 
+### Estimación preliminar de IC y validación de confirmación — 25/10/2026
+
+`EstimacionPreliminarIcService` provee endpoints de estimación dinámica para borradores sin alterar el inventario ni la condición vigente del puente (RN-IC-07), y `ConfirmacionEstadoCondicion` modela y valida la confirmación de estado con justificación obligatoria ante discrepancias (RN-IC-06):
+
+1. **Estimación preliminar por respuestas explícitas:** `POST /api/v1/formularios/{formularioId}/ic-preliminar` (roles ESTUDIANTE, CATEDRATICO o ADMINISTRADOR). Recibe `datos` (respuestas del formulario), `condiciones_criticas` (opcional) y `version_pesos_id` (opcional; si se omite, selecciona el juego de pesos vigente más reciente). Devuelve 200 con `EstimacionPreliminarIcDTO` (`preliminar: true`, `indice_condicion`, `estado_calculado`, `anulaciones`, `version_pesos_id`, etc.). Si los datos están incompletos para los pesos del formulario, responde 422 Problem Details.
+2. **Estimación preliminar por borrador persistido:** `POST /api/v1/inspecciones/{inspeccionId}/ic-preliminar` (solo autor de la inspección o CATEDRATICO / ADMINISTRADOR con acceso a la inspección). Obtiene el formulario y datos de la inspección no publicada; responde 409 si la inspección ya se encuentra en estado `PUBLICADA`.
+3. **Validación de confirmación de estado:** `POST /api/v1/inspecciones/confirmacion-estado/validacion` (cualquier rol autenticado). Recibe `estado_calculado`, `estado_confirmado` y `justificacion` opcional. Responde `valido: true/false`, `discrepancia: true/false` y mensaje explicativo. Si los estados coinciden, la justificación es prescindible; ante discrepancia, la justificación no puede ser vacía ni menor a 10 caracteres (`JUSTIFICACION_OBLIGATORIA_POR_DISCREPANCIA`).
+
+Detalle: [ADR 0044](adr/0044-estimacion-preliminar-del-ic-y-confirmacion-con-justificacion.md).
+
 ## 3. Configuración de pesos
 
 ### Creación HTTP completa — 25/10/2026
@@ -129,6 +139,9 @@ En local: API `http://localhost:8080`; Swagger `http://localhost:8080/api/docs/s
 | `GET /api/v1/formularios/{formularioId}/juegos-pesos` | ADMINISTRADOR | Página de juegos de esa versión de formulario, por ID descendente |
 | `GET /api/v1/juegos-pesos/{id}` | ADMINISTRADOR | Juego: `id`, `formulario_version_id`, `acta`, `vigente_desde` |
 | `GET /api/v1/juegos-pesos/{id}/pesos` | ADMINISTRADOR | Página de elementos: `id`, `elemento_ref`, `peso`; referencia ascendente |
+| `POST /api/v1/formularios/{formularioId}/ic-preliminar` | ESTUDIANTE, CATEDRATICO o ADMINISTRADOR | JSON `datos`, `condiciones_criticas` (opcional), `version_pesos_id` (opcional); 200 `EstimacionPreliminarIcDTO` con `preliminar: true` |
+| `POST /api/v1/inspecciones/{inspeccionId}/ic-preliminar` | Autor de la inspección, CATEDRATICO o ADMINISTRADOR | JSON `version_pesos_id` (opcional); 200 `EstimacionPreliminarIcDTO` dinámico desde borrador (409 si ya está PUBLICADA) |
+| `POST /api/v1/inspecciones/confirmacion-estado/validacion` | Cualquier rol autenticado | JSON `estado_calculado`, `estado_confirmado`, `justificacion`; 200 `ResultadoConfirmacionEstadoDTO` (RN-IC-06) |
 | `GET /api/v1/inspecciones/{inspeccionId}/recalculos-ic` | CATEDRATICO o ADMINISTRADOR | Resultado original publicado (`original`) y página de recálculos (`recalculos`) por ID descendente |
 | `POST /api/v1/inspecciones/{inspeccionId}/recalculos-ic` | CATEDRATICO o ADMINISTRADOR | JSON `version_pesos_id`, 200 `RecalculoIcDTO` idempotente sin alterar la inspección publicada |
 | `GET /api/v1/puentes/{puenteId}/ordenes-mantenimiento` | CATEDRATICO o ADMINISTRADOR | Historial paginado de todos los estados del puente, con `puente_id`, ID descendente |
@@ -253,6 +266,37 @@ Fecha ausente/nula/vacía, inexistente o formato incorrecto: 400. Orden de otro 
 Este PATCH resuelve la edición de programación de MTO-03. RN-MTO-07 requiere además asegurar la programación rutinaria anual por puente; ya existen consulta/vista y recordatorios diarios, descritos más abajo. No confundir aceptar sin fecha, registrar una fecha o emitir recordatorio con garantizar esa periodicidad. [ADR 0033](adr/0033-programacion-auditada-de-fecha-de-ordenes.md).
 
 En frontend, `ConsultaOrdenes` recibe `puedeProgramar` de la sesión (false por defecto), incorpora el formulario y emite `fechaProgramada` confirmado; `operacionPendiente()` bloquea las otras acciones mientras guarda. El inventario P3 existe; aún falta conectar los componentes privados con su selección y la sesión/guardias frontend de P2.
+
+### Prueba de estimación preliminar y confirmación con Postman
+
+Con Bearer de una sesión activa (Estudiante, Catedrático o Administrador):
+
+1. **Estimación preliminar por respuestas:** `POST /api/v1/formularios/{formularioId}/ic-preliminar`, Body → raw → JSON:
+```json
+{
+  "datos": {
+    "superestructura": { "vigas_principales": { "grietas": 1 } },
+    "subestructura": { "estribo_entrada": { "socavacion": 2 } }
+  },
+  "condiciones_criticas": {
+    "socavacion_critica": false,
+    "asentamiento": false,
+    "perdida_seccion": false,
+    "ausencia_portante": false
+  }
+}
+```
+Verifica `200 OK` con `preliminar: true`, `indice_condicion`, `estado_calculado`, `anulaciones: []`, `version_pesos_id` y `total_elementos_evaluados`. No modifica la base de datos ni afecta el estado del inventario de puentes.
+
+2. **Validación de confirmación de estado con justificación (RN-IC-06):** `POST /api/v1/inspecciones/confirmacion-estado/validacion`, Body → raw → JSON:
+```json
+{
+  "estado_calculado": "REGULAR",
+  "estado_confirmado": "MALO",
+  "justificacion": "Se observa daño progresivo acelerado en estribo no reflejado completamente en la ponderación estándar."
+}
+```
+Verifica `200 OK` con `valido: true`, `discrepancia: true`, y justificación aceptada. Si la justificación se envía vacía o menor a 10 caracteres ante discrepancia, devuelve `valido: false` con código `JUSTIFICACION_OBLIGATORIA_POR_DISCREPANCIA`. [ADR 0044](adr/0044-estimacion-preliminar-del-ic-y-confirmacion-con-justificacion.md).
 
 ## 6. Conexiones pendientes del equipo
 

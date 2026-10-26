@@ -1,5 +1,9 @@
 # pf-puentes-backend
 
+### Estimación preliminar de IC y validación de confirmación con justificación (P8, 25/10/2026)
+
+`POST /api/v1/formularios/{formularioId}/ic-preliminar` y `POST /api/v1/inspecciones/{inspeccionId}/ic-preliminar` permiten estimar dinámicamente el Índice de Condición sobre borradores de formularios o inspecciones sin persistir resultados ni mutar la condición vigente del puente en el inventario (`RN-IC-07`). Devuelve `EstimacionPreliminarIcDTO` con bandera `preliminar: true` y selección automática del juego de pesos vigente. Además, `POST /api/v1/inspecciones/confirmacion-estado/validacion` valida la concordancia entre `estado_calculado` y `estado_confirmado`, exigiendo justificación explicativa no vacía (mínimo 10 caracteres) únicamente ante discrepancia (`RN-IC-06`, `ConfirmacionEstadoCondicion`). [ADR 0044](docs/adr/0044-estimacion-preliminar-del-ic-y-confirmacion-con-justificacion.md) y [manual técnico](docs/manual-tecnico-p8.md).
+
 ### Cancelar órdenes programadas con motivo (P8, 25/10/2026)
 
 `POST /api/v1/puentes/{puenteId}/ordenes-mantenimiento/{ordenId}/cancelacion`, solo Catedrático y Administrador (política adoptada por el responsable P8 para la transición hacia `CANCELADA` de `RN-MTO-04/09`): recibe JSON `{"motivo":"..."}` y mueve exclusivamente `PROGRAMADA → CANCELADA` conservando motivo, intervención, prioridades, fecha programada y evidencias previas en modo solo lectura. Unifica el servicio transaccional y auditado `DecisionConMotivoOrdenService` con el descarte de propuestas. Estados distintos o repetición responden `409` sin duplicar auditoría; motivo ausente o en blanco responde `400`. [ADR 0042](docs/adr/0042-cancelacion-auditada-de-ordenes-programadas.md) y [manual técnico](docs/manual-tecnico-p8.md).
