@@ -43,6 +43,7 @@ class InspeccionControllerTest {
   @MockitoBean InicioInspeccionService inicio;
   @MockitoBean PrecargaInspeccionService precarga;
   @MockitoBean CapturaBorradorService captura;
+  @MockitoBean EnvioInspeccionService envio;
 
   @ParameterizedTest
   @EnumSource(
@@ -138,6 +139,20 @@ class InspeccionControllerTest {
   @EnumSource(
       value = Rol.class,
       names = {"ESTUDIANTE", "PROFESIONAL_EXTERNO", "CATEDRATICO"})
+  void inspectoresEnvianBorradores(Rol rol) throws Exception {
+    mvc.perform(
+            post("/api/v1/inspecciones/" + USUARIO + "/envio")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{}")
+                .with(csrf())
+                .with(como(rol, USUARIO)))
+        .andExpect(status().isOk());
+  }
+
+  @ParameterizedTest
+  @EnumSource(
+      value = Rol.class,
+      names = {"ESTUDIANTE", "PROFESIONAL_EXTERNO", "CATEDRATICO"})
   void inspectoresGuardanConfirmanYEliminanBorradores(Rol rol) throws Exception {
     mvc.perform(
             put("/api/v1/inspecciones/" + USUARIO)
@@ -184,6 +199,13 @@ class InspeccionControllerTest {
                 .with(csrf())
                 .with(como(Rol.ADMINISTRADOR, USUARIO)))
         .andExpect(status().isForbidden());
+    mvc.perform(
+            post("/api/v1/inspecciones/" + USUARIO + "/envio")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{}")
+                .with(csrf())
+                .with(como(Rol.ADMINISTRADOR, USUARIO)))
+        .andExpect(status().isForbidden());
   }
 
   @Test
@@ -198,6 +220,12 @@ class InspeccionControllerTest {
                 .with(csrf()))
         .andExpect(status().isUnauthorized());
     mvc.perform(delete("/api/v1/inspecciones/" + USUARIO).with(csrf()))
+        .andExpect(status().isUnauthorized());
+    mvc.perform(
+            post("/api/v1/inspecciones/" + USUARIO + "/envio")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{}")
+                .with(csrf()))
         .andExpect(status().isUnauthorized());
   }
 }

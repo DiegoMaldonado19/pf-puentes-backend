@@ -4,7 +4,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.cunoc.puentes.PruebaIntegracion;
+import com.cunoc.puentes.common.ErrorCampo;
 import com.cunoc.puentes.common.NegocioException;
+import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -43,7 +46,26 @@ class ConsultaFormularioProvisionalTest extends PruebaIntegracion {
     assertThat(consulta.grupos(VERSION))
         .anySatisfy(grupo -> assertThat(grupo.id()).isEqualTo("subestructura.estribo_entrada"));
     consulta.validarParcial(Map.of(), VERSION);
-    consulta.validarCompleto(Map.of(), VERSION);
+    assertThatThrownBy(() -> consulta.validarCompleto(Map.of(), VERSION))
+        .isInstanceOf(NegocioException.class)
+        .satisfies(
+            error -> {
+              NegocioException negocio = (NegocioException) error;
+              assertThat(negocio.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_CONTENT);
+              assertThat(errores(negocio))
+                  .extracting(ErrorCampo::campo)
+                  .contains("identificacion.tipologia", "cauce.calificacion");
+            });
+    Map<String, Object> completos = completos(VERSION);
+    consulta.validarCompleto(completos, VERSION);
+    RutasDatos.escribir(completos, "cauce.calificacion", 9);
+    assertThatThrownBy(() -> consulta.validarCompleto(completos, VERSION))
+        .isInstanceOf(NegocioException.class)
+        .satisfies(
+            error ->
+                assertThat(errores((NegocioException) error))
+                    .extracting(ErrorCampo::campo)
+                    .contains("cauce.calificacion"));
     assertThatThrownBy(
             () ->
                 consulta.validarParcial(
@@ -54,6 +76,32 @@ class ConsultaFormularioProvisionalTest extends PruebaIntegracion {
               NegocioException negocio = (NegocioException) error;
               assertThat(negocio.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_CONTENT);
             });
+  }
+
+  private Map<String, Object> completos(UUID version) {
+    Map<String, Object> datos = new LinkedHashMap<>();
+    for (String ruta : consulta.rutasPermanentes(version)) {
+      String cola = ruta.substring(ruta.lastIndexOf('.') + 1);
+      Object valor =
+          switch (cola) {
+            case "numero_tramos", "anio_construccion" -> 2;
+            default -> cola.endsWith("_m") ? 10 : "x";
+          };
+      RutasDatos.escribir(datos, ruta, valor);
+    }
+    for (String ruta : consulta.rutasDeDano(version)) {
+      RutasDatos.escribir(datos, ruta, 1);
+    }
+    return datos;
+  }
+
+  @SuppressWarnings("unchecked")
+  private static List<ErrorCampo> errores(NegocioException error) {
+    Object crudo =
+        error.getBody().getProperties() == null
+            ? null
+            : error.getBody().getProperties().get("errores");
+    return crudo instanceof List<?> lista ? (List<ErrorCampo>) lista : List.of();
   }
 
   @Test
