@@ -115,6 +115,29 @@ class IdempotenciaCompatibilidadTest extends PruebaIntegracion {
     softly.assertAll();
   }
 
+  @Test
+  void envioRechazaInclusoUnDtoP5HeredadoValidoSinConvertirNiEjecutar() throws Exception {
+    String dto =
+        mvc.perform(
+                org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get(
+                        BASE + BORRADOR)
+                    .with(como(Rol.ESTUDIANTE, E1)))
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+    insertarFilaHeredada("dto-p5", dto);
+    InspeccionAntes antes = inspeccionAntes(BORRADOR);
+    Contadores cantidades = contadores();
+    String legado = respuestaJsonb("dto-p5");
+    MvcResult respuesta = enviarConClave("dto-p5");
+    SoftAssertions softly = new SoftAssertions();
+    afirmarConflicto(softly, respuesta);
+    softly.assertThat(inspeccionAntes(BORRADOR)).isEqualTo(antes);
+    softly.assertThat(contadores()).isEqualTo(cantidades);
+    softly.assertThat(respuestaJsonb("dto-p5")).isEqualTo(legado);
+    softly.assertAll();
+  }
+
   private static Stream<Arguments> filasHeredadasNoP5() {
     return Stream.of(
         arguments("GUARDAR", "legado-put-null", null),
