@@ -26,4 +26,3 @@ class PropuestasInspeccionPublicadaListener {
     generador.generarDesdeInspeccionPublicada(evento);
   }
 }
-

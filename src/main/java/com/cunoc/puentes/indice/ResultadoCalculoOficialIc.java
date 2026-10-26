@@ -23,4 +23,3 @@ public record ResultadoCalculoOficialIc(
     anulaciones = anulaciones == null ? Set.of() : Set.copyOf(anulaciones);
   }
 }
-

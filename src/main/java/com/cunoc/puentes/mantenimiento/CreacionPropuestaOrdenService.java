@@ -47,4 +47,3 @@ class CreacionPropuestaOrdenService {
     return ordenes.save(orden);
   }
 }
-

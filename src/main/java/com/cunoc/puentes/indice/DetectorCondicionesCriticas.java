@@ -210,4 +210,3 @@ public class DetectorCondicionesCriticas {
 
   private record CampoCritico(List<String> ruta, Anulacion anulacion) {}
 }
-

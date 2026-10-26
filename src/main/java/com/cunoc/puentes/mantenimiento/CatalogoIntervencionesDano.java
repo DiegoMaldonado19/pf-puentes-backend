@@ -152,4 +152,3 @@ public final class CatalogoIntervencionesDano {
     return prefijo + etiqueta + " (daño registrado grado " + calificacion + ").";
   }
 }
-

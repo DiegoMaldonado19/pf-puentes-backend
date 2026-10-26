@@ -29,4 +29,3 @@ public record PropuestaIntervencion(
     descripcion = descripcion.trim();
   }
 }
-
