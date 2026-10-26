@@ -32,4 +32,7 @@ interface IdempotenciaRepository extends JpaRepository<Idempotencia, UUID> {
 
     byte[] getRespuestaBytes();
   }
+
+  Optional<Idempotencia> findByUsuarioIdAndClave(UUID usuarioId, String clave);
+  Idempotencia save(Idempotencia fila);
 }

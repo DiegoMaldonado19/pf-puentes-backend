@@ -6,6 +6,7 @@ import com.cunoc.puentes.archivo.dto.SubirDocumentoDTO;
 import com.cunoc.puentes.archivo.dto.SubirFotoDTO;
 import com.cunoc.puentes.common.NegocioException;
 import com.cunoc.puentes.inspeccion.EstadoInspeccion;
+import com.cunoc.puentes.inspeccion.InspeccionService;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.time.Instant;
@@ -25,6 +26,7 @@ import org.locationtech.jts.geom.Point;
 import org.locationtech.jts.geom.PrecisionModel;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
@@ -49,12 +51,23 @@ public class ArchivoService {
   private final AlmacenamientoArchivos almacenamiento;
   private final ArchivoRepository repositorio;
   private final ArchivoMapper mapper;
+  private final InspeccionService inspecciones;
 
   ArchivoService(
       AlmacenamientoArchivos almacenamiento, ArchivoRepository repositorio, ArchivoMapper mapper) {
+    this(almacenamiento, repositorio, mapper, null);
+  }
+
+  @Autowired
+  ArchivoService(
+      AlmacenamientoArchivos almacenamiento,
+      ArchivoRepository repositorio,
+      ArchivoMapper mapper,
+      InspeccionService inspecciones) {
     this.almacenamiento = almacenamiento;
     this.repositorio = repositorio;
     this.mapper = mapper;
+    this.inspecciones = inspecciones;
   }
 
   /** DT-ALM-04: la foto comprimida y su miniatura de 300 px llegan ya generadas por el cliente. */
@@ -129,6 +142,7 @@ public class ArchivoService {
     exigirBorrador(inspeccionPropia(archivo.getInspeccionId(), usuarioId));
     repositorio.delete(archivo);
     eliminarObjetos(archivo);
+    tocarActividad(archivo.getInspeccionId());
   }
 
   /**
@@ -196,7 +210,9 @@ public class ArchivoService {
               // eliminar), quedan objetos huérfanos; barrerlos si llega a importar
               Archivo archivo = guardarObjetos.apply(inspeccion.getPuenteId());
               archivo.setInspeccionId(inspeccionId);
-              return aDTO(repositorio.save(archivo));
+              ArchivoDTO dto = aDTO(repositorio.save(archivo));
+              tocarActividad(inspeccionId);
+              return dto;
             });
   }
 
@@ -340,5 +356,11 @@ public class ArchivoService {
 
   private static NegocioException noEncontrado(String tipo, String titulo, String detalle) {
     return new NegocioException(HttpStatus.NOT_FOUND, tipo, titulo, detalle);
+  }
+
+  private void tocarActividad(UUID inspeccionId) {
+    if (inspecciones != null) {
+      inspecciones.registrarActividadAutor(inspeccionId);
+    }
   }
 }

@@ -3,6 +3,7 @@ package com.cunoc.puentes.sync;
 import com.cunoc.puentes.common.EntidadBase;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import java.util.Map;
 import java.util.UUID;
 import lombok.AccessLevel;
 import lombok.Getter;
@@ -48,5 +49,15 @@ public class Idempotencia extends EntidadBase {
 
   public void setRespuestaBytes(byte[] respuestaBytes) {
     this.respuestaBytes = respuestaBytes == null ? null : respuestaBytes.clone();
+  }
+
+  public static Idempotencia de(
+      UUID usuarioId, String clave, int estadoHttp, Map<String, Object> respuesta) {
+    Idempotencia fila = new Idempotencia();
+    fila.setUsuarioId(usuarioId);
+    fila.setClave(clave);
+    fila.setEstadoHttp(estadoHttp);
+    fila.setRespuesta(respuesta);
+    return fila;
   }
 }
