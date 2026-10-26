@@ -6,7 +6,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
-interface IdempotenciaRepository extends JpaRepository<Idempotencia, UUID> {
+public interface IdempotenciaRepository extends JpaRepository<Idempotencia, UUID> {
 
   @Query(
       value =
@@ -34,5 +34,6 @@ interface IdempotenciaRepository extends JpaRepository<Idempotencia, UUID> {
   }
 
   Optional<Idempotencia> findByUsuarioIdAndClave(UUID usuarioId, String clave);
+
   Idempotencia save(Idempotencia fila);
 }

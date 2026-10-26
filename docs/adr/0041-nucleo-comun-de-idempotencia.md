@@ -28,6 +28,16 @@ La migración aditiva agrega `huella_version`, `huella_sha256` y `respuesta_byte
 
 No se añade expiración, purga, canonicalizador, allowlist ni mecanismo adicional de retención. El diccionario de datos se regenera con `DiccionarioDeDatosTest`, ejecutado también dentro de `./mvnw clean verify`; se versiona junto con la migración.
 
+## Coexistencia con P5 tras el merge
+
+La tabla conserva dos representaciones deliberadamente distintas. Las filas P5 existentes guardan el DTO de `Inspeccion` como objeto JSONB, estado HTTP 200 y las columnas de huella/bytes en `NULL`. El núcleo G7.1 guarda versión y digest de huella, estado HTTP y bytes exactos; su JSONB `respuesta` queda en `NULL`. `IdempotenciaRepository` expone ambas lecturas: la proyección de metadatos/bytes del núcleo y el finder más `save` usados por P5. `Idempotencia.respuesta` permanece como `Object` para conservar la compatibilidad con valores JSONB heredados, incluidos escalares y `NULL`.
+
+Los lectores de replay de PUT de avance y POST de envío de P5 aceptan únicamente una fila legacy cuyo status y forma correspondan a un DTO P5 reproducible. Una fila moderna G7.1, una respuesta legacy `NULL`, escalar o con forma ajena se rechaza antes de mutar inspecciones con 409 `clave-idempotencia-incompatible`. P5 no interpreta `respuesta_bytes` ni convierte bytes genéricos a `InspeccionDTO`; el núcleo tampoco decodifica ni reconstruye la respuesta JSONB P5. Reutilizar entre integraciones la misma clave de usuario no transforma una representación en la otra ni reemplaza el resultado original.
+
+Esto es una barrera de compatibilidad, no la unificación G7.2. No corrige el replay P5 anterior a comprobar la titularidad del recurso solicitado (aunque el controller exige autenticación/rol), el vínculo actual de claves entre endpoints/recursos, la coordinación de solicitudes P5 concurrentes ni la reproducción byte-exacta P5 (que sigue basada en JSONB). Esas limitaciones requieren una decisión y trabajo aparte; tampoco se introducen canonicalización, esperas predeterminadas ni allowlists en este arreglo.
+
+Evidencia de compatibilidad (26/10/2026 UTC): el merge humano `aeb5e64` falló al compilar por visibilidad del repository (6 errores). Tras reparar visibilidad, las regresiones HTTP reprodujeron 8 respuestas 500 donde correspondía 409; con la barrera pasan 8/8 y las focalizadas de núcleo/borrador/envío/compatibilidad pasan 41/41. Suite global 1484/1484, sin omisiones; gates JaCoCo, formato/package/PMD y diccionario sin cambios aprobados. El primer check global falló por formato en tres archivos del arreglo, luego corregidos. Revisión independiente de código sin defecto causado por el candidato; no se ejecutó una corrida independiente adicional. No hay comparación HTTP diferencial con el merge base porque este no compila. La revisión nativa de este nuevo candidato no se considera cubierta por el cierre histórico G7.1.
+
 ## Límites externos
 
 El callback y la fila del resultado comparten transacción PostgreSQL, no una transacción con MinIO ni otro sistema. Ante resultado externo incierto, el integrador debe reconciliar antes de repetir efectos; este ADR no afirma una garantía de recuperación operativa. No se implementan rutas, DTO, filtros ni handlers por defecto.
