@@ -37,6 +37,7 @@ class EnvioInspeccionService {
   private final CambioEstadoInspeccionService estados;
   private final ConsultaInspeccionService consultas;
   private final AvisoInspeccionEnviada avisos;
+  private final PublicacionInspeccionService publicacion;
   private final IdempotenciaRepository idempotencias;
   private final JsonMapper json;
 
@@ -50,6 +51,7 @@ class EnvioInspeccionService {
       CambioEstadoInspeccionService estados,
       ConsultaInspeccionService consultas,
       AvisoInspeccionEnviada avisos,
+      PublicacionInspeccionService publicacion,
       IdempotenciaRepository idempotencias,
       JsonMapper json) {
     this.contrato = contrato;
@@ -61,6 +63,7 @@ class EnvioInspeccionService {
     this.estados = estados;
     this.consultas = consultas;
     this.avisos = avisos;
+    this.publicacion = publicacion;
     this.idempotencias = idempotencias;
     this.json = json;
   }
@@ -93,6 +96,11 @@ class EnvioInspeccionService {
     estados.cambiar(
         inspeccionId, EstadoInspeccion.ENVIADA, actorId, DatosTransicionInspeccion.en(dispositivo));
     inspecciones.marcarSincronizada(inspeccionId, servidor);
+    if (rol == Rol.CATEDRATICO || rol == Rol.PROFESIONAL_EXTERNO) {
+      InspeccionDTO publicada = publicacion.publicarDirecta(inspeccionId, actorId);
+      guardarIdempotencia(actorId, claveIdempotencia, publicada);
+      return publicada;
+    }
     avisos.avisar(inspeccionId, cursoId);
     InspeccionDTO dto = consultas.detalle(inspeccionId, actorId, rol);
     guardarIdempotencia(actorId, claveIdempotencia, dto);

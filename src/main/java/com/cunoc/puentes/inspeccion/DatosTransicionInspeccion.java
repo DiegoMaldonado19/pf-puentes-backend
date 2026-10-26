@@ -19,6 +19,10 @@ public record DatosTransicionInspeccion(
         ocurridaEn == null ? Instant.now() : ocurridaEn, null, null, null);
   }
 
+  public static DatosTransicionInspeccion publicacion(UUID revisionId, Publicacion ic) {
+    return new DatosTransicionInspeccion(Instant.now(), null, revisionId, ic);
+  }
+
   public record Publicacion(
       BigDecimal indiceCondicion,
       EstadoCondicion estadoCalculado,

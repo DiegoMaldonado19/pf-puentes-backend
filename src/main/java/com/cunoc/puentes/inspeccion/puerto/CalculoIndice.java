@@ -1,14 +1,22 @@
 package com.cunoc.puentes.inspeccion.puerto;
 
-import com.cunoc.puentes.indice.ResultadoIndiceCondicion;
+import com.cunoc.puentes.indice.Anulacion;
+import com.cunoc.puentes.indice.EstadoCondicion;
+import java.math.BigDecimal;
 import java.util.Map;
 import java.util.UUID;
 
 /**
  * Puerto del contrato 3 hacia P8. El núcleo {@code CalculadoraIndiceCondicion} ya existe; este
- * puerto es el adaptador {@code datos JSON + versión → elementos} que P5 llamará al publicar.
+ * puerto adapta {@code datos JSON + versión → elementos y pesos vigentes}.
  */
 public interface CalculoIndice {
 
-  ResultadoIndiceCondicion calcular(Map<String, Object> datos, UUID formularioVersionId);
+  ResultadoCalculo calcular(Map<String, Object> datos, UUID formularioVersionId);
+
+  record ResultadoCalculo(
+      BigDecimal indiceCondicion,
+      EstadoCondicion estadoCalculado,
+      Anulacion anulacion,
+      UUID versionPesosId) {}
 }

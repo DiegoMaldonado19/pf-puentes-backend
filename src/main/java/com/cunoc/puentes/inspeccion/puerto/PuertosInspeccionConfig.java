@@ -6,6 +6,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.jdbc.core.simple.JdbcClient;
 
 /**
  * Los provisionales solo existen mientras P4/P8 no registren el puerto real.
@@ -26,7 +27,7 @@ class PuertosInspeccionConfig {
 
   @Bean
   @ConditionalOnMissingBean(CalculoIndice.class)
-  CalculoIndiceProvisional calculoIndice() {
-    return new CalculoIndiceProvisional();
+  CalculoIndiceProvisional calculoIndice(JdbcClient jdbc, ConsultaFormulario formularios) {
+    return new CalculoIndiceProvisional(jdbc, formularios);
   }
 }
