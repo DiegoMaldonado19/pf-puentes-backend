@@ -1,7 +1,9 @@
 package com.cunoc.puentes.inspeccion;
 
+import com.cunoc.puentes.common.NegocioException;
 import com.cunoc.puentes.indice.Anulacion;
 import com.cunoc.puentes.indice.EstadoCondicion;
+import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
@@ -9,6 +11,7 @@ import jakarta.persistence.FetchType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
+import jakarta.persistence.Version;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -24,6 +27,7 @@ import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.annotations.UpdateTimestamp;
 import org.hibernate.type.SqlTypes;
 import org.locationtech.jts.geom.Point;
+import org.springframework.http.HttpStatus;
 
 /** No extiende EntidadBase: el id lo genera el cliente (DT-OFF-05). */
 @Entity
@@ -31,6 +35,8 @@ import org.locationtech.jts.geom.Point;
 @Setter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Inspeccion {
+
+  private static final MaquinaEstadosInspeccion MAQUINA = new MaquinaEstadosInspeccion();
 
   @Id private UUID id;
 
@@ -40,9 +46,18 @@ public class Inspeccion {
 
   private UUID formularioVersionId;
 
+  private UUID cursoId;
+
+  private UUID precargadaDeId;
+
+  private Instant datosPermanentesConfirmadosEn;
+
   @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumn(name = "supersede_a_id")
   private Inspeccion supersedeA;
+
+  @Column(length = 500)
+  private String motivoCorreccion;
 
   // DT-BE-07: solo la máquina de estados del servicio lo cambia
   @Setter(AccessLevel.PACKAGE)
@@ -57,7 +72,12 @@ public class Inspeccion {
   @JdbcTypeCode(SqlTypes.GEOGRAPHY)
   private Point ubicacionInicio;
 
+  @Column(name = "distancia_a_puente_m", precision = 10, scale = 2)
+  private BigDecimal distanciaAPuenteM;
+
   private String dispositivoId;
+
+  private Instant creadaEnDispositivo;
 
   private Instant enviadaEn;
 
@@ -78,11 +98,71 @@ public class Inspeccion {
   @Enumerated(EnumType.STRING)
   private EstadoCondicion estadoConfirmado;
 
+  private UUID estadoConfirmadoPor;
+
   private String justificacionEstado;
 
   private Instant eliminadoEn;
 
+  private Instant ultimaActividadEn = Instant.now();
+
+  private Instant avisoAbandonoEn;
+
+  @Setter(AccessLevel.NONE)
+  @Version
+  @Column(nullable = false)
+  private Long version;
+
   @CreationTimestamp private Instant creadoEn;
 
   @UpdateTimestamp private Instant actualizadoEn;
+
+  /**
+   * Única puerta de mutación de {@code estado}. El servicio autorizado la llama después de
+   * comprobar el actor.
+   */
+  void cambiarEstado(EstadoInspeccion destino, DatosTransicionInspeccion datos) {
+    MAQUINA.validar(estado, destino, datos);
+    switch (destino) {
+      case ENVIADA -> enviadaEn = oAhora(datos.ocurridaEn());
+      case PUBLICADA -> aplicarPublicacion(datos);
+      default -> {
+        // El resto de transiciones no toca fechas de ciclo ni el IC.
+      }
+    }
+    estado = destino;
+  }
+
+  void exigirEditable() {
+    if (estado != EstadoInspeccion.BORRADOR) {
+      throw new NegocioException(
+          HttpStatus.CONFLICT,
+          "inspeccion-no-editable",
+          "La inspección no admite cambios",
+          "Solo un borrador puede modificar datos, fecha, acompañantes o eliminarse.");
+    }
+  }
+
+  private void aplicarPublicacion(DatosTransicionInspeccion datos) {
+    DatosTransicionInspeccion.Publicacion ic = datos.publicacion();
+    if (ic == null
+        || ic.indiceCondicion() == null
+        || ic.estadoCalculado() == null
+        || ic.estadoConfirmado() == null) {
+      throw new IllegalArgumentException(
+          "La publicación exige índice de condición y estados calculado y confirmado.");
+    }
+    indiceCondicion = ic.indiceCondicion();
+    estadoCalculado = ic.estadoCalculado();
+    estadoConfirmado = ic.estadoConfirmado();
+    versionPesosId = ic.versionPesosId();
+    anulacion = ic.anulacion();
+    estadoConfirmadoPor = ic.estadoConfirmadoPor();
+    justificacionEstado = ic.justificacionEstado();
+    publicadaEn = oAhora(datos.ocurridaEn());
+  }
+
+  private static Instant oAhora(Instant instante) {
+    return instante == null ? Instant.now() : instante;
+  }
 }
