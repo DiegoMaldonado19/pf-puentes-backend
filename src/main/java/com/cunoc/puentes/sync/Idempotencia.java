@@ -25,4 +25,14 @@ public class Idempotencia extends EntidadBase {
 
   @JdbcTypeCode(SqlTypes.JSON)
   private Map<String, Object> respuesta;
+
+  public static Idempotencia de(
+      UUID usuarioId, String clave, int estadoHttp, Map<String, Object> respuesta) {
+    Idempotencia fila = new Idempotencia();
+    fila.setUsuarioId(usuarioId);
+    fila.setClave(clave);
+    fila.setEstadoHttp(estadoHttp);
+    fila.setRespuesta(respuesta);
+    return fila;
+  }
 }
