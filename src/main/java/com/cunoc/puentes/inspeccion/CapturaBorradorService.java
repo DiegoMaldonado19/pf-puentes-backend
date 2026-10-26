@@ -165,7 +165,7 @@ class CapturaBorradorService {
   private Optional<InspeccionDTO> respuestaIdempotente(UUID actorId, String clave) {
     return idempotencias
         .findByUsuarioIdAndClave(actorId, clave)
-        .map(fila -> json.convertValue(fila.getRespuesta(), InspeccionDTO.class));
+        .map(fila -> RespuestaIdempotenteInspeccion.leer(fila, json));
   }
 
   private void guardarIdempotencia(UUID actorId, String clave, InspeccionDTO dto) {

@@ -14,9 +14,13 @@ import com.cunoc.puentes.PruebaIntegracion;
 import com.cunoc.puentes.common.NegocioException;
 import com.cunoc.puentes.inspeccion.dto.EnviarInspeccionDTO;
 import com.cunoc.puentes.usuario.Rol;
+import com.jayway.jsonpath.JsonPath;
+import java.math.BigDecimal;
 import java.sql.Timestamp;
 import java.time.Instant;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
@@ -35,6 +39,7 @@ import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.context.jdbc.Sql;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.MvcResult;
 
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -134,6 +139,67 @@ class InspeccionEnvioTest extends PruebaIntegracion {
             .query(Instant.class)
             .single();
     assertThat(sincronizada).isAfter(dispositivo);
+  }
+
+  @Test
+  void envioConLaMismaClaveReproduceRespuestaJsonbSinDuplicarTransicion() throws Exception {
+    preparar(BORRADOR, DATOS_COMPLETOS, 4, false);
+    long transicionesAntes =
+        jdbc.sql("select count(*) from transicion_inspeccion where inspeccion_id = :id")
+            .param("id", BORRADOR)
+            .query(Long.class)
+            .single();
+    long avisosAntes =
+        jdbc.sql("select count(*) from notificacion where usuario_id = :id and tipo = :tipo")
+            .param("id", C1)
+            .param("tipo", AvisoInspeccionEnviada.TIPO)
+            .query(Long.class)
+            .single();
+
+    MvcResult primera =
+        mvc.perform(
+                enviar(BORRADOR)
+                    .header(InspeccionController.IDEMPOTENCIA, "envio-p5-repetido")
+                    .with(como(Rol.ESTUDIANTE, E1)))
+            .andExpect(status().isOk())
+            .andReturn();
+    MvcResult replay =
+        mvc.perform(
+                enviar(BORRADOR)
+                    .header(InspeccionController.IDEMPOTENCIA, "envio-p5-repetido")
+                    .with(como(Rol.ESTUDIANTE, E1)))
+            .andExpect(status().isOk())
+            .andReturn();
+
+    assertThat(cuerpoJsonNormalizado(replay.getResponse().getContentAsString()))
+        .isEqualTo(cuerpoJsonNormalizado(primera.getResponse().getContentAsString()));
+    assertThat(estado(BORRADOR)).isEqualTo("ENVIADA");
+    assertThat(
+            jdbc.sql("select count(*) from transicion_inspeccion where inspeccion_id = :id")
+                .param("id", BORRADOR)
+                .query(Long.class)
+                .single())
+        .isEqualTo(transicionesAntes + 1);
+    assertThat(
+            jdbc.sql("select count(*) from notificacion where usuario_id = :id and tipo = :tipo")
+                .param("id", C1)
+                .param("tipo", AvisoInspeccionEnviada.TIPO)
+                .query(Long.class)
+                .single())
+        .isEqualTo(avisosAntes + 1);
+    assertThat(
+            jdbc.sql(
+                    """
+                    select estado_http = 200 and respuesta is not null
+                       and huella_version is null and huella_sha256 is null
+                       and respuesta_bytes is null
+                    from idempotencia where usuario_id = :usuario and clave = :clave
+                    """)
+                .param("usuario", E1)
+                .param("clave", "envio-p5-repetido")
+                .query(Boolean.class)
+                .single())
+        .isTrue();
   }
 
   @Test
@@ -367,6 +433,26 @@ class InspeccionEnvioTest extends PruebaIntegracion {
                 .query(Long.class)
                 .single())
         .isEqualTo(1);
+  }
+
+  private static Object cuerpoJsonNormalizado(String cuerpo) {
+    return normalizarJson(JsonPath.parse(cuerpo).json());
+  }
+
+  private static Object normalizarJson(Object valor) {
+    if (valor instanceof Number numero) {
+      return new BigDecimal(numero.toString()).stripTrailingZeros();
+    }
+    if (valor instanceof Map<?, ?> mapa) {
+      Map<String, Object> normalizado = new LinkedHashMap<>();
+      mapa.forEach(
+          (clave, contenido) -> normalizado.put(clave.toString(), normalizarJson(contenido)));
+      return normalizado;
+    }
+    if (valor instanceof List<?> lista) {
+      return lista.stream().map(InspeccionEnvioTest::normalizarJson).toList();
+    }
+    return valor;
   }
 
   private void preparar(UUID inspeccion, String datos, int vigentes, boolean extraPurgada) {
