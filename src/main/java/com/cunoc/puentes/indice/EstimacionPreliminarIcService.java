@@ -39,6 +39,7 @@ public class EstimacionPreliminarIcService {
 
   private final PreparacionCalificacionesService preparacion;
   private final VersionPesosRepository versiones;
+  private final DetectorCondicionesCriticas detector;
   private final JdbcTemplate jdbc;
   private final ObjectMapper json = new ObjectMapper();
   private final CalculadoraIndiceCondicion calculadora = new CalculadoraIndiceCondicion();
@@ -46,9 +47,11 @@ public class EstimacionPreliminarIcService {
   public EstimacionPreliminarIcService(
       PreparacionCalificacionesService preparacion,
       VersionPesosRepository versiones,
+      DetectorCondicionesCriticas detector,
       JdbcTemplate jdbc) {
     this.preparacion = preparacion;
     this.versiones = versiones;
+    this.detector = detector;
     this.jdbc = jdbc;
   }
 
@@ -90,8 +93,8 @@ public class EstimacionPreliminarIcService {
 
     List<CalificacionElemento> calificaciones =
         preparacion.preparar(formularioVersionId, juegoId, datos);
-    CondicionesCriticas criticas =
-        condiciones != null ? condiciones : new CondicionesCriticas(false, false, false, false);
+    CondicionesCriticas detectadas = detector.detectar(formularioVersionId, datos);
+    CondicionesCriticas criticas = DetectorCondicionesCriticas.combinar(detectadas, condiciones);
     ResultadoIndiceCondicion resultado = calculadora.calcular(calificaciones, criticas);
 
     return EstimacionPreliminarIcDTO.de(

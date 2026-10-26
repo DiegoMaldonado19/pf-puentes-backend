@@ -64,4 +64,3 @@ public record ConfirmacionEstadoCondicion(
     return estadoConfirmado;
   }
 }
-
