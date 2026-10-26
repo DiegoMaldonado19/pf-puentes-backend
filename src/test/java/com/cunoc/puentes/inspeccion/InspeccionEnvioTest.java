@@ -23,6 +23,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import org.hamcrest.Matchers;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -55,7 +56,7 @@ class InspeccionEnvioTest extends PruebaIntegracion {
   static final UUID FORMULARIO = InspeccionConsultaTest.id(0x21);
   static final UUID FORMULARIO_NUEVO = InspeccionConsultaTest.id(0x22);
   static final String BASE = "/api/v1/inspecciones/";
-  static final String DATOS_COMPLETOS =
+  public static final String DATOS_COMPLETOS =
       """
       {"identificacion":{"tipologia":"losas","material_principal":"concreto",\
       "numero_tramos":2,"longitud_m":18.0,"ancho_calzada_m":6.0,"anio_construccion":1998},\
@@ -76,6 +77,11 @@ class InspeccionEnvioTest extends PruebaIntegracion {
   @Autowired MockMvc mvc;
   @Autowired JdbcClient jdbc;
   @Autowired EnvioInspeccionService envio;
+
+  @BeforeEach
+  void reiniciarOyentes() {
+    OyentesPublicacionDePrueba.reiniciar();
+  }
 
   @Test
   void estudianteEnviaCompletaQuedaEnviadaYAvisaSoloASuCatedratico() throws Exception {
@@ -131,7 +137,7 @@ class InspeccionEnvioTest extends PruebaIntegracion {
   }
 
   @Test
-  void profesionalEnviaYNoPublica() throws Exception {
+  void profesionalEnviaYPublicaEnElMismoActo() throws Exception {
     preparar(BORRADOR_PRO, DATOS_COMPLETOS, 4, false);
     mvc.perform(
             post(BASE + BORRADOR_PRO + "/envio")
@@ -140,14 +146,19 @@ class InspeccionEnvioTest extends PruebaIntegracion {
                 .with(csrf())
                 .with(como(Rol.PROFESIONAL_EXTERNO, PROFESIONAL)))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.estado").value("ENVIADA"))
-        .andExpect(jsonPath("$.publicada_en").doesNotExist());
+        .andExpect(jsonPath("$.estado").value("PUBLICADA"))
+        .andExpect(jsonPath("$.publicada_en").isNotEmpty())
+        .andExpect(jsonPath("$.indice_condicion").value(65.0))
+        .andExpect(jsonPath("$.estado_calculado").value("REGULAR"))
+        .andExpect(jsonPath("$.estado_confirmado").value("REGULAR"));
     assertThat(
             jdbc.sql("select count(*) from notificacion where tipo = :tipo")
                 .param("tipo", AvisoInspeccionEnviada.TIPO)
                 .query(Long.class)
                 .single())
         .isZero();
+    assertThat(OyentesPublicacionDePrueba.propuestas).contains(BORRADOR_PRO);
+    assertThat(OyentesPublicacionDePrueba.hilos).contains(BORRADOR_PRO);
   }
 
   @Test
@@ -321,7 +332,13 @@ class InspeccionEnvioTest extends PruebaIntegracion {
           autenticar(E1, Rol.ESTUDIANTE);
           listos.await();
           try {
-            envio.enviar(BORRADOR, E1, Rol.ESTUDIANTE, new EnviarInspeccionDTO(null), null, false);
+            envio.enviar(
+                BORRADOR,
+                E1,
+                Rol.ESTUDIANTE,
+                new EnviarInspeccionDTO(null, null, null),
+                null,
+                false);
             return 200;
           } catch (NegocioException e) {
             return e.getStatusCode().value();

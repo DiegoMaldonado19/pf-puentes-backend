@@ -36,6 +36,22 @@ UPDATE formulario_version SET estado = 'RETIRADA' WHERE estado = 'ACTIVA';
 INSERT INTO formulario_version (id, codigo, esquema, estado, publicada_en)
 VALUES ('0199c200-0000-7000-8000-000000000021', 'SIECA-1', '{"type":"object"}'::jsonb, 'ACTIVA', now());
 
+INSERT INTO version_pesos (id, formulario_version_id, vigente_desde)
+VALUES ('0199c200-0000-7000-8000-000000000061', '0199c200-0000-7000-8000-000000000021',
+  '2026-01-01T00:00:00Z');
+INSERT INTO peso_elemento (id, version_pesos_id, elemento_ref, peso)
+VALUES
+  ('0199c200-0000-7000-8000-000000000071', '0199c200-0000-7000-8000-000000000061',
+    'subestructura.estribo_entrada', 1.000),
+  ('0199c200-0000-7000-8000-000000000072', '0199c200-0000-7000-8000-000000000061',
+    'subestructura.estribo_salida', 1.000),
+  ('0199c200-0000-7000-8000-000000000073', '0199c200-0000-7000-8000-000000000061',
+    'superestructura.losa', 1.000),
+  ('0199c200-0000-7000-8000-000000000074', '0199c200-0000-7000-8000-000000000061',
+    'accesos.entrada', 1.000),
+  ('0199c200-0000-7000-8000-000000000075', '0199c200-0000-7000-8000-000000000061',
+    'cauce', 1.000);
+
 INSERT INTO curso (id, nombre, anio, semestre, catedratico_id, vigente)
 VALUES
   ('0199c200-0000-7000-8000-000000000031', 'Puentes 2026', 2026, 2,
