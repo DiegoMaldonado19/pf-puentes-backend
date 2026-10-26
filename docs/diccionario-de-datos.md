@@ -279,11 +279,15 @@ Respuestas guardadas por Idempotency-Key (DT-OFF-07)
 | `respuesta` | jsonb | Sí |  |  | Cuerpo de la respuesta original |
 | `creado_en` | timestamp with time zone | No | now() |  | Fecha de la operación original, en UTC |
 | `actualizado_en` | timestamp with time zone | No | now() |  | Igual a creado_en: la respuesta guardada no cambia |
+| `huella_version` | integer | Sí |  |  | Versión explícita del formato de huella aportada por el integrador; NULL para filas heredadas |
+| `huella_sha256` | bytea | Sí |  |  | Huella SHA-256 de 32 bytes aportada por el integrador; NULL para filas heredadas |
+| `respuesta_bytes` | bytea | Sí |  |  | Cuerpo binario exacto de la respuesta admitida; NULL para filas heredadas |
 
 **Restricciones**
 
 - `UNIQUE (usuario_id, clave)`
 - `CHECK (((estado_http >= 100) AND (estado_http <= 599)))`
+- `CHECK ((((huella_version IS NULL) AND (huella_sha256 IS NULL) AND (respuesta_bytes IS NULL)) OR ((huella_version IS NOT NULL) AND (huella_version >= 1) AND (huella_sha256 IS NOT NULL) AND (octet_length(huella_sha256) = 32) AND (respuesta_bytes IS NOT NULL))))`
 
 ## inscripcion
 
