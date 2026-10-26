@@ -15,12 +15,9 @@ import com.cunoc.puentes.common.NegocioException;
 import com.cunoc.puentes.inspeccion.dto.EnviarInspeccionDTO;
 import com.cunoc.puentes.usuario.Rol;
 import com.jayway.jsonpath.JsonPath;
-import java.math.BigDecimal;
 import java.sql.Timestamp;
 import java.time.Instant;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
@@ -82,6 +79,105 @@ class InspeccionEnvioTest extends PruebaIntegracion {
   @Autowired MockMvc mvc;
   @Autowired JdbcClient jdbc;
   @Autowired EnvioInspeccionService envio;
+  @Autowired org.springframework.transaction.PlatformTransactionManager gestor;
+
+  @org.springframework.test.context.bean.override.mockito.MockitoSpyBean
+  com.cunoc.puentes.sync.IdempotenciaRepository resultados;
+
+  @Test
+  void fallaAlGuardarResultadoRevierteEnvioPublicacionYAvisos() throws Exception {
+    for (boolean profesional : List.of(false, true)) {
+      UUID recurso = profesional ? BORRADOR_PRO : BORRADOR;
+      UUID actor = profesional ? PROFESIONAL : E1;
+      Rol rol = profesional ? Rol.PROFESIONAL_EXTERNO : Rol.ESTUDIANTE;
+      preparar(recurso, DATOS_COMPLETOS, 4, false);
+      List<String> antes = instantanea(recurso);
+      org.mockito.Mockito.doThrow(
+              new org.springframework.dao.DataIntegrityViolationException("fallo resultado"))
+          .when(resultados)
+          .save(org.mockito.ArgumentMatchers.any());
+      try {
+        assertThat(conClave(recurso, "fallo", "{}", false, actor, rol).getResponse().getStatus())
+            .isEqualTo(500);
+      } finally {
+        org.mockito.Mockito.reset(resultados);
+      }
+      assertThat(instantanea(recurso)).isEqualTo(antes);
+      // Los dobles registran invocaciones en memoria; no representan efectos persistidos.
+      assertThat(conClave(recurso, "fallo", "{}", false, actor, rol).getResponse().getStatus())
+          .isEqualTo(200);
+    }
+  }
+
+  @Test
+  void timeoutDeDosSegundosNoCacheaYPermiteReintentar() throws Exception {
+    preparar(BORRADOR, DATOS_COMPLETOS, 4, false);
+    String clave = "envio-timeout";
+    byte[] bytes = clave.getBytes(java.nio.charset.StandardCharsets.UTF_8);
+    byte[] identidad =
+        java.nio.ByteBuffer.allocate(20 + bytes.length)
+            .putLong(E1.getMostSignificantBits())
+            .putLong(E1.getLeastSignificantBits())
+            .putInt(bytes.length)
+            .put(bytes)
+            .array();
+    long bloqueo =
+        java.nio.ByteBuffer.wrap(
+                java.security.MessageDigest.getInstance("SHA-256").digest(identidad))
+            .getLong();
+    List<String> antes = instantanea(BORRADOR);
+    try (var ejecutor = Executors.newVirtualThreadPerTaskExecutor()) {
+      new org.springframework.transaction.support.TransactionTemplate(gestor)
+          .executeWithoutResult(
+              tx -> {
+                jdbc.sql("select pg_advisory_xact_lock(:llave)")
+                    .param("llave", bloqueo)
+                    .query(Object.class)
+                    .single();
+                var pendiente =
+                    ejecutor.submit(
+                        () -> conClave(BORRADOR, clave, "{}", false, E1, Rol.ESTUDIANTE));
+                long inicio = System.nanoTime();
+                try {
+                  exigirError(pendiente.get(5, TimeUnit.SECONDS), 409, "operacion-en-proceso");
+                  assertThat(java.time.Duration.ofNanos(System.nanoTime() - inicio))
+                      .isGreaterThanOrEqualTo(java.time.Duration.ofMillis(1900));
+                  assertThat(instantanea(BORRADOR)).isEqualTo(antes);
+                } catch (Exception error) {
+                  throw new IllegalStateException(error);
+                }
+              });
+    }
+    assertThat(conClave(BORRADOR, clave, "{}", false, E1, Rol.ESTUDIANTE).getResponse().getStatus())
+        .isEqualTo(200);
+  }
+
+  @Test
+  void dosPeticionesHttpConMismaClaveProducenUnaSolaTransicionYAviso() throws Exception {
+    preparar(BORRADOR, DATOS_COMPLETOS, 4, false);
+    CountDownLatch iniciar = new CountDownLatch(1);
+    Callable<MvcResult> peticion =
+        () -> {
+          iniciar.await();
+          return conClave(BORRADOR, "concurrente", "{}", false, E1, Rol.ESTUDIANTE);
+        };
+    List<String> antes = instantanea(BORRADOR);
+    try (var ejecutor = Executors.newVirtualThreadPerTaskExecutor()) {
+      var primera = ejecutor.submit(peticion);
+      var segunda = ejecutor.submit(peticion);
+      iniciar.countDown();
+      MvcResult una = primera.get(10, TimeUnit.SECONDS);
+      MvcResult otra = segunda.get(10, TimeUnit.SECONDS);
+      assertThat(una.getResponse().getStatus()).isEqualTo(200);
+      assertThat(otra.getResponse().getStatus()).isEqualTo(200);
+      assertThat(otra.getResponse().getContentAsByteArray())
+          .containsExactly(una.getResponse().getContentAsByteArray());
+    }
+    List<String> despues = instantanea(BORRADOR);
+    assertThat(Long.parseLong(despues.get(1))).isEqualTo(Long.parseLong(antes.get(1)) + 1);
+    assertThat(Long.parseLong(despues.get(2))).isEqualTo(Long.parseLong(antes.get(2)) + 1);
+    assertThat(Long.parseLong(despues.get(4))).isEqualTo(Long.parseLong(antes.get(4)) + 1);
+  }
 
   @BeforeEach
   void reiniciarOyentes() {
@@ -142,7 +238,7 @@ class InspeccionEnvioTest extends PruebaIntegracion {
   }
 
   @Test
-  void envioConLaMismaClaveReproduceRespuestaJsonbSinDuplicarTransicion() throws Exception {
+  void envioConLaMismaClaveReproduceBytesExactosSinDuplicarTransicion() throws Exception {
     preparar(BORRADOR, DATOS_COMPLETOS, 4, false);
     long transicionesAntes =
         jdbc.sql("select count(*) from transicion_inspeccion where inspeccion_id = :id")
@@ -171,8 +267,8 @@ class InspeccionEnvioTest extends PruebaIntegracion {
             .andExpect(status().isOk())
             .andReturn();
 
-    assertThat(cuerpoJsonNormalizado(replay.getResponse().getContentAsString()))
-        .isEqualTo(cuerpoJsonNormalizado(primera.getResponse().getContentAsString()));
+    assertThat(replay.getResponse().getContentAsByteArray())
+        .containsExactly(primera.getResponse().getContentAsByteArray());
     assertThat(estado(BORRADOR)).isEqualTo("ENVIADA");
     assertThat(
             jdbc.sql("select count(*) from transicion_inspeccion where inspeccion_id = :id")
@@ -190,9 +286,9 @@ class InspeccionEnvioTest extends PruebaIntegracion {
     assertThat(
             jdbc.sql(
                     """
-                    select estado_http = 200 and respuesta is not null
-                       and huella_version is null and huella_sha256 is null
-                       and respuesta_bytes is null
+                    select estado_http = 200 and respuesta is null
+                       and huella_version = 1 and huella_sha256 is not null
+                       and respuesta_bytes is not null
                     from idempotencia where usuario_id = :usuario and clave = :clave
                     """)
                 .param("usuario", E1)
@@ -435,24 +531,245 @@ class InspeccionEnvioTest extends PruebaIntegracion {
         .isEqualTo(1);
   }
 
-  private static Object cuerpoJsonNormalizado(String cuerpo) {
-    return normalizarJson(JsonPath.parse(cuerpo).json());
+  @Test
+  void dtoCompletoCanonizaOrdenEscalaYUuidPeroNoIgnoraCamposDelCliente() throws Exception {
+    preparar(BORRADOR, DATOS_COMPLETOS, 4, false);
+    String cuerpo = "{\"indice_condicion\":1.00,\"estado_calculado\":\"REGULAR\"}";
+    MvcResult original = conClave(BORRADOR, " canonica ", cuerpo, false, E1, Rol.ESTUDIANTE);
+    assertThat(original.getResponse().getStatus()).isEqualTo(200);
+    MvcResult replay =
+        mvc.perform(
+                post(BASE + BORRADOR.toString().toUpperCase(java.util.Locale.ROOT) + "/envio")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .header(InspeccionController.IDEMPOTENCIA, "canonica")
+                    .content("{\"estado_calculado\":\"REGULAR\",\"indice_condicion\":1e0}")
+                    .with(como(Rol.ESTUDIANTE, E1)))
+            .andReturn();
+    assertThat(replay.getResponse().getStatus()).isEqualTo(200);
+    assertThat(replay.getResponse().getContentAsByteArray())
+        .containsExactly(original.getResponse().getContentAsByteArray());
+    List<String> antes = instantanea(BORRADOR);
+    exigirError(
+        conClave(
+            BORRADOR,
+            "canonica",
+            "{\"indice_condicion\":2,\"estado_calculado\":\"REGULAR\"}",
+            false,
+            E1,
+            Rol.ESTUDIANTE),
+        409,
+        "clave-idempotencia-incompatible");
+    exigirError(
+        conClave(
+            BORRADOR,
+            "canonica",
+            "{\"indice_condicion\":1,\"estado_calculado\":\"BUENO\"}",
+            false,
+            E1,
+            Rol.ESTUDIANTE),
+        409,
+        "clave-idempotencia-incompatible");
+    assertThat(instantanea(BORRADOR)).isEqualTo(antes);
   }
 
-  private static Object normalizarJson(Object valor) {
-    if (valor instanceof Number numero) {
-      return new BigDecimal(numero.toString()).stripTrailingZeros();
+  @Test
+  void claveUnicode100EsValidaY101NoMuta() throws Exception {
+    List<String> antes = instantanea(ENVIADA);
+    exigirError(
+        conClave(ENVIADA, "😀".repeat(101), "{}", false, E1, Rol.ESTUDIANTE),
+        400,
+        "idempotencia-invalida");
+    assertThat(instantanea(ENVIADA)).isEqualTo(antes);
+    assertThat(
+            conClave(ENVIADA, "😀".repeat(100), null, false, E1, Rol.ESTUDIANTE)
+                .getResponse()
+                .getStatus())
+        .isEqualTo(200);
+    MvcResult replay = conClave(ENVIADA, "😀".repeat(100), null, false, E1, Rol.ESTUDIANTE);
+    assertThat(replay.getResponse().getStatus()).isEqualTo(200);
+    assertThat(instantanea(ENVIADA).subList(0, 4)).isEqualTo(antes.subList(0, 4));
+  }
+
+  @Test
+  void huellaVinculaRecursoPayloadSyncYCuerpoAusente() throws Exception {
+    preparar(BORRADOR, DATOS_COMPLETOS, 4, false);
+    MvcResult original = conClave(BORRADOR, "huella", "{}", false, E1, Rol.ESTUDIANTE);
+    assertThat(original.getResponse().getStatus()).isEqualTo(200);
+    List<String> antes = instantanea(BORRADOR);
+    for (MvcResult rechazo :
+        List.of(
+            conClave(
+                BORRADOR,
+                "huella",
+                "{\"enviada_en\":\"2026-10-20T10:00:00Z\"}",
+                false,
+                E1,
+                Rol.ESTUDIANTE),
+            conClave(BORRADOR, "huella", "{}", true, E1, Rol.ESTUDIANTE),
+            conClave(CAMBIOS, "huella", "{}", false, E1, Rol.ESTUDIANTE),
+            conClave(BORRADOR, "huella", null, false, E1, Rol.ESTUDIANTE))) {
+      exigirError(rechazo, 409, "clave-idempotencia-incompatible");
     }
-    if (valor instanceof Map<?, ?> mapa) {
-      Map<String, Object> normalizado = new LinkedHashMap<>();
-      mapa.forEach(
-          (clave, contenido) -> normalizado.put(clave.toString(), normalizarJson(contenido)));
-      return normalizado;
+    assertThat(instantanea(BORRADOR)).isEqualTo(antes);
+  }
+
+  @Test
+  void rechazo422SeConservaTrasCorregirDatosHastaUsarNuevaClave() throws Exception {
+    preparar(BORRADOR, DATOS_SIN_TRES, 0, false);
+    List<String> antes = instantanea(BORRADOR);
+    MvcResult rechazo = conClave(BORRADOR, "rechazo", "{}", false, E1, Rol.ESTUDIANTE);
+    exigirError(rechazo, 422, "inspeccion-no-publicable");
+    assertThat(instantanea(BORRADOR).subList(0, 4)).isEqualTo(antes.subList(0, 4));
+    preparar(BORRADOR, DATOS_COMPLETOS, 4, false);
+    List<String> corregida = instantanea(BORRADOR);
+    MvcResult replay = conClave(BORRADOR, "rechazo", "{}", false, E1, Rol.ESTUDIANTE);
+    exigirError(replay, 422, "inspeccion-no-publicable");
+    assertThat(replay.getResponse().getContentAsByteArray())
+        .containsExactly(rechazo.getResponse().getContentAsByteArray());
+    assertThat(replay.getResponse().getContentType()).isEqualTo("application/problem+json");
+    assertThat(instantanea(BORRADOR)).isEqualTo(corregida);
+    assertThat(
+            conClave(BORRADOR, "corregida", "{}", false, E1, Rol.ESTUDIANTE)
+                .getResponse()
+                .getStatus())
+        .isEqualTo(200);
+  }
+
+  @Test
+  void publicadaReproduceBytesDespuesDelCommitSinPublicarDeNuevo() throws Exception {
+    preparar(BORRADOR_PRO, DATOS_COMPLETOS, 4, false);
+    String cuerpo = "{\"enviada_en\":\"2026-10-20T10:00:00Z\"}";
+    MvcResult primera =
+        conClave(BORRADOR_PRO, "publicada", cuerpo, false, PROFESIONAL, Rol.PROFESIONAL_EXTERNO);
+    assertThat(primera.getResponse().getStatus()).isEqualTo(200);
+    assertThat(JsonPath.<String>read(primera.getResponse().getContentAsString(), "$.estado"))
+        .isEqualTo("PUBLICADA");
+    List<String> antes = instantanea(BORRADOR_PRO);
+    MvcResult replay =
+        conClave(BORRADOR_PRO, "publicada", cuerpo, false, PROFESIONAL, Rol.PROFESIONAL_EXTERNO);
+    assertThat(replay.getResponse().getStatus()).isEqualTo(200);
+    assertThat(replay.getResponse().getContentType()).isEqualTo("application/json");
+    assertThat(replay.getResponse().getContentAsByteArray())
+        .containsExactly(primera.getResponse().getContentAsByteArray());
+    assertThat(instantanea(BORRADOR_PRO)).isEqualTo(antes);
+  }
+
+  @Test
+  void propietarioEliminacionYPermisosSeCompruebanAntesDelReplay() throws Exception {
+    preparar(BORRADOR, DATOS_COMPLETOS, 4, false);
+    assertThat(
+            conClave(BORRADOR, "autorizacion", "{}", false, E1, Rol.ESTUDIANTE)
+                .getResponse()
+                .getStatus())
+        .isEqualTo(200);
+    List<String> antes = instantanea(BORRADOR);
+    exigirError(
+        conClave(BORRADOR, "autorizacion", "{}", false, E1, Rol.ADMINISTRADOR),
+        403,
+        "acceso-denegado");
+    assertThat(instantanea(BORRADOR)).isEqualTo(antes);
+    jdbc.sql("update inspeccion set autor_id = :autor where id = :id")
+        .param("autor", E2)
+        .param("id", BORRADOR)
+        .update();
+    antes = instantanea(BORRADOR);
+    exigirError(
+        conClave(BORRADOR, "autorizacion", "{}", false, E1, Rol.ESTUDIANTE),
+        404,
+        "inspeccion-no-encontrada");
+    assertThat(instantanea(BORRADOR)).isEqualTo(antes);
+    jdbc.sql("update inspeccion set autor_id = :autor, eliminado_en = now() where id = :id")
+        .param("autor", E1)
+        .param("id", BORRADOR)
+        .update();
+    antes = instantanea(BORRADOR);
+    exigirError(
+        conClave(BORRADOR, "autorizacion", "{}", false, E1, Rol.ESTUDIANTE),
+        404,
+        "inspeccion-no-encontrada");
+    assertThat(instantanea(BORRADOR)).isEqualTo(antes);
+  }
+
+  @Test
+  void estadoBindingYAutenticacionNoGuardanResultados() throws Exception {
+    List<String> antes = instantanea(BORRADOR);
+    exigirError(
+        conClave(
+            InspeccionConsultaTest.PUBLICADA_RECIENTE, "estado", "{}", false, E1, Rol.ESTUDIANTE),
+        409,
+        "inspeccion-no-editable");
+    assertThat(
+            conClave(BORRADOR, "binding", "{", false, E1, Rol.ESTUDIANTE).getResponse().getStatus())
+        .isEqualTo(400);
+    assertThat(
+            mvc.perform(enviar(BORRADOR).header(InspeccionController.IDEMPOTENCIA, "anonimo"))
+                .andReturn()
+                .getResponse()
+                .getStatus())
+        .isEqualTo(401);
+    assertThat(instantanea(BORRADOR)).isEqualTo(antes);
+  }
+
+  @Test
+  void claveBlancaYReintentoEnviadaConservanComportamientoAnterior() throws Exception {
+    preparar(BORRADOR, DATOS_COMPLETOS, 4, false);
+    assertThat(conClave(BORRADOR, "   ", "{}", false, E1, Rol.ESTUDIANTE).getResponse().getStatus())
+        .isEqualTo(200);
+    List<String> antes = instantanea(BORRADOR);
+    assertThat(conClave(BORRADOR, "   ", "{}", false, E1, Rol.ESTUDIANTE).getResponse().getStatus())
+        .isEqualTo(200);
+    assertThat(instantanea(BORRADOR)).isEqualTo(antes);
+    assertThat(
+            conClave(BORRADOR, "ya-enviada", "{}", false, E1, Rol.ESTUDIANTE)
+                .getResponse()
+                .getStatus())
+        .isEqualTo(200);
+    assertThat(instantanea(BORRADOR).subList(0, 4)).isEqualTo(antes.subList(0, 4));
+  }
+
+  private MvcResult conClave(
+      UUID id, String clave, String cuerpo, boolean sync, UUID actor, Rol rol) throws Exception {
+    var peticion =
+        post(BASE + id + "/envio")
+            .contentType(MediaType.APPLICATION_JSON)
+            .header(InspeccionController.IDEMPOTENCIA, clave)
+            .header(InspeccionController.SYNC, sync);
+    if (cuerpo != null) {
+      peticion.content(cuerpo);
     }
-    if (valor instanceof List<?> lista) {
-      return lista.stream().map(InspeccionEnvioTest::normalizarJson).toList();
-    }
-    return valor;
+    return mvc.perform(peticion.with(como(rol, actor))).andReturn();
+  }
+
+  private static void exigirError(MvcResult respuesta, int estado, String tipo) throws Exception {
+    assertThat(respuesta.getResponse().getStatus()).isEqualTo(estado);
+    assertThat(JsonPath.<String>read(respuesta.getResponse().getContentAsString(), "$.type"))
+        .isEqualTo("https://sgp.cunoc.usac.edu.gt/errores/" + tipo);
+  }
+
+  private List<String> instantanea(UUID id) {
+    return jdbc.sql(
+            """
+        select row_to_json(i)::text,
+          (select count(*)::text from transicion_inspeccion),
+          (select count(*)::text from notificacion),
+          (select count(*)::text from auditoria),
+          (select count(*)::text from idempotencia),
+          (select row_to_json(p)::text from puente p where p.id = i.puente_id),
+          (select count(*)::text from orden_mantenimiento)
+        from inspeccion i where id = :id
+        """)
+        .param("id", id)
+        .query(
+            (rs, n) ->
+                List.of(
+                    rs.getString(1),
+                    rs.getString(2),
+                    rs.getString(3),
+                    rs.getString(4),
+                    rs.getString(5),
+                    rs.getString(6),
+                    rs.getString(7)))
+        .single();
   }
 
   private void preparar(UUID inspeccion, String datos, int vigentes, boolean extraPurgada) {
