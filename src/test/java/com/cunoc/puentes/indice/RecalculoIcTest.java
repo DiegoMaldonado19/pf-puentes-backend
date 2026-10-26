@@ -298,7 +298,7 @@ class RecalculoIcTest extends PruebaIntegracion {
             jsonPath("$.type")
                 .value("https://sgp.cunoc.usac.edu.gt/errores/juego-pesos-de-otra-version"));
 
-    jdbc.update("UPDATE inspeccion SET datos = '[]'::jsonb WHERE id = ?", INSPECCION);
+    jdbc.update("UPDATE inspeccion SET datos = '{}'::jsonb WHERE id = ?", INSPECCION);
     mvc.perform(
             post(RUTA, INSPECCION)
                 .with(como(Rol.ADMINISTRADOR, ADMIN))
@@ -307,7 +307,18 @@ class RecalculoIcTest extends PruebaIntegracion {
         .andExpect(status().isUnprocessableContent())
         .andExpect(
             jsonPath("$.type")
-                .value("https://sgp.cunoc.usac.edu.gt/errores/datos-inspeccion-invalidos"));
+                .value("https://sgp.cunoc.usac.edu.gt/errores/respuesta-dano-invalida"));
+
+    autenticar(Rol.ADMINISTRADOR);
+    assertThatThrownBy(() -> servicio.leerDatos("[]"))
+        .isInstanceOf(NegocioException.class)
+        .satisfies(
+            error -> {
+              NegocioException negocio = (NegocioException) error;
+              assertThat(negocio.getStatusCode().value()).isEqualTo(422);
+              assertThat(negocio.getBody().getType().toString())
+                  .hasToString("https://sgp.cunoc.usac.edu.gt/errores/datos-inspeccion-invalidos");
+            });
   }
 
   @Test

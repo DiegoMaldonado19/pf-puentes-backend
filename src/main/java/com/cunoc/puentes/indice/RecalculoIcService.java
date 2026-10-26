@@ -167,7 +167,7 @@ public class RecalculoIcService {
     return fila;
   }
 
-  private Map<String, Object> leerDatos(String datosJson) {
+  Map<String, Object> leerDatos(String datosJson) {
     try {
       return json.readValue(datosJson, new TypeReference<>() {});
     } catch (JsonProcessingException error) {
