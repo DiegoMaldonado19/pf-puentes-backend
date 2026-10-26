@@ -14,6 +14,11 @@ public record DatosTransicionInspeccion(
     return new DatosTransicionInspeccion(Instant.now(), motivo, revisionId, null);
   }
 
+  public static DatosTransicionInspeccion en(Instant ocurridaEn) {
+    return new DatosTransicionInspeccion(
+        ocurridaEn == null ? Instant.now() : ocurridaEn, null, null, null);
+  }
+
   public record Publicacion(
       BigDecimal indiceCondicion,
       EstadoCondicion estadoCalculado,

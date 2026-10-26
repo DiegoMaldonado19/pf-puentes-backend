@@ -3,6 +3,7 @@ package com.cunoc.puentes.inspeccion;
 import com.cunoc.puentes.inspeccion.dto.ConfirmarDatosPermanentesDTO;
 import com.cunoc.puentes.inspeccion.dto.CrearInspeccionDTO;
 import com.cunoc.puentes.inspeccion.dto.DatosPermanentesDTO;
+import com.cunoc.puentes.inspeccion.dto.EnviarInspeccionDTO;
 import com.cunoc.puentes.inspeccion.dto.GuardarAvanceDTO;
 import com.cunoc.puentes.inspeccion.dto.HistorialTransicionDTO;
 import com.cunoc.puentes.inspeccion.dto.InspeccionDTO;
@@ -39,7 +40,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/api/v1")
-@Tag(name = "Inspecciones", description = "Consulta, inicio y captura de inspecciones (P5)")
+@Tag(name = "Inspecciones", description = "Consulta, captura y envío de inspecciones (P5)")
 @ApiResponse(responseCode = "401", description = "Sin autenticación")
 class InspeccionController {
 
@@ -50,16 +51,19 @@ class InspeccionController {
   private final InicioInspeccionService inicio;
   private final PrecargaInspeccionService precarga;
   private final CapturaBorradorService captura;
+  private final EnvioInspeccionService envio;
 
   InspeccionController(
       ConsultaInspeccionService consultas,
       InicioInspeccionService inicio,
       PrecargaInspeccionService precarga,
-      CapturaBorradorService captura) {
+      CapturaBorradorService captura,
+      EnvioInspeccionService envio) {
     this.consultas = consultas;
     this.inicio = inicio;
     this.precarga = precarga;
     this.captura = captura;
+    this.envio = envio;
   }
 
   @GetMapping("/puentes-inspeccionables")
@@ -177,6 +181,23 @@ class InspeccionController {
       @PathVariable UUID id,
       @Valid @RequestBody ConfirmarDatosPermanentesDTO datos) {
     return precarga.confirmar(id, id(usuario), rol(autenticacion), datos);
+  }
+
+  @PostMapping("/inspecciones/{id}/envio")
+  @PreAuthorize("hasAnyRole('ESTUDIANTE', 'PROFESIONAL_EXTERNO', 'CATEDRATICO')")
+  @Operation(summary = "Envía un borrador propio a revisión")
+  @ApiResponse(responseCode = "200", description = "Inspección enviada o reenviada (idempotente)")
+  @ApiResponse(responseCode = "404", description = "Inexistente, ajena o eliminada")
+  @ApiResponse(responseCode = "409", description = "No es un borrador")
+  @ApiResponse(responseCode = "422", description = "Faltan datos, permanentes, fecha o fotos")
+  InspeccionDTO enviar(
+      Principal usuario,
+      Authentication autenticacion,
+      @PathVariable UUID id,
+      @RequestHeader(value = IDEMPOTENCIA, required = false) String idempotencia,
+      @RequestHeader(value = SYNC, defaultValue = "false") boolean sync,
+      @RequestBody(required = false) @Valid EnviarInspeccionDTO datos) {
+    return envio.enviar(id, id(usuario), rol(autenticacion), datos, idempotencia, sync);
   }
 
   @PutMapping("/inspecciones/{id}/acompanantes")

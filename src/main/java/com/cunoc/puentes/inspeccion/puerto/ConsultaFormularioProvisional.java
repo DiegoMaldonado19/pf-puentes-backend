@@ -21,8 +21,8 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * Sustituto de P4 mientras el motor de formularios no esté en {@code develop}. Lee la versión
  * {@code ACTIVA} de {@code formulario_version} y las rutas de {@code sgp.formulario.*}. {@code
- * validarParcial} comprueba tipos y rangos de las rutas conocidas; {@code validarCompleto} sigue
- * siendo no-op hasta el envío (US-P5-07).
+ * validarParcial} comprueba tipos y rangos; {@code validarCompleto} exige todas las rutas conocidas
+ * (permanentes y daño) de esa versión.
  */
 class ConsultaFormularioProvisional implements ConsultaFormulario {
 
@@ -97,31 +97,51 @@ class ConsultaFormularioProvisional implements ConsultaFormulario {
     Objects.requireNonNull(versionId, "La versión del formulario es obligatoria.");
     List<ErrorCampo> errores = new ArrayList<>();
     for (String ruta : permanentes) {
-      validarRuta(datos, ruta, false, errores);
+      validarRuta(datos, ruta, false, false, errores);
     }
     for (String ruta : danos) {
-      validarRuta(datos, ruta, true, errores);
+      validarRuta(datos, ruta, true, false, errores);
     }
-    if (!errores.isEmpty()) {
-      throw new NegocioException(
-              HttpStatus.UNPROCESSABLE_CONTENT,
-              "datos-invalidos",
-              "Los datos no cumplen el esquema",
-              "Hay valores con tipo o rango inválido.")
-          .conErrores(List.copyOf(errores));
-    }
+    lanzarSiHay(errores, "Hay valores con tipo o rango inválido.");
   }
 
   @Override
   public void validarCompleto(Map<String, Object> datos, UUID versionId) {
     Objects.requireNonNull(datos, "Los datos del formulario son obligatorios.");
     Objects.requireNonNull(versionId, "La versión del formulario es obligatoria.");
+    List<ErrorCampo> errores = new ArrayList<>();
+    for (String ruta : permanentes) {
+      validarRuta(datos, ruta, false, true, errores);
+    }
+    for (String ruta : danos) {
+      validarRuta(datos, ruta, true, true, errores);
+    }
+    lanzarSiHay(errores, "Faltan campos obligatorios o hay valores inválidos.");
+  }
+
+  private static void lanzarSiHay(List<ErrorCampo> errores, String detalle) {
+    if (errores.isEmpty()) {
+      return;
+    }
+    throw new NegocioException(
+            HttpStatus.UNPROCESSABLE_CONTENT,
+            "datos-invalidos",
+            "Los datos no cumplen el esquema",
+            detalle)
+        .conErrores(List.copyOf(errores));
   }
 
   private static void validarRuta(
-      Map<String, Object> datos, String ruta, boolean dano, List<ErrorCampo> errores) {
+      Map<String, Object> datos,
+      String ruta,
+      boolean dano,
+      boolean obligatorio,
+      List<ErrorCampo> errores) {
     Object valor = RutasDatos.leer(datos, ruta);
     if (valor == null) {
+      if (obligatorio) {
+        errores.add(new ErrorCampo(ruta, "Requerido"));
+      }
       return;
     }
     String cola = cola(ruta);

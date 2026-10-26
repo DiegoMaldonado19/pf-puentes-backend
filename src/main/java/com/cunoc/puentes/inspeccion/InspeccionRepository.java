@@ -108,4 +108,8 @@ interface InspeccionRepository extends Repository<Inspeccion, UUID> {
   @Modifying(clearAutomatically = true)
   @Query("update Inspeccion i set i.avisoAbandonoEn = :ahora where i.id = :id")
   int marcarAvisoAbandono(UUID id, Instant ahora);
+
+  @Modifying(clearAutomatically = true)
+  @Query("update Inspeccion i set i.sincronizadaEn = :ahora where i.id = :id")
+  int marcarSincronizada(UUID id, Instant ahora);
 }
