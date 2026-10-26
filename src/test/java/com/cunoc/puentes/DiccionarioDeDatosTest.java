@@ -36,7 +36,7 @@ class DiccionarioDeDatosTest extends PruebaIntegracion {
         pg_get_expr(d.adbin, d.adrelid) AS por_defecto,
         (SELECT string_agg(
             CASE k.contype WHEN 'p' THEN 'PK' ELSE 'FK → ' || k.confrelid::regclass END,
-            ', ' ORDER BY k.contype DESC)
+            ', ' ORDER BY k.contype DESC, k.confrelid::regclass::text, k.conname)
           FROM pg_constraint k
           WHERE k.conrelid = c.oid AND k.contype IN ('p', 'f') AND a.attnum = ANY (k.conkey)
         ) AS llaves,
