@@ -4,7 +4,7 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 
-/** Entrada interna normalizada; el adaptador de P4 deberá obtenerla de metadatos confiables. */
+/** Entrada interna normalizada; MetadatosDanoFormulario la obtiene del esquema persistido de P4. */
 public record ElementosDeDano(UUID formularioVersionId, Set<String> referencias) {
 
   public ElementosDeDano {

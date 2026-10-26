@@ -1,5 +1,45 @@
 # pf-puentes-backend
 
+### Crear juegos completos de pesos (P8, 25/10/2026)
+
+`POST /api/v1/formularios/{formularioId}/juegos-pesos`, solo Administrador: `{"acta":null,"pesos":[{"elemento_ref":"referencia-real","peso":1.25}]}`. Debe incluir exactamente un peso por cada campo de daño obtenido del servidor. Devuelve 201, DTO y Location del juego nuevo; 400/401/403/404/422 documentados. Transacción, bloqueo compartido del formulario y auditoría por fila reutilizada de P2. No modifica juegos anteriores ni inspecciones, no elige un juego oficial ni recalcula. El ejemplo ilustra el formato, no valores calibrados ni un juego completo de V1.0.0.
+
+La política de completitud y creación para borradores/activas/retiradas fue **adoptada con autorización del responsable P8**, sin atribuirla al texto literal ni a una confirmación del grupo. Queda documentada para el equipo en [ADR 0040](docs/adr/0040-creacion-completa-y-versionada-de-pesos.md) y [manual técnico](docs/manual-tecnico-p8.md). Acta null significa provisional; una referencia no certifica firma/calibración. Se superan las menciones anteriores a esperar esa decisión para habilitar el guardado.
+
+Verificación de creación: **1224 pruebas backend aprobadas**, 21 nuevas; Spotless, PMD, empaquetado y tres reglas JaCoCo aprobados. Fachada nueva: 100 % de líneas y ramas. Frontend: 595 pruebas y controles aprobados según su README. Diccionario sin migraciones; no acredita CI remoto.
+
+**Siete escenarios Playwright y un orquestador JUnit aprobados**, con build de producción, Chrome y API/BD/MinIO reales. Creación de dos juegos de 19 pesos y verificación SQL de históricos, esquema, inspecciones y auditoría. [Guía reproducible](docs/prueba-navegador-p8.md).
+
+### Consulta de campos P4 desde pesos (P8, 24/10/2026)
+
+`GET /api/v1/formularios/{formularioId}/elementos-dano?page=0&size=20` devuelve una página de referencias canónicas ordenadas del esquema persistido. Solo Administrador en HTTP y servicio; tamaño máximo 100, errores 400/401/403/404/422. Funciona aunque la versión no tenga pesos; no crea configuraciones. Frontend: `/admin/pesos` → **Consultar campos de daño del formulario** → seleccionar versión. Reutiliza el listado P4 y mantiene separado el catálogo de versiones con juegos guardados. [ADR 0039](docs/adr/0039-consulta-administrativa-de-referencias-de-dano.md).
+
+El usuario decidió consultar al grupo la completitud del juego y la creación para versiones publicadas antes de habilitar el guardado; selección/publicación P5 y calibración siguen pendientes.
+
+Verificación 25/10/2026: **1203 pruebas backend aprobadas**, diez nuevas; Spotless, PMD, empaquetado y tres reglas JaCoCo aprobados. Servicio nuevo: 100 % de líneas y ramas. Diccionario generado sin diferencias. Frontend: 568 pruebas aprobadas y controles documentados en su README; no acredita CI remoto.
+
+Recorrido final: **seis escenarios Playwright y un orquestador JUnit aprobados**, con Chrome/build de producción y backend/BD/MinIO reales. Incluye la consulta de los 19 campos de la semilla P4 sin juegos de pesos. [Guía actualizada](docs/prueba-navegador-p8.md).
+
+### Metadatos P4 para pesos de P8 (24/10/2026)
+
+`MetadatosDanoFormulario.obtener(UUID)` lee el esquema persistido de esa versión y devuelve `ElementosDeDano` con las referencias `x-elemento-ref` de los campos `x-dano: true`. La versión V1.0.0 contiene 19 referencias; la ruta del dato puede ser diferente de la referencia del peso. Valida escala integer 0–4 y referencias únicas; rechaza metadatos incompatibles con 422 y versiones inexistentes con 404. Es lectura interna sin caché, también para históricos, sin nueva ruta HTTP. [Contrato, límites y pruebas: ADR 0038](docs/adr/0038-metadatos-de-dano-desde-el-formulario-persistido.md).
+
+Este adaptador prepara la creación de pesos con metadatos obtenidos en servidor. La creación HTTP/pantalla, la lectura de respuestas y las condiciones críticas reales siguen pendientes; no se deducen umbrales del marcador crítico de P4.
+
+Verificación local de este merge: **1193 pruebas backend**, 36 nuevas; Spotless, PMD, empaquetado y tres reglas JaCoCo aprobados. Adaptador/extractor: 100 % de líneas y ramas; diccionario generado sin diferencias. Frontend: 553 pruebas y controles de formato, lint, TypeScript y build aprobados. No acredita CI remoto.
+
+### Recorrido P8 con navegador y API reales (23/10/2026)
+
+`./mvnw -B -ntp -Dtest=RecorridoP8Navegador test` inicia PostgreSQL/PostGIS y MinIO temporales y ejecuta Playwright contra la SPA y Spring Boot reales: login, pesos, mantenimiento, foto/cierre, descarte y permisos. **Cinco escenarios de navegador y un orquestador JUnit aprobados**. No usa `.env` ni la base local, no agrega datos a producción y no sustituye la publicación P4/P5. [Preparación, comando y resultados](docs/prueba-navegador-p8.md). Este ejecutor se invoca explícitamente y no exige navegador al CI backend normal.
+
+### Consulta administrativa de pesos (P8, 23/10/2026)
+
+`GET /api/v1/juegos-pesos/formularios?page=0&size=20` devuelve referencias `id`/`codigo` de versiones con juegos guardados, sin duplicados, ordenadas por código e ID y con máximo 100 filas. Solo Administrador, tanto en controlador como servicio; 400 por paginación inválida/desplazamiento excesivo y 401/403 por acceso. Sin versiones con pesos, devuelve página vacía. No expone esquema/mapeo ni certifica calibración. [ADR 0037](docs/adr/0037-catalogo-administrativo-de-formularios-con-pesos.md).
+
+Frontend `/admin/pesos` usa la sesión/interceptores/guardia ya recibidos de P2: elegir código de versión → juego → elementos. La creación HTTP sigue pendiente; los metadatos de referencias P4 ya se extraen en servidor desde el incremento del 24/10. Mantenimiento también tiene acceso protegido desde ficha P3. Las menciones históricas a esperar otra entrega de autenticación P2 quedan superadas para esas consultas.
+
+Verificación local: **1134 pruebas backend**, siete escenarios nuevos, sin fallos/errores/omisiones; compilación limpia, Spotless, PMD, empaquetado y tres reglas JaCoCo aprobados. Diccionario regenerado idéntico al versionado. Sin migraciones ni cambios del workflow. Frontend: 495 pruebas y controles aprobados, según su README. No acredita CI remoto ni navegador con backend real.
+
 ### Seguimiento rutinario anual (P8, 21/10/2026)
 
 El proceso diario de las 06:15 America/Guatemala usa @Scheduled/ShedLock y recorre lotes de 100. Cuando falta una rutina PROGRAMADA/EN_EJECUCION fechada entre hoy y el límite anual, avisa por P9 a Catedráticos y Administradores activos, incluso antes del vencimiento. Un aviso por puente, destinatario y fecha de referencia; lectura sin reenvío, nuevo período tras nueva ejecución rutinaria. Esta política fue aprobada por el usuario para los detalles no expresos del enunciado. Revalida bajo bloqueo y confirma notificación/marca en la misma transacción; un fallo se reintenta sin repetir envíos confirmados. [ADR 0036](docs/adr/0036-recordatorios-de-programacion-rutinaria-anual.md). El recordatorio no crea ni acepta órdenes y no acredita por sí solo programación efectiva anual.

@@ -46,6 +46,7 @@ class ConsultaPesosTest extends PruebaIntegracion {
   private static final String INEXISTENTE = "019a0019-0000-7000-8000-000000000099";
   private static final String LISTADO = BASE + "/formularios/" + FORMULARIO + "/juegos-pesos";
   private static final String DETALLE = BASE + "/juegos-pesos/" + JUEGO;
+  private static final String FORMULARIOS = BASE + "/juegos-pesos/formularios";
 
   @Autowired MockMvc mvc;
   @Autowired ConsultaPesosService servicio;
@@ -54,6 +55,48 @@ class ConsultaPesosTest extends PruebaIntegracion {
   @AfterEach
   void limpiarContexto() {
     SecurityContextHolder.clearContext();
+  }
+
+  @Test
+  void listaReferenciasUnicasPaginadasSinEsquemasNiVersionesSinPesos() throws Exception {
+    mvc.perform(get(FORMULARIOS).param("size", "1").with(como(Rol.ADMINISTRADOR)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.content.length()").value(1))
+        .andExpect(jsonPath("$.content[0].id").value(FORMULARIO))
+        .andExpect(jsonPath("$.content[0].codigo").value("P8-CONSULTA-A"))
+        .andExpect(jsonPath("$.content[0].esquema").doesNotExist())
+        .andExpect(jsonPath("$.content[0].mapeo").doesNotExist())
+        .andExpect(jsonPath("$.total_elements").value(2))
+        .andExpect(jsonPath("$.total_pages").value(2));
+    mvc.perform(
+            get(FORMULARIOS).param("size", "1").param("page", "1").with(como(Rol.ADMINISTRADOR)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.content[0].codigo").value("P8-CONSULTA-B"));
+    mvc.perform(get(FORMULARIOS).param("page", "5").with(como(Rol.ADMINISTRADOR)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.content").isEmpty());
+  }
+
+  @Test
+  void sinConfiguracionesDevuelvePaginaVaciaSinInventarVersiones() throws Exception {
+    jdbc.update("DELETE FROM peso_elemento");
+    jdbc.update("DELETE FROM version_pesos");
+    mvc.perform(get(FORMULARIOS).with(como(Rol.ADMINISTRADOR)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.content").isEmpty())
+        .andExpect(jsonPath("$.size").value(20))
+        .andExpect(jsonPath("$.total_elements").value(0));
+  }
+
+  @ParameterizedTest
+  @EnumSource(value = Rol.class, names = "ADMINISTRADOR", mode = EnumSource.Mode.EXCLUDE)
+  void catalogoTambienEsExclusivoDelAdministrador(Rol rol) throws Exception {
+    mvc.perform(get(FORMULARIOS).with(como(rol))).andExpect(status().isForbidden());
+  }
+
+  @Test
+  void catalogoSinSesionNoEsPublico() throws Exception {
+    mvc.perform(get(FORMULARIOS)).andExpect(status().isUnauthorized());
   }
 
   @Test
@@ -136,9 +179,9 @@ class ConsultaPesosTest extends PruebaIntegracion {
   }
 
   @ParameterizedTest
-  @CsvSource({"page,-1", "size,0", "size,101", "page,abc", "size,abc"})
+  @CsvSource({"page,-1", "size,0", "size,101", "page,abc", "size,abc", "page,2147483647"})
   void rechazaPaginacionInvalidaEnAmbasColecciones(String campo, String valor) throws Exception {
-    for (String ruta : List.of(LISTADO, DETALLE + "/pesos")) {
+    for (String ruta : List.of(LISTADO, DETALLE + "/pesos", FORMULARIOS)) {
       mvc.perform(get(ruta).param(campo, valor).with(como(Rol.ADMINISTRADOR)))
           .andExpect(status().isBadRequest())
           .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
@@ -148,7 +191,7 @@ class ConsultaPesosTest extends PruebaIntegracion {
 
   @Test
   void aceptaElLimiteDeCienEnAmbasColecciones() throws Exception {
-    for (String ruta : List.of(LISTADO, DETALLE + "/pesos")) {
+    for (String ruta : List.of(LISTADO, DETALLE + "/pesos", FORMULARIOS)) {
       mvc.perform(get(ruta).param("size", "100").with(como(Rol.ADMINISTRADOR)))
           .andExpect(status().isOk())
           .andExpect(jsonPath("$.size").value(100));
@@ -194,6 +237,8 @@ class ConsultaPesosTest extends PruebaIntegracion {
         .isInstanceOf(AccessDeniedException.class);
     assertThatThrownBy(() -> servicio.listarPesos(UUID.fromString(JUEGO), 0, 20))
         .isInstanceOf(AccessDeniedException.class);
+    assertThatThrownBy(() -> servicio.listarFormularios(0, 20))
+        .isInstanceOf(AccessDeniedException.class);
   }
 
   @Test
@@ -205,6 +250,8 @@ class ConsultaPesosTest extends PruebaIntegracion {
         .isInstanceOf(AuthenticationCredentialsNotFoundException.class);
     assertThatThrownBy(() -> servicio.listarPesos(UUID.fromString(JUEGO), 0, 20))
         .isInstanceOf(AuthenticationCredentialsNotFoundException.class);
+    assertThatThrownBy(() -> servicio.listarFormularios(0, 20))
+        .isInstanceOf(AuthenticationCredentialsNotFoundException.class);
   }
 
   @Test
@@ -213,6 +260,7 @@ class ConsultaPesosTest extends PruebaIntegracion {
     for (String ruta : rutas(FORMULARIO, JUEGO)) {
       mvc.perform(get(ruta).with(como(Rol.ADMINISTRADOR))).andExpect(status().isOk());
     }
+    mvc.perform(get(FORMULARIOS).with(como(Rol.ADMINISTRADOR))).andExpect(status().isOk());
     assertThat(jdbc.queryForObject("SELECT count(*) FROM auditoria", Long.class)).isEqualTo(antes);
     assertThat(
             jdbc.queryForObject(

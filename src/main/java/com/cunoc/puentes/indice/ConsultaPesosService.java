@@ -1,6 +1,7 @@
 package com.cunoc.puentes.indice;
 
 import com.cunoc.puentes.common.NegocioException;
+import com.cunoc.puentes.indice.dto.FormularioConPesosDTO;
 import com.cunoc.puentes.indice.dto.JuegoPesosDTO;
 import com.cunoc.puentes.indice.dto.PesoElementoDTO;
 import java.util.UUID;
@@ -40,6 +41,10 @@ public class ConsultaPesosService {
         .findByFormularioVersionId(
             formularioId, PageRequest.of(pagina, tamano, Sort.by("id").descending()))
         .map(mapper::aDTO);
+  }
+
+  public Page<FormularioConPesosDTO> listarFormularios(int pagina, int tamano) {
+    return versiones.formulariosConPesos(PageRequest.of(pagina, tamano)).map(mapper::aDTO);
   }
 
   public JuegoPesosDTO obtener(UUID id) {
