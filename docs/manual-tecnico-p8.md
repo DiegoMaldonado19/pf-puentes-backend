@@ -14,9 +14,9 @@ Regresión de navegador del 24/10 aprobada: cinco escenarios Playwright y un orq
 
 | Pieza | Disponible | Pendiente |
 |---|---|---|
-| `indice/` | Núcleo puro, pesos normalizados, metadatos P4, preparación de calificaciones desde respuestas reales, creación completa HTTP autorizada/auditada y cinco GET Admin (incluidos catálogo de versiones con pesos y referencias de daño) | Calibración, selección de juego, condiciones críticas P4, publicación P5 y confirmación/recálculos |
+| `indice/` | Núcleo puro, pesos normalizados, metadatos P4, preparación de calificaciones desde respuestas reales, creación completa HTTP autorizada/auditada, cinco GET Admin (incluidos catálogo de versiones con pesos y referencias de daño) y consulta/registro de recálculos fechados (`GET/POST /api/v1/inspecciones/{inspeccionId}/recalculos-ic`) | Calibración, selección de juego, condiciones críticas P4, publicación P5 y confirmación |
 | `mantenimiento/` | Máquina, origen orden/puente/inspección, consultas de historial/detalle/propuestas, PATCH autorizados/auditados de prioridad y fecha programada y POST de aceptación/inicio/cierre/descarte/cancelación y carga/consulta paginada de evidencia P1; alerta de inspección vencida y recordatorio rutinario anual diarios mediante P9 | Sugerencia automática, generación por catálogo y programación efectiva anual |
-| Frontend P8 | Condición en inventario; `/admin/pesos` con catálogo, consulta y creación de juegos completos; `/puentes/:id/mantenimiento` con propuestas, historial, seguimiento y acciones (incluida cancelación con motivo); sesión/guardias/interceptores P2 conectados | Calibración, daños/publicación reales P4/P5 y recorridos finales; presentación de avisos P9 |
+| Frontend P8 | Condición en inventario; `/admin/pesos` con catálogo, consulta y creación de juegos completos; componente `<app-recalculo-ic>` de comparación y solicitud de recálculos fechados; `/puentes/:id/mantenimiento` con propuestas, historial, seguimiento y acciones (incluida cancelación con motivo); sesión/guardias/interceptores P2 conectados | Calibración, daños/publicación reales P4/P5 y recorridos finales; presentación de avisos P9 |
 
 ### Acceso a pesos con P2 recibido — 23/10/2026
 
@@ -129,6 +129,8 @@ En local: API `http://localhost:8080`; Swagger `http://localhost:8080/api/docs/s
 | `GET /api/v1/formularios/{formularioId}/juegos-pesos` | ADMINISTRADOR | Página de juegos de esa versión de formulario, por ID descendente |
 | `GET /api/v1/juegos-pesos/{id}` | ADMINISTRADOR | Juego: `id`, `formulario_version_id`, `acta`, `vigente_desde` |
 | `GET /api/v1/juegos-pesos/{id}/pesos` | ADMINISTRADOR | Página de elementos: `id`, `elemento_ref`, `peso`; referencia ascendente |
+| `GET /api/v1/inspecciones/{inspeccionId}/recalculos-ic` | CATEDRATICO o ADMINISTRADOR | Resultado original publicado (`original`) y página de recálculos (`recalculos`) por ID descendente |
+| `POST /api/v1/inspecciones/{inspeccionId}/recalculos-ic` | CATEDRATICO o ADMINISTRADOR | JSON `version_pesos_id`, 200 `RecalculoIcDTO` idempotente sin alterar la inspección publicada |
 | `GET /api/v1/puentes/{puenteId}/ordenes-mantenimiento` | CATEDRATICO o ADMINISTRADOR | Historial paginado de todos los estados del puente, con `puente_id`, ID descendente |
 | `GET /api/v1/puentes/{puenteId}/ordenes-mantenimiento/{ordenId}` | CATEDRATICO o ADMINISTRADOR | DTO de detalle; 404 si pertenece a otro puente o no existe |
 | `GET /api/v1/puentes/{puenteId}/ordenes-mantenimiento/propuestas` | CATEDRATICO o ADMINISTRADOR | Página de PROPUESTA del puente por ID descendente, con `puente_id` también si está vacía |

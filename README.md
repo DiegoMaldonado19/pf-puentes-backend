@@ -367,3 +367,8 @@ Envía una notificación `INSPECCION_VENCIDA` por puente/destinatario/período, 
 Se consulta mediante el GET autenticado existente `/api/v1/notificaciones?page=0&size=20` de P9 (lista `contenido`). No se añade endpoint para forzar el job ni pantalla de notificaciones propia de P8. El frontend P9 y la publicación P5 conservan sus tareas de integración; la programación rutinaria anual sigue pendiente. [ADR 0034](docs/adr/0034-alertas-de-inspeccion-vencida.md) y [manual técnico](docs/manual-tecnico-p8.md).
 
 Verificación del incremento de alerta (21/10/2026): **1089 pruebas backend aprobadas**, incluidas 17 nuevas. Pasan Spotless, PMD, empaquetado y las tres reglas JaCoCo (servicios 95.16 %; núcleo IC/máquina 100 % según clases configuradas). El servicio de alerta tiene 100 % de líneas/ramas. Frontend sin cambios; no se acredita CI remoto.
+
+### Recálculo fechado del Índice de Condición (P8)
+
+- `GET /api/v1/inspecciones/{inspeccionId}/recalculos-ic?page=0&size=20`: devuelve el resultado original publicado inmutable (`original`) junto con la página de recálculos (`recalculos`) ordenada por ID descendente.
+- `POST /api/v1/inspecciones/{inspeccionId}/recalculos-ic`: cuerpo `{"version_pesos_id":"..."}`, para Catedrático o Administrador. Calcula y registra un recálculo fechado bajo otro juego de pesos de la misma versión de formulario, conservando la anulación crítica e idempotencia por pareja `(inspeccion_id, version_pesos_id)` sin alterar la inspección original ni los campos derivados del puente (RN-IC-08). Detalle en [ADR 0043](docs/adr/0043-recalculo-fechado-del-indice-de-condicion.md).
