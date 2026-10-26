@@ -113,6 +113,27 @@ class MaquinaEstadosInspeccionTest {
             () -> maquina.validar(EstadoInspeccion.ENVIADA, EstadoInspeccion.PUBLICADA, vacios));
   }
 
+  @Test
+  void enUsaLaHoraDelDispositivoCuandoViene() {
+    Instant hora = Instant.parse("2026-10-25T16:05:00Z");
+    DatosTransicionInspeccion datos = DatosTransicionInspeccion.en(hora);
+    assertThat(datos.ocurridaEn()).isEqualTo(hora);
+    assertThat(datos.motivo()).isNull();
+    assertThat(datos.revisionId()).isNull();
+    assertThat(datos.publicacion()).isNull();
+  }
+
+  @Test
+  void enSinHoraUsaAhora() {
+    Instant antes = Instant.now();
+    DatosTransicionInspeccion datos = DatosTransicionInspeccion.en(null);
+    Instant despues = Instant.now();
+    assertThat(datos.ocurridaEn()).isBetween(antes, despues);
+    assertThat(datos.motivo()).isNull();
+    assertThat(datos.revisionId()).isNull();
+    assertThat(datos.publicacion()).isNull();
+  }
+
   private static void comprobar(HttpStatus estado, String tipo, Runnable operacion) {
     assertThatThrownBy(operacion::run)
         .isInstanceOfSatisfying(

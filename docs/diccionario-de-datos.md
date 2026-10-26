@@ -2,6 +2,7 @@
 
 > Generado por `DiccionarioDeDatosTest` desde los `COMMENT ON` de las migraciones: no se edita a mano. Se actualiza al correr `./mvnw verify`.
 
+- [`acompanante_inspeccion`](#acompanante_inspeccion): Personas que acompañaron al autor en la visita; el autor sigue siendo el único responsable (RN-INS-02)
 - [`archivo`](#archivo): Fotos y documentos; el contenido está en MinIO (DT-BE-13, DT-ALM-01)
 - [`asignacion`](#asignacion): Puente que un estudiante puede inspeccionar dentro de su curso (RN-INS-14)
 - [`auditoria`](#auditoria): Bitácora de toda acción sobre datos (RN-USR-09); sin contraseñas, tokens ni datos personales completos (DT-SEC-12)
@@ -30,8 +31,27 @@
 - [`solicitud_puente`](#solicitud_puente): Solicitudes de alta de un Catedrático, pendientes de un Administrador (RN-INV-07)
 - [`token_renovacion`](#token_renovacion): Tokens de renovación emitidos, para poder revocarlos (DT-SEC-01)
 - [`token_verificacion`](#token_verificacion): Tokens de un solo uso enviados por correo: verificar el correo (RN-USR-01) o recuperar la contraseña (DT-SEC-07)
+- [`transicion_inspeccion`](#transicion_inspeccion): Historial de cambios de estado de una inspección: quién, cuándo y por qué. Solo se inserta (RN-INS-04, RN-REV-06)
 - [`usuario`](#usuario): Cuentas del sistema; nunca se borran, se desactivan (RN-USR-08)
 - [`version_pesos`](#version_pesos): Juego de pesos del IC para una versión del formulario (RN-IC-03)
+
+## acompanante_inspeccion
+
+Personas que acompañaron al autor en la visita; el autor sigue siendo el único responsable (RN-INS-02)
+
+| Columna | Tipo | Nulo | Por defecto | Llaves | Descripción |
+|---|---|---|---|---|---|
+| `id` | uuid | No |  | PK | UUID v7 |
+| `inspeccion_id` | uuid | No |  | FK → inspeccion | Inspección en la que participó |
+| `nombre` | character varying(150) | No |  |  | Nombre del acompañante, con o sin cuenta en el sistema |
+| `usuario_id` | uuid | Sí |  | FK → usuario | Cuenta del acompañante si la tiene; NULL si es una persona externa |
+| `creado_en` | timestamp with time zone | No | now() |  | Fecha de registro, en UTC |
+| `actualizado_en` | timestamp with time zone | No | now() |  | Última modificación, en UTC |
+
+**Restricciones**
+
+- `UNIQUE (inspeccion_id, usuario_id)`
+- `CHECK ((btrim((nombre)::text) <> ''::text))`
 
 ## archivo
 
@@ -308,17 +328,17 @@ Inspección de un puente: columnas tipadas + daños en JSONB (DT-BD-02)
 | Columna | Tipo | Nulo | Por defecto | Llaves | Descripción |
 |---|---|---|---|---|---|
 | `id` | uuid | No |  | PK | UUID v7 generado en el cliente, antes de cualquier contacto con el servidor (DT-OFF-05) |
-| `puente_id` | uuid | No |  | FK → puente | Puente inspeccionado |
+| `puente_id` | uuid | No |  | FK → inspeccion, FK → inspeccion, FK → puente | Puente inspeccionado |
 | `autor_id` | uuid | No |  | FK → usuario | Autor único y responsable (RN-INS-02) |
 | `formulario_version_id` | uuid | No |  | FK → formulario_version | Versión del formulario con la que se levantó (RN-FRM-02) |
-| `supersede_a_id` | uuid | Sí |  | FK → inspeccion | Inspección publicada que esta corrige (RN-INS-08) |
+| `supersede_a_id` | uuid | Sí |  | FK → inspeccion, FK → inspeccion | Inspección publicada que esta corrige (RN-INS-08) |
 | `estado` | character varying(20) | No | 'BORRADOR'::character varying |  | Estado de la máquina de RN-INS-04 |
 | `fecha_inspeccion` | date | No |  |  | Ni futura ni anterior al año de construcción del puente (RN-INS-03) |
 | `datos` | jsonb | No | '{}'::jsonb |  | Respuestas del formulario, validadas contra el JSON Schema de su versión (RN-FRM-08) |
-| `ubicacion_inicio` | geography(Point,4326) | Sí |  |  | GPS del dispositivo al iniciar; se compara con el puente (RN-INS-12) |
+| `ubicacion_inicio` | geography(Point,4326) | Sí |  |  | GPS del dispositivo al iniciar (RN-INS-12); NULL si no estuvo disponible |
 | `dispositivo_id` | character varying(100) | Sí |  |  | Identificador del dispositivo (RN-INS-13) |
-| `enviada_en` | timestamp with time zone | Sí |  |  | Fecha y hora de envío a revisión (RN-INS-13) |
-| `sincronizada_en` | timestamp with time zone | Sí |  |  | Fecha y hora de sincronización (RN-INS-13) |
+| `enviada_en` | timestamp with time zone | Sí |  |  | Fecha y hora en que el autor la envió a revisión; la del dispositivo si fue sin conexión (RN-INS-13) |
+| `sincronizada_en` | timestamp with time zone | Sí |  |  | Fecha y hora en que el servidor recibió y guardó la inspección (RN-INS-13) |
 | `publicada_en` | timestamp with time zone | Sí |  |  | Fecha y hora de publicación |
 | `version_pesos_id` | uuid | Sí |  | FK → version_pesos | Pesos con los que se calculó el IC (RN-IC-08) |
 | `indice_condicion` | numeric(5,2) | Sí |  |  | IC de 0 a 100, calculado al publicar (RN-IC-01, RN-IC-02) |
@@ -329,18 +349,36 @@ Inspección de un puente: columnas tipadas + daños en JSONB (DT-BD-02)
 | `eliminado_en` | timestamp with time zone | Sí |  |  | Borrado lógico de un borrador (RN-INS-15, pendiente #6) |
 | `creado_en` | timestamp with time zone | No | now() |  | Fecha y hora de creación (RN-INS-13), en UTC |
 | `actualizado_en` | timestamp with time zone | No | now() |  | Última modificación, en UTC |
+| `curso_id` | uuid | Sí |  | FK → curso | Curso en cuyo contexto se levantó; su Catedrático es el "asignado" (RN-INS-05). NULL en las de Catedrático y Profesional externo |
+| `precargada_de_id` | uuid | Sí |  | FK → inspeccion | Inspección publicada del mismo puente de la que se precargaron los datos permanentes (RN-INS-09); NULL si no había ninguna |
+| `datos_permanentes_confirmados_en` | timestamp with time zone | Sí |  |  | Cuándo el autor confirmó explícitamente los datos permanentes (RN-INS-09); NULL mientras no los confirme |
+| `motivo_correccion` | character varying(500) | Sí |  |  | Error que enmienda esta corrección; obligatorio si supersede_a_id tiene valor (RN-INS-08) |
+| `distancia_a_puente_m` | numeric(10,2) | Sí |  |  | Metros entre el GPS de inicio y el puente; más de 500 genera una advertencia (RN-INS-12). NULL si no hubo GPS |
+| `creada_en_dispositivo` | timestamp with time zone | Sí |  |  | Hora en que el dispositivo creó la inspección; creado_en es la del servidor al recibirla (RN-INS-13) |
+| `estado_confirmado_por` | uuid | Sí |  | FK → usuario | Quien confirmó un estado distinto del calculado (RN-IC-06, pendiente #12) |
+| `version` | bigint | No | 0 |  | Contador de escrituras en el servidor, para detectar divergencia con el dispositivo y escrituras simultáneas (RN-OFF-09) |
+| `ultima_actividad_en` | timestamp with time zone | No | now() |  | Última actividad del autor sobre el borrador (guardado, foto, documento); no la tocan los procesos del sistema (RN-ARC-06) |
+| `aviso_abandono_en` | timestamp with time zone | Sí |  |  | Cuándo se avisó al autor de que el borrador lleva 180 días inactivo; NULL si no se ha avisado (RN-ARC-06) |
 
 **Restricciones**
 
+- `UNIQUE (id, puente_id)`
 - `CHECK (((anulacion)::text = ANY ((ARRAY['SOCAVACION'::character varying, 'ASENTAMIENTO'::character varying, 'PERDIDA_SECCION'::character varying, 'AUSENCIA_PORTANTE'::character varying])::text[])))`
 - `CHECK ((supersede_a_id <> id))`
 - `CHECK ((((estado)::text = 'PUBLICADA'::text) = ((indice_condicion IS NOT NULL) AND (estado_calculado IS NOT NULL) AND (estado_confirmado IS NOT NULL) AND (publicada_en IS NOT NULL))))`
 - `CHECK (((estado_confirmado IS NULL) OR ((estado_confirmado)::text = (estado_calculado)::text) OR (justificacion_estado IS NOT NULL)))`
 - `CHECK ((((estado)::text <> 'PUBLICADA'::text) OR (eliminado_en IS NULL)))`
+- `CHECK (((supersede_a_id IS NULL) = (motivo_correccion IS NULL))) NOT VALID`
+- `CHECK (((motivo_correccion IS NULL) OR (btrim((motivo_correccion)::text) <> ''::text)))`
+- `CHECK ((jsonb_typeof(datos) = 'object'::text))`
+- `CHECK (((distancia_a_puente_m IS NULL) OR (distancia_a_puente_m >= (0)::numeric)))`
+- `CHECK (((distancia_a_puente_m IS NULL) OR (ubicacion_inicio IS NOT NULL)))`
 - `CHECK (((estado_calculado)::text = ANY ((ARRAY['BUENO'::character varying, 'REGULAR'::character varying, 'MALO'::character varying])::text[])))`
 - `CHECK (((estado)::text = ANY ((ARRAY['BORRADOR'::character varying, 'ENVIADA'::character varying, 'EN_REVISION'::character varying, 'CAMBIOS_SOLICITADOS'::character varying, 'PUBLICADA'::character varying, 'RECHAZADA'::character varying])::text[])))`
 - `CHECK (((estado_confirmado)::text = ANY ((ARRAY['BUENO'::character varying, 'REGULAR'::character varying, 'MALO'::character varying])::text[])))`
+- `CHECK (((estado_confirmado IS NULL) OR ((estado_confirmado)::text = (estado_calculado)::text) OR (estado_confirmado_por IS NOT NULL))) NOT VALID`
 - `CHECK (((indice_condicion >= (0)::numeric) AND (indice_condicion <= (100)::numeric)))`
+- `CHECK (((precargada_de_id IS NULL) OR (precargada_de_id <> id)))`
 
 ## invitacion
 
@@ -618,6 +656,29 @@ Tokens de un solo uso enviados por correo: verificar el correo (RN-USR-01) o rec
 - `UNIQUE (token_hash)`
 - `CHECK ((expira_en > creado_en))`
 - `CHECK (((tipo)::text = ANY ((ARRAY['VERIFICACION_CORREO'::character varying, 'RECUPERACION_CONTRASENA'::character varying])::text[])))`
+
+## transicion_inspeccion
+
+Historial de cambios de estado de una inspección: quién, cuándo y por qué. Solo se inserta (RN-INS-04, RN-REV-06)
+
+| Columna | Tipo | Nulo | Por defecto | Llaves | Descripción |
+|---|---|---|---|---|---|
+| `id` | uuid | No |  | PK | UUID v7 |
+| `inspeccion_id` | uuid | No |  | FK → inspeccion | Inspección que cambió de estado |
+| `estado_origen` | character varying(20) | Sí |  |  | Estado anterior; NULL en la creación de la inspección |
+| `estado_destino` | character varying(20) | No |  |  | Estado al que pasó |
+| `actor_id` | uuid | Sí |  | FK → usuario | Quién provocó el cambio; NULL si fue el Sistema (ACT-06) |
+| `revision_id` | uuid | Sí |  | FK → revision | Ciclo de revisión que originó el cambio; NULL si no vino de una revisión |
+| `motivo` | character varying(500) | Sí |  |  | Justificación escrita, por ejemplo la observación de un rechazo |
+| `creado_en` | timestamp with time zone | No | now() |  | Momento del cambio, en UTC |
+| `actualizado_en` | timestamp with time zone | No | now() |  | Igual a creado_en: el historial no se modifica |
+
+**Restricciones**
+
+- `CHECK (((estado_destino)::text = ANY ((ARRAY['BORRADOR'::character varying, 'ENVIADA'::character varying, 'EN_REVISION'::character varying, 'CAMBIOS_SOLICITADOS'::character varying, 'PUBLICADA'::character varying, 'RECHAZADA'::character varying])::text[])))`
+- `CHECK (((estado_origen)::text = ANY ((ARRAY['BORRADOR'::character varying, 'ENVIADA'::character varying, 'EN_REVISION'::character varying, 'CAMBIOS_SOLICITADOS'::character varying, 'PUBLICADA'::character varying, 'RECHAZADA'::character varying])::text[])))`
+- `CHECK (((motivo IS NULL) OR (btrim((motivo)::text) <> ''::text)))`
+- `CHECK ((((estado_origen IS NULL) AND ((estado_destino)::text = 'BORRADOR'::text)) OR ((estado_origen IS NOT NULL) AND (((((((((estado_origen)::text = 'BORRADOR'::text) AND ((estado_destino)::text = 'ENVIADA'::text)) OR (((estado_origen)::text = 'ENVIADA'::text) AND ((estado_destino)::text = 'EN_REVISION'::text))) OR (((estado_origen)::text = 'ENVIADA'::text) AND ((estado_destino)::text = 'PUBLICADA'::text))) OR (((estado_origen)::text = 'EN_REVISION'::text) AND ((estado_destino)::text = 'PUBLICADA'::text))) OR (((estado_origen)::text = 'EN_REVISION'::text) AND ((estado_destino)::text = 'CAMBIOS_SOLICITADOS'::text))) OR (((estado_origen)::text = 'EN_REVISION'::text) AND ((estado_destino)::text = 'RECHAZADA'::text))) OR (((estado_origen)::text = 'CAMBIOS_SOLICITADOS'::text) AND ((estado_destino)::text = 'BORRADOR'::text))))))`
 
 ## usuario
 
