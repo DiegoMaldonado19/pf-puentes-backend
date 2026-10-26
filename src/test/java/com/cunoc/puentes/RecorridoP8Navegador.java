@@ -51,6 +51,16 @@ class RecorridoP8Navegador extends PruebaIntegracion {
         """,
         id(22),
         id(1));
+    for (int numero : new int[] {23, 24}) {
+      jdbc.update(
+          """
+          INSERT INTO orden_mantenimiento (id,puente_id,tipo,estado,descripcion,prioridad,fecha_programada)
+          VALUES (?,?,'RUTINARIO','PROGRAMADA',?,'MEDIA',CURRENT_DATE)
+          """,
+          id(numero),
+          id(1),
+          "Rutina para cancelar " + numero);
+    }
     Long ordenesAntes = jdbc.queryForObject("SELECT count(*) FROM orden_mantenimiento", Long.class);
     UUID sieca = UUID.fromString("0192b000-0000-7000-8000-000000000001");
     var esquemaAntes = jdbc.queryForMap("SELECT * FROM formulario_version WHERE id=?", sieca);
@@ -91,6 +101,22 @@ class RecorridoP8Navegador extends PruebaIntegracion {
             jdbc.queryForMap("SELECT estado,motivo FROM orden_mantenimiento WHERE id = ?", id(22)))
         .containsEntry("estado", "DESCARTADA")
         .containsEntry("motivo", "Intervención descartada durante el recorrido aislado");
+    for (int numero : new int[] {23, 24}) {
+      assertThat(
+              jdbc.queryForMap(
+                  "SELECT estado,motivo,fecha_programada::text AS fecha FROM orden_mantenimiento WHERE id=?",
+                  id(numero)))
+          .containsEntry("estado", "CANCELADA")
+          .containsEntry("motivo", "Cancelación del recorrido " + numero)
+          .containsEntry("fecha", hoy);
+      assertThat(
+              jdbc.queryForMap(
+                  "SELECT valor_anterior->>'estado' AS anterior,valor_nuevo->>'estado' AS nuevo,valor_nuevo->>'motivo' AS motivo FROM auditoria WHERE entidad='orden_mantenimiento' AND entidad_id=?",
+                  id(numero)))
+          .containsEntry("anterior", "PROGRAMADA")
+          .containsEntry("nuevo", "CANCELADA")
+          .containsEntry("motivo", "Cancelación del recorrido " + numero);
+    }
     assertThat(
             jdbc.queryForObject(
                 "SELECT count(*) FROM archivo WHERE orden_mantenimiento_id = ?",

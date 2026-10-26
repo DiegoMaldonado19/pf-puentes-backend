@@ -40,4 +40,18 @@ interface OrdenMantenimientoRepository extends Repository<OrdenMantenimiento, UU
 
   @Query(value = "SELECT puente_id FROM inspeccion WHERE id = :inspeccionId", nativeQuery = true)
   Optional<UUID> buscarPuenteDeInspeccion(UUID inspeccionId);
+
+  @Query(
+      "select count(o) > 0 from OrdenMantenimiento o"
+          + " where o.inspeccionId = :inspeccionId and o.elementoRef = :elementoRef")
+  boolean existePorInspeccionYElemento(UUID inspeccionId, String elementoRef);
+
+  @Query(
+      "select count(o) > 0 from OrdenMantenimiento o"
+          + " where o.puenteId = :puenteId"
+          + " and o.tipo = com.cunoc.puentes.mantenimiento.TipoOrden.RUTINARIO"
+          + " and o.estado in (com.cunoc.puentes.mantenimiento.EstadoOrden.PROPUESTA,"
+          + " com.cunoc.puentes.mantenimiento.EstadoOrden.PROGRAMADA,"
+          + " com.cunoc.puentes.mantenimiento.EstadoOrden.EN_EJECUCION)")
+  boolean existeRutinariaAbierta(UUID puenteId);
 }

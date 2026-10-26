@@ -31,17 +31,18 @@ El ejecutor hereda `PruebaIntegracion`: crea PostgreSQL/PostGIS y MinIO desechab
 
 Playwright compila la aplicación de producción y un servidor Node exclusivo de pruebas sirve la SPA y reenvía `/api` al backend temporal, sin reemplazar sus respuestas. Requiere la marca del ejecutor y rechaza el puerto local habitual 8080. El navegador usa login, cookie de renovación, Bearer, guardias, servicios, transacciones, auditoría y objetos MinIO reales. La opción de cookie sin Secure y el origen de prueba solo se aplican en este contexto de pruebas. Service worker bloqueado para no reutilizar cachés; el harness offline conserva su configuración separada.
 
-Se recorren siete escenarios:
+Se recorren nueve escenarios:
 
 1. Administrador: versión de formulario → juego → elementos; recargar conserva sesión.
 2. Administrador: ficha P3 → mantenimiento → aceptar, programar, justificar prioridad, iniciar, rechazar cierre sin foto, comprimir/subir una imagen a MinIO, cerrar, recargar y consultar evidencia; descartar otra propuesta y conservar el motivo.
-3. Catedrático: consulta mantenimiento y tiene denegada la administración de pesos.
-4. Estudiante: rutas y API de mantenimiento/pesos denegadas.
-5. Profesional: las mismas restricciones, con cuenta profesional válida.
-6. Administrador: abrir campos de daño, seleccionar V1.0.0 desde P4 y consultar sus 19 referencias canónicas sin pesos configurados; ocultar el panel.
-7. Administrador: crear dos juegos completos de 19 pesos, uno con referencia de acta de prueba y otro provisional; comprobar consulta tras recarga y conservación del primero. SQL posterior valida valores, actas, auditoría, esquema e inspecciones anteriores sin cambios.
+3. Administrador y Catedrático (dos escenarios): cancelar orden PROGRAMADA con motivo obligatorio, comprobar conservación en historial tras recarga, ausencia de inicio/cancelación repetida y, para Administrador, foto previa visible en solo lectura sin opción de nueva subida.
+4. Catedrático: consulta mantenimiento y tiene denegada la administración de pesos.
+5. Estudiante: rutas y API de mantenimiento/pesos (incluido `/cancelacion`) denegadas.
+6. Profesional: las mismas restricciones, con cuenta profesional válida.
+7. Administrador: abrir campos de daño, seleccionar V1.0.0 desde P4 y consultar sus 19 referencias canónicas sin pesos configurados; ocultar el panel.
+8. Administrador: crear dos juegos completos de 19 pesos, uno con referencia de acta de prueba y otro provisional; comprobar consulta tras recarga y conservación del primero. SQL posterior valida valores, actas, auditoría, esquema e inspecciones anteriores sin cambios.
 
-Al terminar, Java comprueba en SQL estado, fecha, responsable, prioridad, motivo, una evidencia, auditorías y ausencia de órdenes nuevas. Los contenedores desaparecen con la JVM. El icono enviado como imagen es un archivo de prueba; no se presenta como evidencia de un puente real.
+Al terminar, Java comprueba en SQL estado, fecha, responsable, prioridad, motivo (descarte y cancelación), evidencia, auditorías y ausencia de órdenes nuevas. Los contenedores desaparecen con la JVM. El icono enviado como imagen es un archivo de prueba; no se presenta como evidencia de un puente real.
 
 ## Resultados y límites
 

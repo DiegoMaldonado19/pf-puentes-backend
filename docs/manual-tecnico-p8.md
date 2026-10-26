@@ -14,9 +14,9 @@ Regresión de navegador del 24/10 aprobada: cinco escenarios Playwright y un orq
 
 | Pieza | Disponible | Pendiente |
 |---|---|---|
-| `indice/` | Núcleo puro, pesos normalizados, metadatos P4, creación completa HTTP autorizada/auditada y cinco GET Admin (incluidos catálogo de versiones con pesos y referencias de daño) | Calibración, selección de juego, adaptación de respuestas/condiciones críticas P4, publicación P5 y confirmación/recálculos |
-| `mantenimiento/` | Máquina, origen orden/puente/inspección, consultas de historial/detalle/propuestas, PATCH autorizados/auditados de prioridad y fecha programada y POST de aceptación/inicio/cierre/descarte y carga/consulta paginada de evidencia P1; alerta de inspección vencida y recordatorio rutinario anual diarios mediante P9 | Cancelación, sugerencia automática, generación por catálogo y programación efectiva anual |
-| Frontend P8 | Condición en inventario; `/admin/pesos` con catálogo, consulta y creación de juegos completos; `/puentes/:id/mantenimiento` con propuestas, historial, seguimiento y acciones; sesión/guardias/interceptores P2 conectados | Calibración, daños/publicación reales P4/P5 y recorridos finales; presentación de avisos P9 |
+| `indice/` | Núcleo puro, pesos normalizados, metadatos P4, preparación de calificaciones desde respuestas reales, detector de condiciones críticas P4 (`DetectorCondicionesCriticas`, RN-IC-05), fachada oficial de cálculo de IC para P5 (`CalculoIndiceCondicionService`, Contrato 3), creación completa HTTP autorizada/auditada, cinco GET Admin (incluidos catálogo de versiones con pesos y referencias de daño), consulta/registro de recálculos fechados (`GET/POST /api/v1/inspecciones/{inspeccionId}/recalculos-ic`), estimación dinámica de IC preliminar para borradores (`POST .../ic-preliminar`, RN-IC-07) y validación de confirmación de estado con justificación obligatoria ante discrepancia (`POST .../confirmacion-estado/validacion`, RN-IC-06) | Calibración académica oficial (acta) y conexión del emisor de publicación cuando P5 suba su rama |
+| `mantenimiento/` | Máquina, origen orden/puente/inspección, catálogo daño → intervención y prioridad sugerida (`CatalogoIntervencionesDano`, RN-MTO-02/06), generación automática transaccional/auditada/idempotente al escuchar `InspeccionPublicada` (`GeneracionPropuestasMantenimientoService` y `PropuestasInspeccionPublicadaListener`) y generador rutinario anual (`asegurarPropuestaRutinariaAnual`, RN-MTO-07), consultas de historial/detalle/propuestas, PATCH autorizados/auditados de prioridad y fecha programada y POST de aceptación/inicio/cierre/descarte/cancelación y carga/consulta paginada de evidencia P1; alerta de inspección vencida y recordatorio rutinario anual diarios mediante P9 | Ajuste fino de umbrales si el grupo acuerda otros parámetros |
+| Frontend P8 | Condición en inventario; `/admin/pesos` con catálogo, consulta y creación de juegos completos; componente `<app-recalculo-ic>` de comparación y solicitud de recálculos fechados; componentes `<app-ic-preliminar>` y `<app-confirmacion-estado>` listos para empotrarse en P5; `/puentes/:id/mantenimiento` con propuestas (mostrando `elemento_ref` e `inspeccion_id` de origen), historial, seguimiento y acciones (incluida cancelación con motivo); sesión/guardias/interceptores P2 conectados | Empotrado en vistas de captura/publicación cuando P5 entregue su frontend; presentación de avisos P9 |
 
 ### Acceso a pesos con P2 recibido — 23/10/2026
 
@@ -29,6 +29,24 @@ Verificación de este incremento: **1134 pruebas backend**, siete escenarios nue
 Se emplean DTO y MapStruct; las entidades JPA no se exponen por HTTP. La autorización efectiva vive en backend. La existencia de una validación interna o una columna no equivale a una operación HTTP habilitada.
 
 ## 2. Integración del cálculo con P5
+
+### Preparación de respuestas reales — 25/10/2026
+
+Ya existe `PreparacionCalificacionesService.preparar(UUID formularioId, UUID juegoId, Map<String, Object> datos)`. Obtiene el esquema persistido y todos los pesos del juego explícito, comprueba versión/completitud y devuelve `List<CalificacionElemento>` inmutable en orden de referencia. Mantiene las rutas reales como tokens; no usa `elemento_ref` como ruta JSON. Se reutilizan el extractor/lectura de metadatos, repositorios, MapStruct, `JuegoPesos`, `PesoConfigurado` y `CalificacionElemento`. La calculadora y la configuración HTTP conservan sus contratos.
+
+La preparación acepta enteros numéricos 0–4, incluido 2.0. Rechaza ausentes, null, texto/booleanos, fracciones, fuera de rango y no aplicables, sin reemplazarlos por cero ni ignorarlos. Daños dentro de arreglos requieren política de agregación y producen 422; los arreglos sin daños de la semilla no bloquean. Juego ajeno o incompatible → 422; formulario/juego ausente → 404; parámetros Java nulos → `IllegalArgumentException`. Los errores de respuesta usan `ErrorCampo` con la ruta afectada, sin copiar valores privados. [ADR 0041](adr/0041-preparacion-de-calificaciones-desde-respuestas-reales.md).
+
+El consumidor debe autorizar al actor y reutilizar `FormularioValidacionService` de P4 para validar la inspección completa. Esta preparación interna no verifica permisos de una inspección ni define políticas para publicar. No se llama a la sobrecarga de cálculo de estado con condiciones críticas falsas: las banderas reales siguen pendientes. No guarda IC, pesos elegidos, causas, estado del puente ni auditoría de mutación. No hay endpoint ni formulario nuevo de P8 en este incremento.
+
+Prueba focalizada reproducible (Java 25 y Docker para Testcontainers):
+
+```bash
+./mvnw -B -ntp -Dtest=AdaptadorRespuestasDanoTest,ExtractorElementosDeDanoTest,PreparacionCalificacionesTest,MetadatosDanoFormularioTest,CreacionJuegoPesosTest test
+```
+
+**Verificación final 25/10/2026:** `clean spotless:check verify pmd:check` aprobado en `/tmp/p8-respuestas-cjgx_cm7`, con Java 25 y PostgreSQL/PostGIS/MinIO reales: **1259 pruebas**, 35 nuevas, cero fallos/errores/omisiones. Adaptador y servicio nuevos: 100 % de líneas y ramas; extractor/lector de metadatos también 100 %. Pasaron empaquetado y las tres reglas JaCoCo. Fuentes/recursos y pom idénticos al repositorio; diccionario generado idéntico al versionado. Las corridas focalizadas anteriores aprobaron 57 casos unitarios y 35 de integración. Sin cambios frontend ni nueva verificación de navegador, al no haber cambio HTTP/UI; no acredita CI remoto. No se usó `.env` ni la base local.
+
+### Núcleo puro y publicación pendiente
 
 `CalculadoraIndiceCondicion` es Java puro, sin repositorios, sesión o HTTP. Recibe calificaciones enteras 0–4 y pesos positivos en `CalificacionElemento`; `CondicionesCriticas` recibe cuatro banderas normalizadas. Devuelve `ResultadoIndiceCondicion` con `indiceCondicion`, `estadoCalculado` y todas las `anulaciones`.
 
@@ -53,9 +71,28 @@ Las cuatro banderas significan exactamente:
 
 Cualquier causa fuerza MALO y conserva el IC numérico. El conjunto contiene todas las causas, sin prioridad entre ellas. La entidad de inspección actual conserva una sola anulación: el adaptador no debe elegir una arbitrariamente para ocultar esa diferencia.
 
-La fachada conceptual `calcular(datos, versionFormulario)` del acuerdo de equipo aún requiere adaptar respuestas y precisar condiciones críticas del esquema real P4 ya recibido. La extracción de referencias descrita más abajo no interpreta respuestas. El núcleo matemático no interpreta JSON Schema ni identifica daños por rutas inventadas. P5 debe obtener entradas confiables, calcular y guardar el resultado oficial al publicar; la llamada y persistencia reales aún no están conectadas. Un borrador no debe presentarse como resultado oficial. `Sin evaluar` lo representa el componente frontend cuando no existe una evaluación aplicable; no se calcula asignando cero a datos ausentes.
+La fachada conceptual `calcular(datos, versionFormulario)` del acuerdo de equipo aún requiere precisar condiciones críticas y coordinar selección/publicación con P5. La preparación de calificaciones desde respuestas reales ya existe como se describe arriba; la API de referencias mantiene su contrato de consulta. El núcleo matemático no interpreta JSON Schema ni identifica daños por rutas inventadas. P5 debe obtener entradas confiables, calcular y guardar el resultado oficial al publicar; la llamada y persistencia reales aún no están conectadas. Un borrador no debe presentarse como resultado oficial. `Sin evaluar` lo representa el componente frontend cuando no existe una evaluación aplicable; no se calcula asignando cero a datos ausentes.
 
 Detalle: [ADR 0016](adr/0016-nucleo-puro-del-indice-de-condicion.md).
+
+### Estimación preliminar de IC y validación de confirmación — 25/10/2026
+
+`EstimacionPreliminarIcService` provee endpoints de estimación dinámica para borradores sin alterar el inventario ni la condición vigente del puente (RN-IC-07), y `ConfirmacionEstadoCondicion` modela y valida la confirmación de estado con justificación obligatoria ante discrepancias (RN-IC-06):
+
+1. **Estimación preliminar por respuestas explícitas:** `POST /api/v1/formularios/{formularioId}/ic-preliminar` (roles ESTUDIANTE, CATEDRATICO o ADMINISTRADOR). Recibe `datos` (respuestas del formulario), `condiciones_criticas` (opcional) y `version_pesos_id` (opcional; si se omite, selecciona el juego de pesos vigente más reciente). Devuelve 200 con `EstimacionPreliminarIcDTO` (`preliminar: true`, `indice_condicion`, `estado_calculado`, `anulaciones`, `version_pesos_id`, etc.). Si los datos están incompletos para los pesos del formulario, responde 422 Problem Details.
+2. **Estimación preliminar por borrador persistido:** `POST /api/v1/inspecciones/{inspeccionId}/ic-preliminar` (solo autor de la inspección o CATEDRATICO / ADMINISTRADOR con acceso a la inspección). Obtiene el formulario y datos de la inspección no publicada; responde 409 si la inspección ya se encuentra en estado `PUBLICADA`.
+3. **Validación de confirmación de estado:** `POST /api/v1/inspecciones/confirmacion-estado/validacion` (cualquier rol autenticado). Recibe `estado_calculado`, `estado_confirmado` y `justificacion` opcional. Responde `valido: true/false`, `discrepancia: true/false` y mensaje explicativo. Si los estados coinciden, la justificación es prescindible; ante discrepancia, la justificación no puede ser vacía ni menor a 10 caracteres (`JUSTIFICACION_OBLIGATORIA_POR_DISCREPANCIA`).
+
+Detalle: [ADR 0044](adr/0044-estimacion-preliminar-del-ic-y-confirmacion-con-justificacion.md).
+
+### Detector de anulaciones críticas P4, fachada oficial de IC y generación de propuestas por daño — 25/10/2026
+
+1. **Detector de condiciones críticas (`DetectorCondicionesCriticas`):** inspecciona los 6 campos con marcador `"x-anulacion-critica"` del esquema JSON de P4 (`SOCAVACION`, `ASENTAMIENTO`, `PERDIDA_SECCION`, `AUSENCIA_PORTANTE`) y activa la causa correspondiente cuando la calificación entera es `>= 3` (`UMBRAL_CRITICO_DEFECTO = 3`), construyendo `CondicionesCriticas` para `RN-IC-05`. Conectado también a `EstimacionPreliminarIcService` cuando la solicitud no provee banderas manuales.
+2. **Fachada de cálculo oficial para P5 (`CalculoIndiceCondicionService`, Contrato 3):** expone `calcular(datos, formularioId)` y `calcular(datos, formularioId, versionPesosIdOpcional)` devolviendo `ResultadoCalculoOficialIc` con `indiceCondicion`, `estadoCalculado`, `anulaciones`, `anulacionPersistible`, `versionPesosId` y `calificaciones`.
+3. **Catálogo daño → intervención y prioridad sugerida (`CatalogoIntervencionesDano`, RN-MTO-02/06):** mapea daños `>= 2` a intervenciones (`2 -> PREVENTIVO`, `3 -> CORRECTIVO`, `4` o condición crítica activa `-> EMERGENCIA`) y calcula `prioridadSugerida` (`ALTA`, `MEDIA`, `BAJA`) en función del IC del puente, la severidad del daño y el peso del elemento.
+4. **Generación automática e idempotente (`GeneracionPropuestasMantenimientoService` y `PropuestasInspeccionPublicadaListener`):** escucha `InspeccionPublicada` en la misma transacción (`Propagation.MANDATORY`), crea y audita las órdenes en estado `PROPUESTA` sin duplicar por `(inspeccion_id, elemento_ref)` y provee `asegurarPropuestaRutinariaAnual(puenteId)` para garantizar una propuesta `RUTINARIO` por período anual cuando falta programación en plazo (`RN-MTO-07`).
+
+Detalle: [ADR 0045](adr/0045-generacion-de-propuestas-por-dano-y-deteccion-de-anulaciones.md).
 
 ## 3. Configuración de pesos
 
@@ -111,6 +148,11 @@ En local: API `http://localhost:8080`; Swagger `http://localhost:8080/api/docs/s
 | `GET /api/v1/formularios/{formularioId}/juegos-pesos` | ADMINISTRADOR | Página de juegos de esa versión de formulario, por ID descendente |
 | `GET /api/v1/juegos-pesos/{id}` | ADMINISTRADOR | Juego: `id`, `formulario_version_id`, `acta`, `vigente_desde` |
 | `GET /api/v1/juegos-pesos/{id}/pesos` | ADMINISTRADOR | Página de elementos: `id`, `elemento_ref`, `peso`; referencia ascendente |
+| `POST /api/v1/formularios/{formularioId}/ic-preliminar` | ESTUDIANTE, CATEDRATICO o ADMINISTRADOR | JSON `datos`, `condiciones_criticas` (opcional), `version_pesos_id` (opcional); 200 `EstimacionPreliminarIcDTO` con `preliminar: true` |
+| `POST /api/v1/inspecciones/{inspeccionId}/ic-preliminar` | Autor de la inspección, CATEDRATICO o ADMINISTRADOR | JSON `version_pesos_id` (opcional); 200 `EstimacionPreliminarIcDTO` dinámico desde borrador (409 si ya está PUBLICADA) |
+| `POST /api/v1/inspecciones/confirmacion-estado/validacion` | Cualquier rol autenticado | JSON `estado_calculado`, `estado_confirmado`, `justificacion`; 200 `ResultadoConfirmacionEstadoDTO` (RN-IC-06) |
+| `GET /api/v1/inspecciones/{inspeccionId}/recalculos-ic` | CATEDRATICO o ADMINISTRADOR | Resultado original publicado (`original`) y página de recálculos (`recalculos`) por ID descendente |
+| `POST /api/v1/inspecciones/{inspeccionId}/recalculos-ic` | CATEDRATICO o ADMINISTRADOR | JSON `version_pesos_id`, 200 `RecalculoIcDTO` idempotente sin alterar la inspección publicada |
 | `GET /api/v1/puentes/{puenteId}/ordenes-mantenimiento` | CATEDRATICO o ADMINISTRADOR | Historial paginado de todos los estados del puente, con `puente_id`, ID descendente |
 | `GET /api/v1/puentes/{puenteId}/ordenes-mantenimiento/{ordenId}` | CATEDRATICO o ADMINISTRADOR | DTO de detalle; 404 si pertenece a otro puente o no existe |
 | `GET /api/v1/puentes/{puenteId}/ordenes-mantenimiento/propuestas` | CATEDRATICO o ADMINISTRADOR | Página de PROPUESTA del puente por ID descendente, con `puente_id` también si está vacía |
@@ -120,6 +162,7 @@ En local: API `http://localhost:8080`; Swagger `http://localhost:8080/api/docs/s
 | `GET /api/v1/puentes/{puenteId}/ordenes-mantenimiento/{ordenId}/evidencias` | CATEDRATICO o ADMINISTRADOR | Página de JPEG/WebP no purgadas, incluso después de cerrar |
 | `POST /api/v1/puentes/{puenteId}/ordenes-mantenimiento/{ordenId}/cierre` | CATEDRATICO o ADMINISTRADOR | JSON fecha_ejecucion/responsable, 200 DTO EJECUTADA; requiere foto guardada de esta orden |
 | `POST /api/v1/puentes/{puenteId}/ordenes-mantenimiento/{ordenId}/descarte` | CATEDRATICO o ADMINISTRADOR | JSON motivo obligatorio, 200 DTO DESCARTADA; solo PROPUESTA, sin borrar historial |
+| `POST /api/v1/puentes/{puenteId}/ordenes-mantenimiento/{ordenId}/cancelacion` | CATEDRATICO o ADMINISTRADOR | JSON motivo obligatorio, 200 DTO CANCELADA; solo PROGRAMADA, sin borrar historial ni evidencias |
 | `PATCH /api/v1/puentes/{puenteId}/ordenes-mantenimiento/{ordenId}/prioridad` | CATEDRATICO o ADMINISTRADOR | JSON prioridad/justificacion, 200 DTO persistido; solo estados abiertos, conserva sugerida |
 | `PATCH /api/v1/puentes/{puenteId}/ordenes-mantenimiento/{ordenId}/fecha-programada` | CATEDRATICO o ADMINISTRADOR | JSON fecha_programada obligatoria, 200 DTO persistido; solo PROGRAMADA, conserva estado |
 
@@ -145,7 +188,7 @@ Detalle: [ADR 0020](adr/0020-consulta-paginada-de-juegos-de-pesos.md), [ADR 0025
 
 ## 5. Órdenes, transacciones y evidencia
 
-La máquina interna admite PROPUESTA → PROGRAMADA, PROPUESTA → DESCARTADA, PROGRAMADA → EN_EJECUCION y EN_EJECUCION → EJECUTADA. CANCELADA puede leerse como histórico, pero su origen sigue pendiente y ninguna transición hacia ella está habilitada. `OrdenMantenimiento.cambiarEstado` valida antes de mutar; no existe setter público de estado.
+La máquina interna admite PROPUESTA → PROGRAMADA, PROPUESTA → DESCARTADA, PROGRAMADA → EN_EJECUCION, PROGRAMADA → CANCELADA y EN_EJECUCION → EJECUTADA. `OrdenMantenimiento.cambiarEstado` valida antes de mutar; no existe setter público de estado.
 
 Cerrar exige fecha, responsable no vacío y una foto guardada. El contador de `DatosTransicionOrden` es interno: la fachada lo obtiene con `ArchivoService.contarEvidencias(ordenId)`, exclusivamente JPEG/WebP no purgadas de esa orden. P8 conecta autorización, estado, subida, consulta paginada y cierre; conserva las firmas públicas del contrato 16 y añade la consulta paginada. Una foto seleccionada cuya carga no terminó no satisface el mínimo.
 
@@ -188,7 +231,19 @@ Con sesión real Catedrático/Admin, consulta primero una orden en PROPUESTA del
 }
 ```
 
-Comprueba 200, DESCARTADA y el motivo persistido. El GET de detalle/historial conserva la orden; el GET de propuestas ya no la incluye. Repetir da 409 sin añadir auditoría. Un motivo ausente/vacío da 400. No se fija máximo por el límite de otra columna: el motivo de la orden es TEXT y se incluye en la instantánea auditada del cambio. No se habilita CANCELADA. [ADR 0031](adr/0031-descarte-auditado-de-propuestas.md).
+Comprueba 200, DESCARTADA y el motivo persistido. El GET de detalle/historial conserva la orden; el GET de propuestas ya no la incluye. Repetir da 409 sin añadir auditoría. Un motivo ausente/vacío da 400. No se fija máximo por el límite de otra columna: el motivo de la orden es TEXT y se incluye en la instantánea auditada del cambio. [ADR 0031](adr/0031-descarte-auditado-de-propuestas.md).
+
+### Prueba de cancelación con Postman
+
+Con sesión real Catedrático/Admin, consulta primero una orden en PROGRAMADA del puente. Envía `POST .../ordenes-mantenimiento/{ordenId}/cancelacion`, Body → raw → JSON:
+
+```json
+{
+  "motivo": "La intervención programada se reprogramará en otro período."
+}
+```
+
+Comprueba 200, CANCELADA y el motivo persistido. Se conservan intervención, prioridades, fecha programada y evidencias previas en solo lectura; no permite iniciar ejecución ni reabrir la orden. Repetir o intentar cancelar desde otro estado responde 409 sin duplicar auditoría. [ADR 0042](adr/0042-cancelacion-auditada-de-ordenes-programadas.md) y [ADR frontend 0029](../../pf-puentes-frontend/docs/adr/0029-cancelacion-con-motivo-desde-el-detalle.md).
 
 ### Prueba de ajuste manual de prioridad con Postman
 
@@ -221,11 +276,42 @@ Este PATCH resuelve la edición de programación de MTO-03. RN-MTO-07 requiere a
 
 En frontend, `ConsultaOrdenes` recibe `puedeProgramar` de la sesión (false por defecto), incorpora el formulario y emite `fechaProgramada` confirmado; `operacionPendiente()` bloquea las otras acciones mientras guarda. El inventario P3 existe; aún falta conectar los componentes privados con su selección y la sesión/guardias frontend de P2.
 
+### Prueba de estimación preliminar y confirmación con Postman
+
+Con Bearer de una sesión activa (Estudiante, Catedrático o Administrador):
+
+1. **Estimación preliminar por respuestas:** `POST /api/v1/formularios/{formularioId}/ic-preliminar`, Body → raw → JSON:
+```json
+{
+  "datos": {
+    "superestructura": { "vigas_principales": { "grietas": 1 } },
+    "subestructura": { "estribo_entrada": { "socavacion": 2 } }
+  },
+  "condiciones_criticas": {
+    "socavacion_critica": false,
+    "asentamiento": false,
+    "perdida_seccion": false,
+    "ausencia_portante": false
+  }
+}
+```
+Verifica `200 OK` con `preliminar: true`, `indice_condicion`, `estado_calculado`, `anulaciones: []`, `version_pesos_id` y `total_elementos_evaluados`. No modifica la base de datos ni afecta el estado del inventario de puentes.
+
+2. **Validación de confirmación de estado con justificación (RN-IC-06):** `POST /api/v1/inspecciones/confirmacion-estado/validacion`, Body → raw → JSON:
+```json
+{
+  "estado_calculado": "REGULAR",
+  "estado_confirmado": "MALO",
+  "justificacion": "Se observa daño progresivo acelerado en estribo no reflejado completamente en la ponderación estándar."
+}
+```
+Verifica `200 OK` con `valido: true`, `discrepancia: true`, y justificación aceptada. Si la justificación se envía vacía o menor a 10 caracteres ante discrepancia, devuelve `valido: false` con código `JUSTIFICACION_OBLIGATORIA_POR_DISCREPANCIA`. [ADR 0044](adr/0044-estimacion-preliminar-del-ic-y-confirmacion-con-justificacion.md).
+
 ## 6. Conexiones pendientes del equipo
 
 | Responsable | Entrega necesaria para completar el flujo |
 |---|---|
-| P4 | Esquema/API/motor recibidos y extracción de referencias integrada; faltan condiciones críticas explícitas, adaptación de respuestas/repetidos y acuerdo de versiones con pesos |
+| P4 | Esquema/API/motor recibidos y extracción de referencias integrada; preparación de respuestas individuales integrada; faltan condiciones críticas explícitas, política de repetidos y selección de pesos al publicar |
 | P5 | El record InspeccionPublicada ya llegó con P3; faltan publicación real que calcula/guarda IC/versiones y emisor en esa transacción |
 | P3 | Inventario/listado/mapa/ficha y estado P8 recibidos; mantenimiento ya conectado desde ficha al puente seleccionado |
 | P2 | Sesión, interceptores y guardias frontend recibidos e integrados; aplicar sus mecanismos existentes a futuras operaciones |

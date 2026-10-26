@@ -3,4 +3,4 @@ package com.cunoc.puentes.mantenimiento.dto;
 import jakarta.validation.constraints.NotBlank;
 
 /** RN-MTO-09: se conserva el motivo escrito sin truncarlo. */
-public record DescartarOrdenDTO(@NotBlank String motivo) {}
+public record MotivoOrdenDTO(@NotBlank String motivo) {}

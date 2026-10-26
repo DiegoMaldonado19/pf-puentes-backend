@@ -1,5 +1,27 @@
 # pf-puentes-backend
 
+### Generación automática de propuestas de mantenimiento por daño, detector crítico P4 y fachada oficial de IC (P8, 25/10/2026)
+
+1. **`DetectorCondicionesCriticas` (`RN-IC-05`):** evalúa automáticamente los 6 campos con marcador `"x-anulacion-critica"` del esquema P4 (`SOCAVACION`, `ASENTAMIENTO`, `PERDIDA_SECCION`, `AUSENCIA_PORTANTE`) con umbral configurable por defecto `>= 3` y se conecta también a `EstimacionPreliminarIcService` cuando no se envían banderas explícitas.
+2. **`CalculoIndiceCondicionService` (`Contrato 3` para P5):** fachada transaccional de solo lectura `calcular(datos, formularioId[, versionPesosId])` que selecciona el juego de pesos vigente, prepara las calificaciones con `PreparacionCalificacionesService`, detecta anulaciones críticas y devuelve `ResultadoCalculoOficialIc`.
+3. **`CatalogoIntervencionesDano`, `GeneracionPropuestasMantenimientoService` y `PropuestasInspeccionPublicadaListener` (`HU-P8-MTO-02`, `RN-MTO-02/06/07`, `Contrato 6`):** al escuchar `InspeccionPublicada` en la misma transacción (`MANDATORY`), evalúa cada elemento dañado (`2 -> PREVENTIVO`, `3 -> CORRECTIVO`, `4` o anulación crítica `-> EMERGENCIA`), calcula `prioridad_sugerida` (`ALTA`, `MEDIA`, `BAJA`) según IC y peso del elemento, y crea órdenes en estado `PROPUESTA` auditadas con `@Auditable` de forma idempotente por `(inspeccion_id, elemento_ref)`. Incluye además `asegurarPropuestaRutinariaAnual(puenteId)` para `RN-MTO-07`. [ADR 0045](docs/adr/0045-generacion-de-propuestas-por-dano-y-deteccion-de-anulaciones.md) y [manual técnico](docs/manual-tecnico-p8.md).
+
+### Estimación preliminar de IC y validación de confirmación con justificación (P8, 25/10/2026)
+
+`POST /api/v1/formularios/{formularioId}/ic-preliminar` y `POST /api/v1/inspecciones/{inspeccionId}/ic-preliminar` permiten estimar dinámicamente el Índice de Condición sobre borradores de formularios o inspecciones sin persistir resultados ni mutar la condición vigente del puente en el inventario (`RN-IC-07`). Devuelve `EstimacionPreliminarIcDTO` con bandera `preliminar: true` y selección automática del juego de pesos vigente. Además, `POST /api/v1/inspecciones/confirmacion-estado/validacion` valida la concordancia entre `estado_calculado` y `estado_confirmado`, exigiendo justificación explicativa no vacía (mínimo 10 caracteres) únicamente ante discrepancia (`RN-IC-06`, `ConfirmacionEstadoCondicion`). [ADR 0044](docs/adr/0044-estimacion-preliminar-del-ic-y-confirmacion-con-justificacion.md) y [manual técnico](docs/manual-tecnico-p8.md).
+
+### Cancelar órdenes programadas con motivo (P8, 25/10/2026)
+
+`POST /api/v1/puentes/{puenteId}/ordenes-mantenimiento/{ordenId}/cancelacion`, solo Catedrático y Administrador (política adoptada por el responsable P8 para la transición hacia `CANCELADA` de `RN-MTO-04/09`): recibe JSON `{"motivo":"..."}` y mueve exclusivamente `PROGRAMADA → CANCELADA` conservando motivo, intervención, prioridades, fecha programada y evidencias previas en modo solo lectura. Unifica el servicio transaccional y auditado `DecisionConMotivoOrdenService` con el descarte de propuestas. Estados distintos o repetición responden `409` sin duplicar auditoría; motivo ausente o en blanco responde `400`. [ADR 0042](docs/adr/0042-cancelacion-auditada-de-ordenes-programadas.md) y [manual técnico](docs/manual-tecnico-p8.md).
+
+### Preparar calificaciones desde respuestas reales (P8, 25/10/2026)
+
+`PreparacionCalificacionesService.preparar(formularioId, juegoId, datos)` es una operación interna de solo lectura que entrega entradas inmutables para la calculadora IC existente. Reutiliza el extractor P4, los repositorios, MapStruct y las validaciones del dominio. Lee cada daño por su ruta real, comprueba versión/cobertura completa del juego indicado y obtiene todos los pesos. Ausentes, null, no aplicables y daños repetidos sin contrato producen error; cero sigue siendo válido. No interpreta condiciones críticas ni produce un IC oficial. [Contrato y límites: ADR 0041](docs/adr/0041-preparacion-de-calificaciones-desde-respuestas-reales.md), [manual técnico](docs/manual-tecnico-p8.md).
+
+No hay nueva pantalla o API: el siguiente consumidor será el flujo de inspección P5, que aún debe aportar autorización, validación completa P4 y publicación. La creación completa de pesos ya está implementada; las menciones anteriores a su ausencia son históricas.
+
+**Verificación final 25/10/2026:** `clean spotless:check verify pmd:check` aprobado en `/tmp/p8-respuestas-cjgx_cm7`, con Java 25 y PostgreSQL/PostGIS/MinIO reales: **1259 pruebas**, 35 nuevas, cero fallos/errores/omisiones. Adaptador y servicio nuevos: 100 % de líneas y ramas; extractor/lector de metadatos también 100 %. Pasaron empaquetado y las tres reglas JaCoCo. Fuentes/recursos y pom idénticos al repositorio; diccionario generado idéntico al versionado. Las corridas focalizadas anteriores aprobaron 57 casos unitarios y 35 de integración. Sin cambios frontend ni nueva verificación de navegador, al no haber cambio HTTP/UI; no acredita CI remoto. No se usó `.env` ni la base local.
+
 ### Crear juegos completos de pesos (P8, 25/10/2026)
 
 `POST /api/v1/formularios/{formularioId}/juegos-pesos`, solo Administrador: `{"acta":null,"pesos":[{"elemento_ref":"referencia-real","peso":1.25}]}`. Debe incluir exactamente un peso por cada campo de daño obtenido del servidor. Devuelve 201, DTO y Location del juego nuevo; 400/401/403/404/422 documentados. Transacción, bloqueo compartido del formulario y auditoría por fila reutilizada de P2. No modifica juegos anteriores ni inspecciones, no elige un juego oficial ni recalcula. El ejemplo ilustra el formato, no valores calibrados ni un juego completo de V1.0.0.
@@ -355,3 +377,8 @@ Envía una notificación `INSPECCION_VENCIDA` por puente/destinatario/período, 
 Se consulta mediante el GET autenticado existente `/api/v1/notificaciones?page=0&size=20` de P9 (lista `contenido`). No se añade endpoint para forzar el job ni pantalla de notificaciones propia de P8. El frontend P9 y la publicación P5 conservan sus tareas de integración; la programación rutinaria anual sigue pendiente. [ADR 0034](docs/adr/0034-alertas-de-inspeccion-vencida.md) y [manual técnico](docs/manual-tecnico-p8.md).
 
 Verificación del incremento de alerta (21/10/2026): **1089 pruebas backend aprobadas**, incluidas 17 nuevas. Pasan Spotless, PMD, empaquetado y las tres reglas JaCoCo (servicios 95.16 %; núcleo IC/máquina 100 % según clases configuradas). El servicio de alerta tiene 100 % de líneas/ramas. Frontend sin cambios; no se acredita CI remoto.
+
+### Recálculo fechado del Índice de Condición (P8)
+
+- `GET /api/v1/inspecciones/{inspeccionId}/recalculos-ic?page=0&size=20`: devuelve el resultado original publicado inmutable (`original`) junto con la página de recálculos (`recalculos`) ordenada por ID descendente.
+- `POST /api/v1/inspecciones/{inspeccionId}/recalculos-ic`: cuerpo `{"version_pesos_id":"..."}`, para Catedrático o Administrador. Calcula y registra un recálculo fechado bajo otro juego de pesos de la misma versión de formulario, conservando la anulación crítica e idempotencia por pareja `(inspeccion_id, version_pesos_id)` sin alterar la inspección original ni los campos derivados del puente (RN-IC-08). Detalle en [ADR 0043](docs/adr/0043-recalculo-fechado-del-indice-de-condicion.md).

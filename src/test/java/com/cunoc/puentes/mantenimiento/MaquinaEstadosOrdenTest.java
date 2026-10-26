@@ -38,12 +38,13 @@ class MaquinaEstadosOrdenTest {
   }
 
   static Stream<Arguments> matrizDeEstados() {
-    // Expectativas del enunciado, independientes del enum; cancelación sigue sin acuerdo.
+    // Expectativas independientes del enum; cancelación adoptada el 25/10/2026.
     Set<String> habilitadas =
         Set.of(
             "PROPUESTA:PROGRAMADA",
             "PROPUESTA:DESCARTADA",
             "PROGRAMADA:EN_EJECUCION",
+            "PROGRAMADA:CANCELADA",
             "EN_EJECUCION:EJECUTADA");
     return Arrays.stream(EstadoOrden.values())
         .flatMap(
@@ -100,6 +101,19 @@ class MaquinaEstadosOrdenTest {
                     EstadoOrden.PROPUESTA,
                     EstadoOrden.DESCARTADA,
                     new DatosTransicionOrden(null, null, 0, "No requiere intervención")));
+  }
+
+  @ParameterizedTest
+  @NullAndEmptySource
+  @ValueSource(strings = {" ", "\t\n", "\u2003"})
+  void cancelarExigeMotivoNoVacio(String motivo) {
+    comprobarError(
+        HttpStatus.UNPROCESSABLE_CONTENT,
+        () ->
+            maquina.validar(
+                EstadoOrden.PROGRAMADA,
+                EstadoOrden.CANCELADA,
+                new DatosTransicionOrden(null, null, 0, motivo)));
   }
 
   @Test

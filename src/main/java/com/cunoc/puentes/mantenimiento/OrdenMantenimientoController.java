@@ -1,7 +1,7 @@
 package com.cunoc.puentes.mantenimiento;
 
 import com.cunoc.puentes.mantenimiento.dto.AjustarPrioridadDTO;
-import com.cunoc.puentes.mantenimiento.dto.DescartarOrdenDTO;
+import com.cunoc.puentes.mantenimiento.dto.MotivoOrdenDTO;
 import com.cunoc.puentes.mantenimiento.dto.OrdenMantenimientoDTO;
 import com.cunoc.puentes.mantenimiento.dto.PaginaOrdenesDTO;
 import com.cunoc.puentes.mantenimiento.dto.PaginacionOrdenesDTO;
@@ -166,8 +166,32 @@ class OrdenMantenimientoController {
   OrdenMantenimientoDTO descartar(
       @PathVariable UUID puenteId,
       @PathVariable UUID ordenId,
-      @Valid @RequestBody DescartarOrdenDTO datos) {
+      @Valid @RequestBody MotivoOrdenDTO datos) {
     return servicio.descartar(puenteId, ordenId, datos.motivo());
+  }
+
+  @PostMapping(path = "/{ordenId}/cancelacion", consumes = "application/json")
+  @PreAuthorize("hasAnyRole('CATEDRATICO', 'ADMINISTRADOR')")
+  @Operation(
+      summary = "Cancela una orden PROGRAMADA conservando motivo e historial (RN-MTO-04/09)",
+      description =
+          "Política adoptada por el responsable P8: Catedrático/Administrador, solo PROGRAMADA. "
+              + "Conserva origen, intervención, prioridades, fechas y evidencia; no borra la fila. "
+              + "Estado y auditoría se confirman juntos. No permite cancelar EN_EJECUCION ni reabrir terminales.")
+  @ApiResponse(responseCode = "200", description = "Orden persistida CANCELADA con motivo")
+  @ApiResponse(responseCode = "400", description = "UUID o cuerpo/motivo inválido")
+  @ApiResponse(responseCode = "401", description = "Sin sesión o token inválido")
+  @ApiResponse(responseCode = "403", description = "Solo Catedrático o Administrador cancela")
+  @ApiResponse(responseCode = "404", description = "La orden no existe en el puente indicado")
+  @ApiResponse(responseCode = "409", description = "La orden ya no está PROGRAMADA")
+  @ApiResponse(
+      responseCode = "422",
+      description = "La inspección de origen pertenece a otro puente")
+  OrdenMantenimientoDTO cancelar(
+      @PathVariable UUID puenteId,
+      @PathVariable UUID ordenId,
+      @Valid @RequestBody MotivoOrdenDTO datos) {
+    return servicio.cancelar(puenteId, ordenId, datos.motivo());
   }
 
   @PatchMapping(path = "/{ordenId}/prioridad", consumes = "application/json")
