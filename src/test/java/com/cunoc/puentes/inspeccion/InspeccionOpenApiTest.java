@@ -23,6 +23,14 @@ class InspeccionOpenApiTest extends PruebaIntegracion {
         .andExpect(status().isOk())
         .andExpect(
             jsonPath(
+                    "$.paths['/api/v1/inspecciones/{id}/envio'].post.responses['200'].content['application/json'].schema['$ref']")
+                .value("#/components/schemas/InspeccionDTO"))
+        .andExpect(
+            jsonPath(
+                    "$.paths['/api/v1/inspecciones/{id}/envio'].post.responses['422'].content['application/problem+json'].schema['$ref']")
+                .value("#/components/schemas/ProblemDetail"))
+        .andExpect(
+            jsonPath(
                     "$.paths['/api/v1/inspecciones/{id}'].put.responses['200'].content['application/json'].schema['$ref']")
                 .value("#/components/schemas/InspeccionDTO"))
         .andExpect(

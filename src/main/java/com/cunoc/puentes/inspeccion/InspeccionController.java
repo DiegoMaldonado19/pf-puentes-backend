@@ -267,19 +267,63 @@ class InspeccionController {
 
   @PostMapping("/inspecciones/{id}/envio")
   @PreAuthorize("hasAnyRole('ESTUDIANTE', 'PROFESIONAL_EXTERNO', 'CATEDRATICO')")
-  @Operation(summary = "Envía un borrador propio a revisión")
-  @ApiResponse(responseCode = "200", description = "Inspección enviada o reenviada (idempotente)")
+  @Operation(
+      summary = "Envía un borrador propio a revisión",
+      description =
+          "Idempotency-Key opcional, recortada y de hasta 100 caracteres Unicode. "
+              + "Sin clave o en blanco conserva el comportamiento anterior. La huella SHA-256 v1 "
+              + "incluye POST, ruta con UUID canónico, X-Sgp-Sync y DTO completo canonicalizado; "
+              + "cuerpo ausente y {} son distintos. No incluye fechas generadas por el servidor. "
+              + "Autoriza titularidad antes del replay; solo ejecuciones nuevas exigen editabilidad. "
+              + "Transición, publicación, avisos persistidos y resultado se confirman en una transacción. "
+              + "Reproduce status y bytes exactos del 200 ENVIADA/PUBLICADA o 422 inspeccion-no-publicable. "
+              + "Tras corregir datos, permanentes o fotos de un 422 guardado, use una clave nueva. "
+              + "Espera 2 segundos; 409 operacion-en-proceso permite reintentar sin cachear el conflicto. "
+              + "Legado JSONB u otra huella: 409 clave-idempotencia-incompatible sin conversión ni ejecución. "
+              + "Autenticación, permisos, inexistencia, estado, binding y fallos transitorios no se guardan.")
+  @ApiResponse(
+      responseCode = "200",
+      description = "Inspección enviada/publicada o replay byte-exacto",
+      content =
+          @Content(
+              mediaType = "application/json",
+              schema = @Schema(implementation = InspeccionDTO.class)))
   @ApiResponse(responseCode = "404", description = "Inexistente, ajena o eliminada")
-  @ApiResponse(responseCode = "409", description = "No es un borrador")
-  @ApiResponse(responseCode = "422", description = "Faltan datos, permanentes, fecha o fotos")
-  InspeccionDTO enviar(
+  @ApiResponse(
+      responseCode = "400",
+      description = "DTO/encabezado o clave inválidos; no se guarda resultado")
+  @ApiResponse(responseCode = "403", description = "Sin permiso; no se guarda resultado")
+  @ApiResponse(
+      responseCode = "409",
+      description =
+          "inspeccion-no-editable, clave-idempotencia-incompatible u operacion-en-proceso; no se guarda resultado")
+  @ApiResponse(
+      responseCode = "422",
+      description =
+          "inspeccion-no-publicable: faltan datos, permanentes, fecha o fotos; reproducible con clave",
+      content =
+          @Content(
+              mediaType = "application/problem+json",
+              schema = @Schema(implementation = ProblemDetail.class)))
+  ResponseEntity<?> enviar(
       Principal usuario,
       Authentication autenticacion,
       @PathVariable UUID id,
       @RequestHeader(value = IDEMPOTENCIA, required = false) String idempotencia,
       @RequestHeader(value = SYNC, defaultValue = "false") boolean sync,
       @RequestBody(required = false) @Valid EnviarInspeccionDTO datos) {
-    return envio.enviar(id, id(usuario), rol(autenticacion), datos, idempotencia, sync);
+    UUID actorId = id(usuario);
+    Rol rol = rol(autenticacion);
+    if (idempotencia == null || idempotencia.isBlank()) {
+      return ResponseEntity.ok(envio.enviar(id, actorId, rol, datos, idempotencia, sync));
+    }
+    RespuestaIdempotente respuesta =
+        envio.enviarIdempotente(id, actorId, rol, datos, idempotencia, sync);
+    MediaType tipo =
+        respuesta.estadoHttp() == HttpStatus.OK.value()
+            ? MediaType.APPLICATION_JSON
+            : MediaType.APPLICATION_PROBLEM_JSON;
+    return ResponseEntity.status(respuesta.estadoHttp()).contentType(tipo).body(respuesta.cuerpo());
   }
 
   @PutMapping("/inspecciones/{id}/acompanantes")

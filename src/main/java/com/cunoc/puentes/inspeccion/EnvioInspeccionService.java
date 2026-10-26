@@ -6,30 +6,26 @@ import com.cunoc.puentes.common.NegocioException;
 import com.cunoc.puentes.inspeccion.dto.EnviarInspeccionDTO;
 import com.cunoc.puentes.inspeccion.dto.InspeccionDTO;
 import com.cunoc.puentes.inspeccion.puerto.ConsultaFormulario;
-import com.cunoc.puentes.sync.Idempotencia;
-import com.cunoc.puentes.sync.IdempotenciaRepository;
+import com.cunoc.puentes.sync.IdempotenciaService;
+import com.cunoc.puentes.sync.RespuestaIdempotente;
 import com.cunoc.puentes.usuario.Rol;
+import java.net.URI;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.UUID;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.json.JsonMapper;
 
 @Service
 class EnvioInspeccionService {
 
   static final int MIN_FOTOS = 4;
-  private static final Logger LOG = LoggerFactory.getLogger(EnvioInspeccionService.class);
-  private static final TypeReference<Map<String, Object>> MAPA = new TypeReference<>() {};
+  private static final Duration ESPERA_IDEMPOTENCIA = Duration.ofSeconds(2);
 
   private final InspeccionService contrato;
   private final InspeccionRepository inspecciones;
@@ -41,7 +37,7 @@ class EnvioInspeccionService {
   private final ConsultaInspeccionService consultas;
   private final AvisoInspeccionEnviada avisos;
   private final PublicacionInspeccionService publicacion;
-  private final IdempotenciaRepository idempotencias;
+  private final IdempotenciaService idempotencia;
   private final JsonMapper json;
 
   EnvioInspeccionService(
@@ -55,7 +51,7 @@ class EnvioInspeccionService {
       ConsultaInspeccionService consultas,
       AvisoInspeccionEnviada avisos,
       PublicacionInspeccionService publicacion,
-      IdempotenciaRepository idempotencias,
+      IdempotenciaService idempotencia,
       JsonMapper json) {
     this.contrato = contrato;
     this.inspecciones = inspecciones;
@@ -67,7 +63,7 @@ class EnvioInspeccionService {
     this.consultas = consultas;
     this.avisos = avisos;
     this.publicacion = publicacion;
-    this.idempotencias = idempotencias;
+    this.idempotencia = idempotencia;
     this.json = json;
   }
 
@@ -79,19 +75,70 @@ class EnvioInspeccionService {
       EnviarInspeccionDTO cuerpo,
       String claveIdempotencia,
       boolean sync) {
-    // X-Sgp-Sync se acepta por el contrato de P6; el envío siempre registra sincronizada_en.
-    if (claveIdempotencia != null && !claveIdempotencia.isBlank()) {
-      Optional<InspeccionDTO> previa = respuestaIdempotente(actorId, claveIdempotencia.strip());
-      if (previa.isPresent()) {
-        return previa.get();
-      }
+    return ejecutarEnvio(inspeccionId, actorId, rol, cuerpo);
+  }
+
+  RespuestaIdempotente enviarIdempotente(
+      UUID inspeccionId,
+      UUID actorId,
+      Rol rol,
+      EnviarInspeccionDTO cuerpo,
+      String claveIdempotencia,
+      boolean sync) {
+    // Incluso el replay exige un recurso propio y no eliminado.
+    contrato.propio(inspeccionId, actorId);
+    String clave = claveIdempotencia.strip();
+    if (clave.codePointCount(0, clave.length()) > 100) {
+      throw new NegocioException(
+          HttpStatus.BAD_REQUEST,
+          "idempotencia-invalida",
+          "Clave de idempotencia inválida",
+          "Idempotency-Key no puede superar 100 caracteres.");
     }
+    return idempotencia.ejecutar(
+        actorId,
+        clave,
+        HuellaEnvioIdempotencia.crear(inspeccionId, sync, cuerpo, json),
+        ESPERA_IDEMPOTENCIA,
+        () -> {
+          // La autorización y validación se repiten dentro de la transacción del núcleo.
+          Inspeccion inspeccion = contrato.propio(inspeccionId, actorId);
+          if (inspeccion.getEstado() != EstadoInspeccion.ENVIADA) {
+            inspeccion.exigirEditable();
+            try {
+              exigirPublicable(inspeccion);
+            } catch (NegocioException rechazo) {
+              if (rechazo.getStatusCode().value() != 422
+                  || !rechazo.getBody().getType().getPath().endsWith("/inspeccion-no-publicable")) {
+                throw rechazo;
+              }
+              rechazo
+                  .getBody()
+                  .setInstance(URI.create("/api/v1/inspecciones/" + inspeccionId + "/envio"));
+              return new RespuestaIdempotente(422, json.writeValueAsBytes(rechazo.getBody()));
+            }
+          }
+          return new RespuestaIdempotente(
+              200, json.writeValueAsBytes(persistirEnvio(inspeccion, actorId, rol, cuerpo)));
+        });
+  }
+
+  private InspeccionDTO ejecutarEnvio(
+      UUID inspeccionId, UUID actorId, Rol rol, EnviarInspeccionDTO cuerpo) {
     Inspeccion inspeccion = contrato.propio(inspeccionId, actorId);
+    if (inspeccion.getEstado() != EstadoInspeccion.ENVIADA) {
+      inspeccion.exigirEditable();
+      exigirPublicable(inspeccion);
+    }
+    return persistirEnvio(inspeccion, actorId, rol, cuerpo);
+  }
+
+  private InspeccionDTO persistirEnvio(
+      Inspeccion inspeccion, UUID actorId, Rol rol, EnviarInspeccionDTO cuerpo) {
+    UUID inspeccionId = inspeccion.getId();
     if (inspeccion.getEstado() == EstadoInspeccion.ENVIADA) {
       return consultas.detalle(inspeccionId, actorId, rol);
     }
-    inspeccion.exigirEditable();
-    exigirPublicable(inspeccion);
     Instant dispositivo =
         cuerpo != null && cuerpo.enviadaEn() != null ? cuerpo.enviadaEn() : Instant.now();
     Instant servidor = Instant.now();
@@ -100,14 +147,10 @@ class EnvioInspeccionService {
         inspeccionId, EstadoInspeccion.ENVIADA, actorId, DatosTransicionInspeccion.en(dispositivo));
     inspecciones.marcarSincronizada(inspeccionId, servidor);
     if (rol == Rol.CATEDRATICO || rol == Rol.PROFESIONAL_EXTERNO) {
-      InspeccionDTO publicada = publicacion.publicarDirecta(inspeccionId, actorId);
-      guardarIdempotencia(actorId, claveIdempotencia, publicada);
-      return publicada;
+      return publicacion.publicarDirecta(inspeccionId, actorId);
     }
     avisos.avisar(inspeccionId, cursoId);
-    InspeccionDTO dto = consultas.detalle(inspeccionId, actorId, rol);
-    guardarIdempotencia(actorId, claveIdempotencia, dto);
-    return dto;
+    return consultas.detalle(inspeccionId, actorId, rol);
   }
 
   private void exigirPublicable(Inspeccion inspeccion) {
@@ -180,33 +223,5 @@ class EnvioInspeccionService {
       }
     }
     return campos;
-  }
-
-  private Optional<InspeccionDTO> respuestaIdempotente(UUID actorId, String clave) {
-    return idempotencias
-        .findByUsuarioIdAndClave(actorId, clave)
-        .map(fila -> RespuestaIdempotenteInspeccion.leer(fila, json));
-  }
-
-  private void guardarIdempotencia(UUID actorId, String clave, InspeccionDTO dto) {
-    if (clave == null || clave.isBlank()) {
-      return;
-    }
-    String limpia = clave.strip();
-    if (limpia.length() > 100) {
-      throw new NegocioException(
-          HttpStatus.BAD_REQUEST,
-          "idempotencia-invalida",
-          "Clave de idempotencia inválida",
-          "Idempotency-Key no puede superar 100 caracteres.");
-    }
-    try {
-      idempotencias.save(
-          Idempotencia.de(actorId, limpia, HttpStatus.OK.value(), json.convertValue(dto, MAPA)));
-    } catch (DataIntegrityViolationException e) {
-      LOG.debug(
-          "Idempotencia ya persistida por un reintento concurrente ({})",
-          e.getClass().getSimpleName());
-    }
   }
 }

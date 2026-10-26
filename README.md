@@ -116,9 +116,17 @@ Con clave, una repetición de la misma solicitud reproduce status y bytes de res
 
 - **Respuestas reproducibles:** 200; rechazos terminales por payload 413 `cuerpo-demasiado-grande` y 422 por `campo-inmutable`, `grupo-con-danos`, `datos-invalidos` o `fecha-inspeccion-invalida`.
 - **No se cachean:** 400 (clave mayor de 100 caracteres: `idempotencia-invalida`), 401, 403, 404 (`inspeccion-no-encontrada`), 409 por `version-desactualizada`, `inspeccion-no-editable`, `clave-idempotencia-incompatible` o `operacion-en-proceso`, y fallos 500. La espera por una clave concurrente vence a los 2 segundos con 409 `operacion-en-proceso`, reintentable con la misma clave.
-- Las claves heredadas guardadas solo como JSONB devuelven 409 `clave-idempotencia-incompatible`; no se reinterpretan ni se ejecutan otra vez. Esta integración no cambia `POST /api/v1/inspecciones/{id}/envio` ni otras escrituras.
+- Las claves heredadas guardadas solo como JSONB devuelven 409 `clave-idempotencia-incompatible`; no se reinterpretan ni se ejecutan otra vez. El contrato del POST de envío se documenta por separado en la sección siguiente; las otras escrituras no cambian.
 
 El contrato detallado está en la [guía de idempotencia del borrador](docs/idempotencia-borrador.md), el diseño en [ADR 0046](docs/adr/0046-idempotencia-del-put-de-borrador.md) y los encabezados/respuestas en Swagger.
+
+### Enviar una inspección con clave idempotente (G7.2)
+
+`POST /api/v1/inspecciones/{id}/envio` integra el núcleo común: `Idempotency-Key` opcional, recortada y de hasta 100 caracteres Unicode. Sin clave o en blanco conserva el flujo anterior. Autoriza inspección propia/no eliminada antes de replay; solo ejecuciones nuevas exigen editabilidad. La huella SHA-256 v1 incluye método, ruta con UUID canónico, `X-Sgp-Sync` y DTO completo canonicalizado; cuerpo ausente y `{}` se distinguen, fechas generadas por el servidor quedan fuera.
+
+Guarda status/bytes exactos del 200 ENVIADA/PUBLICADA y 422 `inspeccion-no-publicable`, junto con transición, publicación y avisos persistidos en una transacción PostgreSQL. Tras corregir datos, confirmar permanentes o agregar fotos de un rechazo guardado, use una clave nueva. La espera vence a los 2 segundos: 409 `operacion-en-proceso`, reintentable y no cacheable. Legado JSONB u otra huella: 409 `clave-idempotencia-incompatible`, sin conversión ni ejecución.
+
+Autenticación, permisos, inexistencia, estado no editable, binding y fallos transitorios no se guardan. La atomicidad cubre efectos PostgreSQL, no entrega física exactamente una vez de correo/eventos externos. No cambian PUT, otras operaciones ni retención. [Guía de reintentos](docs/idempotencia-envio.md) y [ADR 0047](docs/adr/0047-idempotencia-del-post-de-envio.md).
 
 ## Desarrollo local
 
