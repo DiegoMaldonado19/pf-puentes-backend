@@ -108,6 +108,18 @@ API REST del Sistema de Gestión de Puentes (SGP).
 
 Para probarlo en Postman, usa POST a esa ruta con IDs existentes y `Authorization: Bearer <token de acceso>`; deja Body en `none`. El contrato está también en Swagger. Detalles de integración: [ADR 0025](docs/adr/0025-aceptacion-autorizada-y-auditada-de-propuestas.md).
 
+### Guardar un borrador de inspección con clave idempotente (G7.2)
+
+`PUT /api/v1/inspecciones/{id}` requiere una cuenta activa con rol **ESTUDIANTE**, **PROFESIONAL_EXTERNO** o **CATEDRATICO**, titular de la inspección. `Idempotency-Key` es opcional; ausente o en blanco conserva el flujo anterior. Una clave no blanca se recorta y admite hasta 100 caracteres Unicode. `X-Sgp-Sync` es opcional, predeterminado `false`; con `true` se fusiona una versión local desactualizada y se registra la copia de conflicto.
+
+Con clave, una repetición de la misma solicitud reproduce status y bytes de respuesta. La huella v1 considera método, ruta con UUID canónico, `X-Sgp-Sync` y DTO completo. La operación y el resultado se guardan en una transacción PostgreSQL. La titularidad se valida antes de replay; una operación nueva vuelve a validar que el borrador sea editable.
+
+- **Respuestas reproducibles:** 200; rechazos terminales por payload 413 `cuerpo-demasiado-grande` y 422 por `campo-inmutable`, `grupo-con-danos`, `datos-invalidos` o `fecha-inspeccion-invalida`.
+- **No se cachean:** 400 (clave mayor de 100 caracteres: `idempotencia-invalida`), 401, 403, 404 (`inspeccion-no-encontrada`), 409 por `version-desactualizada`, `inspeccion-no-editable`, `clave-idempotencia-incompatible` o `operacion-en-proceso`, y fallos 500. La espera por una clave concurrente vence a los 2 segundos con 409 `operacion-en-proceso`, reintentable con la misma clave.
+- Las claves heredadas guardadas solo como JSONB devuelven 409 `clave-idempotencia-incompatible`; no se reinterpretan ni se ejecutan otra vez. Esta integración no cambia `POST /api/v1/inspecciones/{id}/envio` ni otras escrituras.
+
+El contrato detallado está en la [guía de idempotencia del borrador](docs/idempotencia-borrador.md), el diseño en [ADR 0046](docs/adr/0046-idempotencia-del-put-de-borrador.md) y los encabezados/respuestas en Swagger.
+
 ## Desarrollo local
 
 Requisitos: Docker con Compose 2.32 o superior. En Windows, Docker Desktop con la integración de WSL activada.
