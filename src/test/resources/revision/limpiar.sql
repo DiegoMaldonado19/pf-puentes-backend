@@ -1,4 +1,9 @@
+DELETE FROM notificacion WHERE tipo = 'REVISION_VENCIDA' AND usuario_id IN ('0192f5a0-0000-7000-8000-000000000101', '0192f5a0-0000-7000-8000-000000000102');
+DELETE FROM aviso_revision WHERE inspeccion_id IN (SELECT id FROM inspeccion WHERE formulario_version_id = '0199b700-0000-7000-8000-000000000001');
 DELETE FROM auditoria WHERE entidad_id IN (
+  SELECT o.id FROM observacion_anclada o JOIN revision r ON r.id = o.revision_id
+  JOIN inspeccion i ON i.id = r.inspeccion_id WHERE i.formulario_version_id = '0199b700-0000-7000-8000-000000000001'
+) OR entidad_id IN (
   SELECT id FROM revision WHERE inspeccion_id IN (SELECT id FROM inspeccion WHERE formulario_version_id = '0199b700-0000-7000-8000-000000000001')
 ) OR (entidad = 'inspeccion' AND entidad_id IN (SELECT id FROM inspeccion WHERE formulario_version_id = '0199b700-0000-7000-8000-000000000001'));
 DELETE FROM observacion_anclada WHERE revision_id IN (SELECT id FROM revision WHERE inspeccion_id IN (SELECT id FROM inspeccion WHERE formulario_version_id = '0199b700-0000-7000-8000-000000000001'));

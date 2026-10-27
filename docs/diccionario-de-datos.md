@@ -7,6 +7,7 @@
 - [`asignacion`](#asignacion): Puente que un estudiante puede inspeccionar dentro de su curso (RN-INS-14)
 - [`auditoria`](#auditoria): Bitácora de toda acción sobre datos (RN-USR-09); sin contraseñas, tokens ni datos personales completos (DT-SEC-12)
 - [`aviso_inspeccion_vencida`](#aviso_inspeccion_vencida): Marca interna de notificación de inspección vencida, atómica con P9; no se borra al leer el aviso
+- [`aviso_revision`](#aviso_revision): Registro idempotente del aviso de revisión vencida de cada envío (RN-REV-08)
 - [`aviso_rutinario_anual`](#aviso_rutinario_anual): Marca de recordatorio rutinario anual enviada atómicamente con P9, una por destinatario y período
 - [`comentario`](#comentario): Comentario de un hilo; un solo nivel de respuesta (RN-FOR-04)
 - [`copia_conflicto`](#copia_conflicto): Versión del servidor que pisó un cliente al sincronizar (RN-OFF-09)
@@ -141,6 +142,17 @@ Marca interna de notificación de inspección vencida, atómica con P9; no se bo
 **Restricciones**
 
 - `UNIQUE NULLS NOT DISTINCT (puente_id, usuario_id, inspeccion_id)`
+
+## aviso_revision
+
+Registro idempotente del aviso de revisión vencida de cada envío (RN-REV-08)
+
+| Columna | Tipo | Nulo | Por defecto | Llaves | Descripción |
+|---|---|---|---|---|---|
+| `inspeccion_id` | uuid | No |  | PK, FK → inspeccion | Inspección enviada sin veredicto |
+| `enviada_en` | timestamp with time zone | No |  | PK | Identifica el envío; cambia al reenviar y conserva avisos anteriores |
+| `destinatario_id` | uuid | No |  | PK, FK → usuario | Catedrático responsable al emitir la notificación |
+| `creado_en` | timestamp with time zone | No | now() |  | Fecha del registro del aviso, UTC |
 
 ## aviso_rutinario_anual
 

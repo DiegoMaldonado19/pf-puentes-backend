@@ -12,7 +12,7 @@ El GET admite omitir estado para consultar ENVIADA y EN_REVISION. Devuelve `cont
 Pruebas focalizadas:
 
 ```bash
-./mvnw -B spotless:check -Dtest=RevisionServiceTest,RevisionIntegracionTest,DecisionRevisionIntegracionTest,CamposRevisionTest test pmd:check
+./mvnw -B spotless:check '-Dtest=*Revision*Test,SaneadorDeAuditoriaTest,DiccionarioDeDatosTest' test pmd:check
 ```
 
 Usan la infraestructura Testcontainers, no la base de desarrollo. La limpieza elimina auditoría, observaciones, transiciones y ciclos antes de inspecciones, formulario y fixtures académicos. No elimina filas ajenas.
@@ -33,8 +33,27 @@ Observación: `{elemento_ref, texto}`. El servicio valida la referencia contra `
 
 Las escrituras bloquean primero la inspección y luego cargan el ciclo, verifican responsable actual y revisor asignado; un ciclo cerrado no admite otro veredicto ni nuevas observaciones. Errores: 400 por cuerpo inválido, 404 por revisión ajena, 409 por ciclo/estado incompatible y 422 por referencia/observación/justificación o cálculo inválidos. Se reutiliza auditoría de revisión y observación, en la misma transacción.
 
-Pendiente: archivos y URL firmadas, calificación privada, historial navegable, pendientes/resolución del estudiante y alertas. [ADR 0049](adr/0049-veredictos-y-observaciones-ancladas.md).
+Decisión de veredictos: [ADR 0049](adr/0049-veredictos-y-observaciones-ancladas.md).
+
+## Seguimiento, nota privada y avisos
+
+| Método | Ruta bajo `/api/v1`              | Acceso                                                             |
+| ------ | -------------------------------- | ------------------------------------------------------------------ |
+| GET    | `/revisiones/mis-pendientes`     | Estudiante: observaciones emitidas propias, pendientes             |
+| GET    | `/revisiones/mis-inspecciones`   | Estudiante: inspecciones propias con historial, aun sin pendientes |
+| PATCH  | `/observaciones/{id}/resolucion` | Autor; exige BORRADOR para la primera resolución                   |
+| GET    | `/inspecciones/{id}/revisiones`  | Historial paginado autorizado; jamás contiene calificación         |
+| GET    | `/revisiones/{id}/calificacion`  | Solo autor y revisor del ciclo                                     |
+| PUT    | `/revisiones/{id}/calificacion`  | Revisor asignado y responsable actual del curso                    |
+
+PUT acepta `{calificacion: 87.50}` o null para retirarla; rango 0–100 y hasta dos decimales. No modifica veredictos anteriores. La nota se omite también de la bitácora general. Resolver es idempotente y preserva texto/ciclo/fecha; no cambia las respuestas ni envía el borrador. Las colecciones usan `page`/`size`, máximo 100, y respuesta `content`, `number`, `size`, `total_elements`, `total_pages`. El historial conserva los ciclos en orden descendente; las observaciones añaden `resuelta_en`.
+
+`AvisoRevisionJob` corre diariamente a las 06:30 GT con ShedLock. A los 15 días naturales exactos desde el envío, ENVIADA o EN_REVISION sin decisión final generan una notificación al responsable activo. La tabla técnica de deduplicación es nueva: `V2026_10_27_1200__crear_aviso_revision.sql`. La marca y la notificación son atómicas, una por envío/destinatario. No configura ni envía correo por su cuenta. [ADR 0050](adr/0050-seguimiento-calificacion-privada-y-avisos-de-revision.md).
+
+Pendiente de integración visual real: fotos/documentos firmados y edición/reenvío en la pantalla de Inspecciones. Capturas del manual y recorrido de navegador no se declaran completados por las pruebas automatizadas.
 
 ## Validación local — 27/10/2026
 
-23 pruebas focalizadas aprobadas: nueve unitarias de apertura, tres del extractor de campos y once integraciones con PostgreSQL/PostGIS y MinIO reales en Testcontainers. Incluyen permisos por fila, concurrencia de apertura, cambios/rechazo, referencia válida/inválida, publicación con IC y rollback por cálculo fallido. Solo el puerto de cálculo se simula en las seis pruebas de decisión; la publicación, las transiciones y la persistencia son reales. Spotless y PMD aprobados. No certifica `verify` completo ni calibración/cobertura global del repositorio.
+51 pruebas focalizadas aprobadas: 33 de revisión, 17 del saneador de auditoría y una de diccionario. Incluyen integración PostgreSQL/PostGIS y MinIO reales, permisos por fila, conservación de ciclos, privacidad de nota (incluida bitácora), resolución idempotente, límite de 15 días, deduplicación y rollback al fallar Notificaciones. El puerto de cálculo se controla en las pruebas de decisión y Notificaciones se simula solo en el caso de fallo; los recorridos normales del aviso usan su persistencia real.
+
+Spotless y PMD aprobados; diccionario regenerado con la tabla nueva. Reporte local JaCoCo: RevisionService 100 %, DecisionRevisionService 90.8 %, SeguimientoRevisionService 96.3 % y AvisoRevisionService 100 % de líneas. Es el informe local acumulado, no una ejecución `clean verify` ni certificación de calibración o cobertura global.

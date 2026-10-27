@@ -18,7 +18,7 @@ final class SaneadorDeAuditoria {
 
   // Cualquier clave que contenga uno de estos fragmentos se omite, a cualquier profundidad
   private static final List<String> SENSIBLES =
-      List.of("contrasena", "password", "hash", "token", "secret", "secreto");
+      List.of("contrasena", "password", "hash", "token", "secret", "secreto", "calificacion");
   private static final List<String> CAMPOS_CORREO = List.of("correo", "email");
   private static final Pattern CORREO = Pattern.compile("^[^@\\s]+@[^@\\s]+$");
 
