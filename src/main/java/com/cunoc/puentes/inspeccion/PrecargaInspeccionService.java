@@ -7,7 +7,10 @@ import com.cunoc.puentes.inspeccion.dto.DatosPermanentesDTO;
 import com.cunoc.puentes.inspeccion.dto.InspeccionDTO;
 import com.cunoc.puentes.inspeccion.puerto.ConsultaFormulario;
 import com.cunoc.puentes.inspeccion.puerto.RutasDatos;
+import com.cunoc.puentes.sync.IdempotenciaService;
+import com.cunoc.puentes.sync.RespuestaIdempotente;
 import com.cunoc.puentes.usuario.Rol;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
@@ -17,6 +20,7 @@ import java.util.UUID;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import tools.jackson.databind.json.JsonMapper;
 
 @Service
 class PrecargaInspeccionService {
@@ -27,6 +31,8 @@ class PrecargaInspeccionService {
   private final ConsultaFormulario formularios;
   private final EscrituraBorradorInspeccion escritura;
   private final ConsultaInspeccionService consultas;
+  private final IdempotenciaService idempotencia;
+  private final JsonMapper json;
 
   PrecargaInspeccionService(
       InspeccionRepository inspecciones,
@@ -34,13 +40,17 @@ class PrecargaInspeccionService {
       ReferenciasInspeccion referencias,
       ConsultaFormulario formularios,
       EscrituraBorradorInspeccion escritura,
-      ConsultaInspeccionService consultas) {
+      ConsultaInspeccionService consultas,
+      IdempotenciaService idempotencia,
+      JsonMapper json) {
     this.inspecciones = inspecciones;
     this.contrato = contrato;
     this.referencias = referencias;
     this.formularios = formularios;
     this.escritura = escritura;
     this.consultas = consultas;
+    this.idempotencia = idempotencia;
+    this.json = json;
   }
 
   @Transactional(readOnly = true)
@@ -79,6 +89,36 @@ class PrecargaInspeccionService {
                         "No se puede armar la precarga sin una versión activa del formulario."))
             .id();
     return armar(puenteId, versionId);
+  }
+
+  RespuestaIdempotente confirmarIdempotente(
+      UUID inspeccionId,
+      UUID actorId,
+      Rol rol,
+      ConfirmarDatosPermanentesDTO cuerpo,
+      String encabezado) {
+    contrato.propio(inspeccionId, actorId);
+    String clave = encabezado.strip();
+    if (clave.codePointCount(0, clave.length()) > 100) {
+      throw new NegocioException(
+          HttpStatus.BAD_REQUEST,
+          "idempotencia-invalida",
+          "Clave de idempotencia inválida",
+          "Idempotency-Key no puede superar 100 caracteres.");
+    }
+    RespuestaIdempotente respuesta =
+        idempotencia.ejecutar(
+            actorId,
+            clave,
+            HuellaPermanentesIdempotencia.crear(inspeccionId, cuerpo, json),
+            Duration.ofSeconds(2),
+            () ->
+                new RespuestaIdempotente(
+                    HttpStatus.OK.value(),
+                    json.writeValueAsBytes(confirmar(inspeccionId, actorId, rol, cuerpo))));
+    // La espera por otra petición no debe conservar un permiso revocado entre tanto.
+    contrato.propio(inspeccionId, actorId);
+    return respuesta;
   }
 
   @Transactional

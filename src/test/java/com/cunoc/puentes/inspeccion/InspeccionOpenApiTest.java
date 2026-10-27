@@ -35,6 +35,33 @@ class InspeccionOpenApiTest extends PruebaIntegracion {
   }
 
   @Test
+  void contextoCapturaPublicaContratosSeparadosYDtoTipado() throws Exception {
+    for (String operacion :
+        new String[] {
+          "$.paths['/api/v1/inspecciones/{id}/confirmacion-datos-permanentes'].post",
+          "$.paths['/api/v1/inspecciones/{id}/acompanantes'].put"
+        }) {
+      mvc.perform(get("/api/docs"))
+          .andExpect(status().isOk())
+          .andExpect(
+              jsonPath(operacion + ".responses['200'].content['application/json'].schema['$ref']")
+                  .value("#/components/schemas/InspeccionDTO"))
+          .andExpect(
+              jsonPath(operacion + ".parameters[?(@.name == 'Idempotency-Key')].in")
+                  .value(org.hamcrest.Matchers.hasItem("header")))
+          .andExpect(
+              jsonPath(operacion + ".description")
+                  .value(org.hamcrest.Matchers.containsString("2 segundos")))
+          .andExpect(
+              jsonPath(operacion + ".description")
+                  .value(org.hamcrest.Matchers.containsString("200")))
+          .andExpect(
+              jsonPath(operacion + ".description")
+                  .value(org.hamcrest.Matchers.containsString("heredado")));
+    }
+  }
+
+  @Test
   void guardarPublicaElEsquemaDeInspeccion() throws Exception {
     mvc.perform(get("/api/docs"))
         .andExpect(status().isOk())

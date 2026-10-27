@@ -202,6 +202,36 @@ class CapturaBorradorService {
       boolean guardarCopiaConflicto,
       boolean sync) {}
 
+  RespuestaIdempotente reemplazarAcompanantesIdempotente(
+      UUID inspeccionId,
+      UUID actorId,
+      Rol rol,
+      ReemplazarAcompanantesDTO cuerpo,
+      String encabezado) {
+    contrato.propio(inspeccionId, actorId);
+    String clave = encabezado.strip();
+    if (clave.codePointCount(0, clave.length()) > 100) {
+      throw new NegocioException(
+          HttpStatus.BAD_REQUEST,
+          "idempotencia-invalida",
+          "Clave de idempotencia inválida",
+          "Idempotency-Key no puede superar 100 caracteres.");
+    }
+    RespuestaIdempotente respuesta =
+        idempotencia.ejecutar(
+            actorId,
+            clave,
+            HuellaAcompanantesIdempotencia.crear(inspeccionId, cuerpo, json),
+            Duration.ofSeconds(2),
+            () ->
+                new RespuestaIdempotente(
+                    HttpStatus.OK.value(),
+                    json.writeValueAsBytes(
+                        reemplazarAcompanantes(inspeccionId, actorId, rol, cuerpo))));
+    contrato.propio(inspeccionId, actorId);
+    return respuesta;
+  }
+
   @Transactional
   InspeccionDTO reemplazarAcompanantes(
       UUID inspeccionId, UUID actorId, Rol rol, ReemplazarAcompanantesDTO cuerpo) {
