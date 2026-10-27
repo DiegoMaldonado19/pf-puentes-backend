@@ -128,6 +128,14 @@ Guarda status/bytes exactos del 200 ENVIADA/PUBLICADA y 422 `inspeccion-no-publi
 
 Autenticación, permisos, inexistencia, estado no editable, binding y fallos transitorios no se guardan. La atomicidad cubre efectos PostgreSQL, no entrega física exactamente una vez de correo/eventos externos. No cambian PUT, otras operaciones ni retención. [Guía de reintentos](docs/idempotencia-envio.md) y [ADR 0047](docs/adr/0047-idempotencia-del-post-de-envio.md).
 
+### Reintentar PDF con intención durable (G7.2, M06 en verificación)
+
+`POST /api/v1/inspecciones/{id}/documentos` admite `Idempotency-Key` opcional: recortada, hasta 100 caracteres Unicode. Huella v1 de método, padre, UUID y SHA-256/tamaño/MIME declarado del PDF; nombre cliente y boundary quedan fuera. Solo guarda 201 JSON exacto, incluidas sus URLs originales aunque venzan. Autoriza el padre vigente antes y después del núcleo; el replay no exige nueva editabilidad ni existencia del adjunto.
+
+Una intención PostgreSQL confirmada antes de MinIO conserva claves estables y permite inspeccionar el contenido remoto al recuperar un fallo, sin sobrescritura ciega. Resultado, archivo, actividad y finalización se confirman juntos. 409 `operacion-en-proceso` es reintentable; `clave-idempotencia-incompatible` rechaza otra huella/legado y `objeto-archivo-incompatible` protege un objeto remoto distinto. No se cachean rechazos ni errores transitorios, no hay expiración/purga nueva. Sin clave/blanco conserva deduplicación UUID/201.
+
+**Alcance:** PDF implementado, verificación final pendiente; fotos y DELETE idempotente siguen pendientes. No acredita T3 completo ni sincronización frontend. [Contrato/evidencia](docs/idempotencia-archivos.md) y [ADR 0050](docs/adr/0050-idempotencia-y-reconciliacion-de-documentos.md).
+
 ## Desarrollo local
 
 Requisitos: Docker con Compose 2.32 o superior. En Windows, Docker Desktop con la integración de WSL activada.

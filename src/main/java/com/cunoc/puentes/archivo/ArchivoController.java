@@ -4,6 +4,9 @@ import com.cunoc.puentes.archivo.dto.ArchivoDTO;
 import com.cunoc.puentes.archivo.dto.SubirDocumentoDTO;
 import com.cunoc.puentes.archivo.dto.SubirFotoDTO;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -11,11 +14,13 @@ import java.security.Principal;
 import java.util.UUID;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
@@ -32,9 +37,11 @@ import org.springframework.web.bind.annotation.RestController;
 class ArchivoController {
 
   private final ArchivoService servicio;
+  private final DocumentoIdempotenciaService documentos;
 
-  ArchivoController(ArchivoService servicio) {
+  ArchivoController(ArchivoService servicio, DocumentoIdempotenciaService documentos) {
     this.servicio = servicio;
+    this.documentos = documentos;
   }
 
   @Operation(
@@ -63,8 +70,21 @@ class ArchivoController {
   @Operation(
       summary = "Adjunta un PDF a un borrador propio",
       description =
-          "Reenviar el mismo id devuelve el documento ya guardado (DT-OFF-05, DT-OFF-07).")
-  @ApiResponse(responseCode = "201", description = "Documento guardado")
+          "Sin clave o en blanco conserva deduplicación UUID/201. Idempotency-Key no blanca se recorta, "
+              + "máximo 100 caracteres Unicode. Huella SHA-256 v1 de POST, padre, UUID y SHA-256/tamaño/MIME "
+              + "del PDF; excluye nombre y boundary. Solo guarda 201 JSON y reproduce status/bytes originales, "
+              + "incluidas URL vencidas, con autorización actual y sin exigir nueva editabilidad. "
+              + "Espera máxima 2 s por bloqueo; 409 operacion-en-proceso reintentable, "
+              + "clave-idempotencia-incompatible para otra huella/legado. No cachea rechazos ni fallos. "
+              + "Intención durable e inspección del contenido remoto permiten recuperar efectos inciertos; "
+              + "objeto-archivo-incompatible no sobrescribe contenido remoto. Sin expiración automática.")
+  @ApiResponse(
+      responseCode = "201",
+      description = "Documento guardado o replay exacto",
+      content =
+          @Content(
+              mediaType = "application/json",
+              schema = @Schema(implementation = ArchivoDTO.class)))
   @ApiResponse(responseCode = "400", description = "Falta un campo o su formato no es válido")
   @ApiResponse(
       responseCode = "409",
@@ -77,11 +97,23 @@ class ArchivoController {
       path = "/inspecciones/{inspeccionId}/documentos",
       consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
   @ResponseStatus(HttpStatus.CREATED)
-  ArchivoDTO subirDocumento(
+  ResponseEntity<?> subirDocumento(
       @PathVariable UUID inspeccionId,
       @Valid @ModelAttribute SubirDocumentoDTO datos,
+      @Parameter(
+              description =
+                  "Opcional, máximo 100 caracteres Unicode; sin clave/blanco conserva flujo histórico")
+          @RequestHeader(value = "Idempotency-Key", required = false)
+          String clave,
       Principal usuario) {
-    return servicio.guardarDocumento(inspeccionId, idDe(usuario), datos);
+    if (clave == null || clave.isBlank()) {
+      return ResponseEntity.status(HttpStatus.CREATED)
+          .body(servicio.guardarDocumento(inspeccionId, idDe(usuario), datos));
+    }
+    var respuesta = documentos.guardar(inspeccionId, idDe(usuario), datos, clave);
+    return ResponseEntity.status(respuesta.estadoHttp())
+        .contentType(MediaType.APPLICATION_JSON)
+        .body(respuesta.cuerpo());
   }
 
   @Operation(summary = "Borra una foto o un PDF de un borrador propio")

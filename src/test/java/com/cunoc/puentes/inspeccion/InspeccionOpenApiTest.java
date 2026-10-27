@@ -62,6 +62,24 @@ class InspeccionOpenApiTest extends PruebaIntegracion {
   }
 
   @Test
+  void pdfPublica201TipadoYContratoSinHabilitarFotosNiBajas() throws Exception {
+    String operacion = "$.paths['/api/v1/inspecciones/{inspeccionId}/documentos'].post";
+    mvc.perform(get("/api/docs"))
+        .andExpect(status().isOk())
+        .andExpect(
+            jsonPath(operacion + ".responses['201'].content['application/json'].schema['$ref']")
+                .value("#/components/schemas/ArchivoDTO"))
+        .andExpect(
+            jsonPath(operacion + ".parameters[?(@.name == 'Idempotency-Key')].in")
+                .value(org.hamcrest.Matchers.hasItem("header")))
+        .andExpect(
+            jsonPath(operacion + ".description").value(org.hamcrest.Matchers.containsString("2 s")))
+        .andExpect(
+            jsonPath(operacion + ".description")
+                .value(org.hamcrest.Matchers.containsString("MIME")));
+  }
+
+  @Test
   void guardarPublicaElEsquemaDeInspeccion() throws Exception {
     mvc.perform(get("/api/docs"))
         .andExpect(status().isOk())
