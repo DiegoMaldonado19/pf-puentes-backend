@@ -55,4 +55,10 @@ public @interface Auditable {
    * dentro del registro de un intento fallido.
    */
   String condicion() default "";
+
+  /** Proyección SpEL opcional del estado anterior; evita copiar texto privado a la bitácora. */
+  String valorAnterior() default "";
+
+  /** Proyección SpEL opcional del estado posterior, incluidos cambios en cascada. */
+  String valorNuevo() default "";
 }
