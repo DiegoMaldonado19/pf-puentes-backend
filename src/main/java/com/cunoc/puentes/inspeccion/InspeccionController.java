@@ -85,19 +85,60 @@ class InspeccionController {
   }
 
   @PostMapping("/inspecciones")
-  @ResponseStatus(HttpStatus.CREATED)
   @PreAuthorize("hasAnyRole('ESTUDIANTE', 'PROFESIONAL_EXTERNO', 'CATEDRATICO')")
-  @Operation(summary = "Inicia una inspección o una corrección")
-  @ApiResponse(responseCode = "201", description = "Borrador creado o reenviado (idempotente)")
+  @Operation(
+      summary = "Inicia una inspección o una corrección",
+      description =
+          "Idempotency-Key opcional: sin clave o en blanco conserva deduplicación UUID y detalle actual. "
+              + "Clave no blanca recortada, máximo 100 caracteres Unicode. Huella SHA-256 v1 de POST, ruta "
+              + "/api/v1/inspecciones y DTO completo (incluye UUID, puente, asignación, curso, fechas, dispositivo, "
+              + "GPS, origen y motivo de corrección); objetos ordenados, números normalizados y UUID canónicos. "
+              + "Solo se guarda 201 application/json con status y bytes exactos, sin expiración automática. "
+              + "Espera máxima 2 segundos; 409 operacion-en-proceso permite reintentar la misma clave. "
+              + "Legado JSONB u otra huella: 409 clave-idempotencia-incompatible sin convertir ni ejecutar. "
+              + "Autoriza rol, autor, recurso no eliminado y asignación vigente antes del replay; no exige "
+              + "nueva editabilidad, formulario activo ni ausencia de corrección viva para reproducir. "
+              + "La baja posterior conserva 409 inspeccion-en-conflicto, no devuelve el resultado antiguo. "
+              + "Alta, transición, auditoría y resultado comparten transacción PostgreSQL. "
+              + "No se guardan rechazos, binding, permisos ni fallos transitorios. X-Sgp-Sync no aplica al alta.")
+  @ApiResponse(
+      responseCode = "201",
+      description = "Borrador creado, deduplicado por UUID o replay byte-exacto",
+      content =
+          @Content(
+              mediaType = "application/json",
+              schema = @Schema(implementation = InspeccionDTO.class)))
   @ApiResponse(responseCode = "400", description = "DTO o UUID v7 inválidos")
   @ApiResponse(responseCode = "403", description = "Sin derecho a inspeccionar ese puente")
-  @ApiResponse(responseCode = "409", description = "Id ajeno, sin formulario o corrección en curso")
+  @ApiResponse(
+      responseCode = "409",
+      description =
+          "Id ajeno/eliminado, sin formulario, corrección en curso, clave-idempotencia-incompatible u operacion-en-proceso; no se guarda")
+  @ApiResponse(
+      responseCode = "404",
+      description = "Recurso inexistente o identidad del resultado ausente; no se guarda")
+  @ApiResponse(responseCode = "500", description = "Fallo transitorio; revierte alta y resultado")
   @ApiResponse(responseCode = "422", description = "Puente inactivo, fecha o corrección inválida")
-  InspeccionDTO crear(
+  ResponseEntity<?> crear(
       Principal usuario,
       Authentication autenticacion,
+      @Parameter(
+              name = IDEMPOTENCIA,
+              in = ParameterIn.HEADER,
+              description =
+                  "Opcional; se recorta, máximo 100 caracteres Unicode. Misma clave y DTO reproducen el 201 original; sin clave o en blanco conserva el flujo anterior.")
+          @RequestHeader(value = IDEMPOTENCIA, required = false)
+          String clave,
       @Valid @RequestBody CrearInspeccionDTO datos) {
-    return inicio.iniciar(id(usuario), rol(autenticacion), datos);
+    if (clave == null || clave.isBlank()) {
+      return ResponseEntity.status(HttpStatus.CREATED)
+          .body(inicio.iniciar(id(usuario), rol(autenticacion), datos));
+    }
+    RespuestaIdempotente respuesta =
+        inicio.iniciarIdempotente(id(usuario), rol(autenticacion), datos, clave);
+    return ResponseEntity.status(respuesta.estadoHttp())
+        .contentType(MediaType.APPLICATION_JSON)
+        .body(respuesta.cuerpo());
   }
 
   @GetMapping("/inspecciones")
