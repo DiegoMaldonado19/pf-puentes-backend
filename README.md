@@ -2,7 +2,7 @@
 
 ## Revisión académica: bandeja e inicio de ciclo
 
-`GET /api/v1/revisiones/pendientes` y `POST /api/v1/inspecciones/{inspeccionId}/revisiones`: Catedrático activo, cursos propios y nunca autor de la inspección. Apertura con bloqueo, auditoría y transición mediante el servicio de Inspecciones. [Contrato, alcance y pruebas](docs/revision-academica.md). No incluye todavía veredictos ni publicación por aprobación.
+`GET /api/v1/revisiones/pendientes` y `POST /api/v1/inspecciones/{inspeccionId}/revisiones`: Catedrático activo, cursos propios y nunca autor de la inspección. Apertura con bloqueo, auditoría y transición mediante el servicio de Inspecciones. El detalle `GET /api/v1/revisiones/{id}`, el POST `/veredicto` y GET/POST `/observaciones` permiten decidir y anclar campos del esquema original. Aprobar delega a `publicarPorAprobacion`; cambios/rechazo requieren texto, sin cambiar estados directamente. [Contrato, alcance y pruebas](docs/revision-academica.md).
 
 ### Generación automática de propuestas de mantenimiento por daño, detector crítico P4 y fachada oficial de IC (P8, 25/10/2026)
 

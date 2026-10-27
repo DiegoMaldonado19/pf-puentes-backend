@@ -61,4 +61,30 @@ class BandejaRevisionRepository {
         .query(String.class)
         .optional();
   }
+
+  Optional<String> estado(UUID actor, UUID inspeccion) {
+    return jdbc.sql("select i.estado " + CONTEXTO + " and i.id = :id")
+        .param("actor", actor)
+        .param("id", inspeccion)
+        .query(String.class)
+        .optional();
+  }
+
+  Optional<UUID> inspeccionDeRevision(UUID actor, UUID revision) {
+    return jdbc.sql("select inspeccion_id from revision where id = :id and revisor_id = :actor")
+        .param("id", revision)
+        .param("actor", actor)
+        .query(UUID.class)
+        .optional();
+  }
+
+  Evidencia evidencia(UUID inspeccion) {
+    return jdbc.sql(
+            "select f.esquema::text as esquema, i.datos::text as datos from inspeccion i join formulario_version f on f.id = i.formulario_version_id where i.id = :id")
+        .param("id", inspeccion)
+        .query(Evidencia.class)
+        .single();
+  }
+
+  record Evidencia(String esquema, String datos) {}
 }
