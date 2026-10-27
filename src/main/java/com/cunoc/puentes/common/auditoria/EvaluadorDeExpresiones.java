@@ -1,6 +1,7 @@
 package com.cunoc.puentes.common.auditoria;
 
 import java.lang.reflect.Method;
+import java.util.Map;
 import java.util.UUID;
 import org.springframework.core.DefaultParameterNameDiscoverer;
 import org.springframework.core.ParameterNameDiscoverer;
@@ -48,6 +49,15 @@ class EvaluadorDeExpresiones {
   boolean cumple(String condicion, Method metodo, Object[] argumentos, Object resultado) {
     return condicion.isBlank()
         || Boolean.TRUE.equals(evaluar(condicion, metodo, argumentos, resultado));
+  }
+
+  Map<String, Object> valores(
+      String expresion, Method metodo, Object[] argumentos, Object resultado) {
+    Object valor = evaluar(expresion, metodo, argumentos, resultado);
+    if (valor instanceof Map<?, ?> mapa) {
+      return SaneadorDeAuditoria.sanear(mapa);
+    }
+    throw new IllegalStateException("La proyección auditable debe devolver un mapa.");
   }
 
   private Object evaluar(String expresion, Method metodo, Object[] argumentos, Object resultado) {
