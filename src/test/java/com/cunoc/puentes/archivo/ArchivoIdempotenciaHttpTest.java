@@ -234,7 +234,7 @@ abstract class ArchivoIdempotenciaHttpTest extends PruebaIntegracion {
     return mvc.perform(peticion.with(como(Rol.ESTUDIANTE, autor))).andReturn();
   }
 
-  private MvcResult borrar(UUID id, String clave, UUID autor) throws Exception {
+  protected MvcResult borrar(UUID id, String clave, UUID autor) throws Exception {
     var peticion = delete("/api/v1/archivos/" + id).with(como(Rol.ESTUDIANTE, autor));
     if (clave != null) {
       peticion.header("Idempotency-Key", clave);

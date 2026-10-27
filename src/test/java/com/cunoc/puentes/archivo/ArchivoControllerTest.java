@@ -36,6 +36,7 @@ class ArchivoControllerTest {
 
   @MockitoBean ArchivoService servicio;
   @MockitoBean DocumentoIdempotenciaService documentos;
+  @MockitoBean BajaArchivoIdempotenciaService bajas;
 
   @ParameterizedTest
   @EnumSource(

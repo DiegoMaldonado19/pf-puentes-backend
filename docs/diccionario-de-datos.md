@@ -18,6 +18,7 @@
 - [`idempotencia`](#idempotencia): Respuestas guardadas por Idempotency-Key (DT-OFF-07)
 - [`inscripcion`](#inscripcion): Estudiante vinculado a un curso; activarlo y vincularlo es RN-USR-02
 - [`inspeccion`](#inspeccion): Inspección de un puente: columnas tipadas + daños en JSONB (DT-BD-02)
+- [`intento_baja_archivo`](#intento_baja_archivo): Manifiesto durable de baja física y autorización por padre vigente, sin expiración automática
 - [`intento_documento`](#intento_documento): Intención durable de carga PDF o foto/miniatura; sobrevive al rollback y no expira automáticamente.
 - [`invitacion`](#invitacion): Invitaciones del Administrador para roles que no se auto-registran (RN-USR-03)
 - [`municipio`](#municipio): Municipios de Guatemala según el INE
@@ -384,6 +385,22 @@ Inspección de un puente: columnas tipadas + daños en JSONB (DT-BD-02)
 - `CHECK (((estado_confirmado IS NULL) OR ((estado_confirmado)::text = (estado_calculado)::text) OR (estado_confirmado_por IS NOT NULL))) NOT VALID`
 - `CHECK (((indice_condicion >= (0)::numeric) AND (indice_condicion <= (100)::numeric)))`
 - `CHECK (((precargada_de_id IS NULL) OR (precargada_de_id <> id)))`
+
+## intento_baja_archivo
+
+Manifiesto durable de baja física y autorización por padre vigente, sin expiración automática
+
+| Columna | Tipo | Nulo | Por defecto | Llaves | Descripción |
+|---|---|---|---|---|---|
+| `usuario_id` | uuid | No |  | PK | Usuario de la operación, no concede permisos |
+| `clave` | character varying(100) | No |  | PK | Clave de operación recortada |
+| `archivo_id` | uuid | No |  |  | UUID solicitado, reutilizable tras finalizar |
+| `inspeccion_id` | uuid | No |  |  | Identidad del padre que debe autorizarse actualmente |
+| `clave_objeto` | text | No |  |  | Clave física exacta del objeto principal |
+| `clave_miniatura` | text | Sí |  |  | Clave física exacta de miniatura opcional |
+| `huella_version` | integer | No |  |  | Versión del contrato de huella |
+| `huella_sha256` | bytea | No |  |  | SHA-256 de método y recurso canónico |
+| `finalizada` | boolean | No | false |  | Baja y resultado confirmados atómicamente |
 
 ## intento_documento
 

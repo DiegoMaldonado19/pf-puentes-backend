@@ -1,5 +1,9 @@
 # pf-puentes-backend
 
+### Archivos idempotentes — T3 verificado localmente
+
+`DELETE /api/v1/archivos/{id}` incorpora `Idempotency-Key`: solo conserva 204 vacío, autoriza el padre vigente antes/después del replay y reconcilia objetos mediante manifiesto durable. Sin clave/blanco conserva 204/404 histórico salvo reserva pendiente, que exige recuperar la operación original. No hay nueva purga ni expiración. RED comunicado por el padre: 18 pruebas, 11 fallos, cero errores/omitidos. Verificación final: 168/168 pruebas focalizadas y 1758/1758 globales sin fallos/errores/omitidos, JaCoCo/formato/PMD y diccionario aprobados. Verificación independiente sin bloqueantes y diferencial de 90 observaciones por versión sin diferencias inesperadas; [contrato y límites](docs/adr/0052-idempotencia-de-baja-de-archivo.md).
+
 ### Generación automática de propuestas de mantenimiento por daño, detector crítico P4 y fachada oficial de IC (P8, 25/10/2026)
 
 1. **`DetectorCondicionesCriticas` (`RN-IC-05`):** evalúa automáticamente los 6 campos con marcador `"x-anulacion-critica"` del esquema P4 (`SOCAVACION`, `ASENTAMIENTO`, `PERDIDA_SECCION`, `AUSENCIA_PORTANTE`) con umbral configurable por defecto `>= 3` y se conecta también a `EstimacionPreliminarIcService` cuando no se envían banderas explícitas.
@@ -134,7 +138,7 @@ Autenticación, permisos, inexistencia, estado no editable, binding y fallos tra
 
 Una intención PostgreSQL confirmada antes de MinIO conserva claves estables y permite inspeccionar el contenido remoto al recuperar un fallo, sin sobrescritura ciega. Resultado, archivo, actividad y finalización se confirman juntos. 409 `operacion-en-proceso` es reintentable; `clave-idempotencia-incompatible` rechaza otra huella/legado y `objeto-archivo-incompatible` protege un objeto remoto distinto. No se cachean rechazos ni errores transitorios, no hay expiración/purga nueva. Sin clave/blanco conserva deduplicación UUID/201.
 
-**Alcance:** PDF implementado, verificación final pendiente; fotos y DELETE idempotente siguen pendientes. No acredita T3 completo ni sincronización frontend. [Contrato/evidencia](docs/idempotencia-archivos.md) y [ADR 0050](docs/adr/0050-idempotencia-y-reconciliacion-de-documentos.md).
+**Alcance:** PDF, fotos/miniaturas y DELETE idempotente implementados y verificados localmente en T3. No acredita el cierre global de G7.2, aceptación externa ni sincronización frontend. [Contrato/evidencia](docs/idempotencia-archivos.md) y [ADR 0050](docs/adr/0050-idempotencia-y-reconciliacion-de-documentos.md).
 
 ## Desarrollo local
 

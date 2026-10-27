@@ -56,6 +56,8 @@ public class ArchivoService {
   private final InspeccionService inspecciones;
   private final CargaDocumentoService cargas;
   private final BloqueoArchivo bloqueos;
+  @Autowired private BajaArchivoIntencion bajas;
+  @Autowired private org.springframework.transaction.PlatformTransactionManager gestor;
 
   ArchivoService(
       AlmacenamientoArchivos almacenamiento, ArchivoRepository repositorio, ArchivoMapper mapper) {
@@ -152,6 +154,9 @@ public class ArchivoService {
     if (bloqueos != null) {
       bloqueos.uuid(datos.id());
     }
+    if (bajas != null) {
+      bajas.exigirSinPendiente(datos.id());
+    }
     return yaGuardado(datos.id(), ordenId, Archivo::getOrdenMantenimientoId)
         .orElseGet(
             () -> {
@@ -217,6 +222,9 @@ public class ArchivoService {
     if (bloqueos != null) {
       bloqueos.baja(archivoId);
     }
+    if (bajas != null) {
+      bajas.exigirSinPendiente(archivoId);
+    }
     Archivo archivo =
         repositorio
             .findById(archivoId)
@@ -235,6 +243,58 @@ public class ArchivoService {
       repositorio.flush();
     }
     tocarActividad(archivo.getInspeccionId());
+  }
+
+  /** Dentro de la transacción G7.1: manifiesto independiente y resultado atómico. */
+  void eliminarIdempotente(
+      UUID id, UUID padre, UUID usuario, String clave, HuellaIdempotencia huella) {
+    bloqueos.archivo(padre, id);
+    exigirBorrador(inspeccionPropia(padre, usuario));
+    bajas.exigirDisponible(id, usuario, clave);
+    var intento =
+        bajas
+            .buscar(usuario, clave)
+            .orElseGet(
+                () -> {
+                  Archivo archivo =
+                      repositorio
+                          .findById(id)
+                          .filter(a -> padre.equals(a.getInspeccionId()))
+                          .orElseThrow(
+                              () ->
+                                  noEncontrado(
+                                      "archivo-no-encontrado",
+                                      "El archivo no existe",
+                                      "No hay un archivo con ese id."));
+                  return bajas.preparar(usuario, clave, huella, archivo);
+                });
+    eliminarObjetoReconciliado(intento.claveObjeto());
+    eliminarObjetoReconciliado(intento.claveMiniatura());
+    repositorio
+        .findById(id)
+        .ifPresent(
+            archivo -> {
+              if (!padre.equals(archivo.getInspeccionId())
+                  || !intento.claveObjeto().equals(archivo.getClave())
+                  || !java.util.Objects.equals(
+                      intento.claveMiniatura(), archivo.getClaveMiniatura())) {
+                throw new IllegalStateException(
+                    "La identidad física cambió durante una baja pendiente.");
+              }
+              repositorio.delete(archivo);
+            });
+    repositorio.flush();
+    tocarActividad(padre);
+    bajas.finalizar(usuario, clave);
+  }
+
+  private void eliminarObjetoReconciliado(String clave) {
+    if (clave != null && almacenamiento.inspeccionar(clave).isPresent()) {
+      almacenamiento.eliminar(clave);
+      if (almacenamiento.inspeccionar(clave).isPresent()) {
+        throw new IllegalStateException("El objeto sigue presente después de DELETE.");
+      }
+    }
   }
 
   /**
@@ -284,9 +344,17 @@ public class ArchivoService {
     int purgados = 0;
     for (Archivo archivo : vencidos) {
       try {
-        eliminarObjetos(archivo);
-        archivo.setPurgadoEn(Instant.now());
-        repositorio.save(archivo);
+        if (bloqueos == null) {
+          purgar(archivo);
+        } else {
+          new org.springframework.transaction.support.TransactionTemplate(gestor)
+              .executeWithoutResult(
+                  estado -> {
+                    bloqueos.archivo(archivo.getInspeccionId(), archivo.getId());
+                    bajas.exigirSinPendiente(archivo.getId());
+                    repositorio.findById(archivo.getId()).ifPresent(this::purgar);
+                  });
+        }
         purgados++;
       } catch (RuntimeException ex) {
         // Sin purgado_en: la próxima corrida lo vuelve a intentar
@@ -296,12 +364,21 @@ public class ArchivoService {
     log.info("RN-ARC-06: {} de {} archivos purgados", purgados, vencidos.size());
   }
 
+  private void purgar(Archivo archivo) {
+    eliminarObjetos(archivo);
+    archivo.setPurgadoEn(Instant.now());
+    repositorio.save(archivo);
+  }
+
   private ArchivoDTO subir(
       UUID inspeccionId, UUID usuarioId, UUID id, Function<UUID, Archivo> guardarObjetos) {
     if (bloqueos != null) {
       bloqueos.archivo(inspeccionId, id);
     }
     InspeccionDelArchivo inspeccion = inspeccionPropia(inspeccionId, usuarioId);
+    if (bajas != null) {
+      bajas.exigirSinPendiente(id);
+    }
     return yaGuardado(id, inspeccionId, Archivo::getInspeccionId)
         .orElseGet(
             () -> {

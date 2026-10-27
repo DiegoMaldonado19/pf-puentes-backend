@@ -39,6 +39,9 @@ class ArchivoController {
   private final ArchivoService servicio;
   private final DocumentoIdempotenciaService documentos;
 
+  @org.springframework.beans.factory.annotation.Autowired
+  private BajaArchivoIdempotenciaService bajas;
+
   ArchivoController(ArchivoService servicio, DocumentoIdempotenciaService documentos) {
     this.servicio = servicio;
     this.documentos = documentos;
@@ -140,7 +143,15 @@ class ArchivoController {
         .body(respuesta.cuerpo());
   }
 
-  @Operation(summary = "Borra una foto o un PDF de un borrador propio")
+  @Operation(
+      summary = "Borra una foto o un PDF de un borrador propio",
+      description =
+          "Sin clave/blanco conserva 204 inicial y 404 posterior. Idempotency-Key: strip, "
+              + "máximo 100 caracteres Unicode; huella v1 DELETE y UUID. Solo conserva 204 vacío. "
+              + "Replay con autorización actual del padre retenido, sin exigir BORRADOR ni repetir DELETE. "
+              + "Espera 2 s por bloqueo; operacion-en-proceso reintentable. Otra huella/legado: "
+              + "clave-idempotencia-incompatible. Manifiesto durable reconcilia ausencia de objetos. "
+              + "Sin expiración ni nueva purga; rechazos y fallos no cacheables.")
   @ApiResponse(responseCode = "204", description = "Archivo borrado")
   @ApiResponse(
       responseCode = "409",
@@ -148,8 +159,19 @@ class ArchivoController {
           "La inspección ya no es un borrador; la evidencia publicada no se borra (RN-ARC-05)")
   @DeleteMapping("/archivos/{id}")
   @ResponseStatus(HttpStatus.NO_CONTENT)
-  void eliminar(@PathVariable UUID id, Principal usuario) {
-    servicio.eliminar(id, idDe(usuario));
+  void eliminar(
+      @PathVariable UUID id,
+      @Parameter(
+              description =
+                  "Opcional; máximo 100 caracteres Unicode, blanco conserva flujo histórico")
+          @RequestHeader(value = "Idempotency-Key", required = false)
+          String clave,
+      Principal usuario) {
+    if (clave == null || clave.isBlank()) {
+      servicio.eliminar(id, idDe(usuario));
+    } else {
+      bajas.eliminar(id, idDe(usuario), clave);
+    }
   }
 
   // Contrato 14: el nombre de la autenticación es el UUID del usuario
