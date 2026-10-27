@@ -269,6 +269,7 @@ GitHub Actions (`.github/workflows/ci-cd.yml`) corre cuatro etapas: build → te
 - **Deploy:** el job escribe el `.env` del entorno desde su GitHub Environment y corre `docker compose up --wait`. Si un contenedor no queda sano, el job falla.
 - **Acceso:** el backend, postgres y minio no publican puertos. La API se alcanza por el nginx del frontend en `https://pf-puentes.duckdns.org[:puerto]/api`, y las fotos por las URL firmadas de `/archivos/` ([ADR 0013](docs/adr/0013-url-firmadas-de-minio-servidas-por-nginx.md)).
 - **Revisar un entorno:** `cd ~/puentes/<entorno>/pf-puentes-backend && docker compose ps`
+- **Respaldos:** `scripts/respaldo.sh <entorno>` cada noche desde el cron del host, y `scripts/restaurar.sh` para probarlos ([guía de respaldo y restauración](docs/guia-respaldo-y-restauracion.md)).
 
 Las decisiones están en [docs/adr](docs/adr/). Los secretos y variables por configurar están en el [ADR 0004](docs/adr/0004-configuracion-por-entorno-con-github-environments.md).
 
