@@ -263,6 +263,32 @@ class CapturaBorradorService {
     return consultas.detalle(inspeccion.getId(), actorId, rol);
   }
 
+  RespuestaIdempotente eliminarIdempotente(UUID inspeccionId, UUID actorId, String encabezado) {
+    contrato.propioParaReplayDeBaja(inspeccionId, actorId);
+    String clave = encabezado.strip();
+    if (clave.codePointCount(0, clave.length()) > 100) {
+      throw new NegocioException(
+          HttpStatus.BAD_REQUEST,
+          "idempotencia-invalida",
+          "Clave de idempotencia inválida",
+          "Idempotency-Key no puede superar 100 caracteres.");
+    }
+    RespuestaIdempotente respuesta =
+        idempotencia.ejecutar(
+            actorId,
+            clave,
+            HuellaBajaBorradorIdempotencia.crear(inspeccionId, json),
+            ESPERA_IDEMPOTENCIA,
+            () -> {
+              // La misma baja auditada participa en la transacción del núcleo. Revalida
+              // propiedad, existencia y editabilidad después de esperar por la clave.
+              eliminar(inspeccionId, actorId);
+              return new RespuestaIdempotente(HttpStatus.NO_CONTENT.value(), new byte[0]);
+            });
+    contrato.propioParaReplayDeBaja(inspeccionId, actorId);
+    return respuesta;
+  }
+
   @Transactional
   void eliminar(UUID inspeccionId, UUID actorId) {
     Inspeccion inspeccion = contrato.propioEnBorrador(inspeccionId, actorId);

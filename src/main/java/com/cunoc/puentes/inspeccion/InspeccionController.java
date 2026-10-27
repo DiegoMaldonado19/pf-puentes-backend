@@ -43,7 +43,6 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
@@ -262,14 +261,47 @@ class InspeccionController {
   }
 
   @DeleteMapping("/inspecciones/{id}")
-  @ResponseStatus(HttpStatus.NO_CONTENT)
   @PreAuthorize("hasAnyRole('ESTUDIANTE', 'PROFESIONAL_EXTERNO', 'CATEDRATICO')")
-  @Operation(summary = "Elimina lógicamente un borrador propio")
-  @ApiResponse(responseCode = "204", description = "Borrador dado de baja")
-  @ApiResponse(responseCode = "404", description = "Inexistente, ajena, eliminada o no visible")
-  @ApiResponse(responseCode = "409", description = "No es un borrador")
-  void eliminar(Principal usuario, @PathVariable UUID id) {
-    captura.eliminar(id, id(usuario));
+  @Operation(
+      summary = "Elimina lógicamente un borrador propio",
+      description =
+          "Idempotency-Key opcional: replay 204 vacío, sin Content-Type ni nuevos efectos. "
+              + "Huella v1 de método DELETE y ruta con UUID. Espera máxima 2 s; "
+              + "409 operacion-en-proceso permite reintentar. Se exige autor actual de la fila "
+              + "original incluso eliminada, antes y después del replay; no exige editabilidad "
+              + "para reproducir. Una ejecución nueva requiere borrador propio no eliminado. "
+              + "Otra huella o resultado heredado devuelve 409 clave-idempotencia-incompatible. "
+              + "Solo se guarda 204; baja, versión, auditoría y resultado son atómicos. "
+              + "Sin clave o en blanco conserva 204/404 histórico. No hay expiración ni purga nueva.")
+  @ApiResponse(responseCode = "204", description = "Baja o replay sin cuerpo", content = @Content)
+  @ApiResponse(
+      responseCode = "400",
+      description = "Clave mayor de 100 caracteres Unicode o UUID inválido")
+  @ApiResponse(responseCode = "401", description = "Sin sesión vigente")
+  @ApiResponse(responseCode = "403", description = "Rol no admitido")
+  @ApiResponse(
+      responseCode = "404",
+      description = "Inexistente, ajena o eliminada sin resultado propio")
+  @ApiResponse(
+      responseCode = "409",
+      description = "No editable, clave incompatible u operación en proceso; no se cachea")
+  @ApiResponse(responseCode = "500", description = "Fallo transitorio; rollback sin resultado")
+  ResponseEntity<Void> eliminar(
+      Principal usuario,
+      @PathVariable UUID id,
+      @Parameter(
+              name = IDEMPOTENCIA,
+              in = ParameterIn.HEADER,
+              description =
+                  "Opcional; se recorta y admite hasta 100 caracteres Unicode. Blanca equivale a ausencia.")
+          @RequestHeader(value = IDEMPOTENCIA, required = false)
+          String idempotencia) {
+    if (idempotencia == null || idempotencia.isBlank()) {
+      captura.eliminar(id, id(usuario));
+      return ResponseEntity.noContent().build();
+    }
+    RespuestaIdempotente respuesta = captura.eliminarIdempotente(id, id(usuario), idempotencia);
+    return ResponseEntity.status(respuesta.estadoHttp()).build();
   }
 
   @GetMapping("/inspecciones/{id}/historial")

@@ -114,6 +114,25 @@ class InspeccionOpenApiTest extends PruebaIntegracion {
   }
 
   @Test
+  void bajaBorradorPublicaReplay204VacioYAutorizacionTrasBaja() throws Exception {
+    String operacion = "$.paths['/api/v1/inspecciones/{id}'].delete";
+    mvc.perform(get("/api/docs"))
+        .andExpect(status().isOk())
+        .andExpect(
+            jsonPath(operacion + ".parameters[?(@.name == 'Idempotency-Key')].in")
+                .value(org.hamcrest.Matchers.hasItem("header")))
+        .andExpect(
+            jsonPath(operacion + ".description")
+                .value(org.hamcrest.Matchers.containsString("204 vacío")))
+        .andExpect(
+            jsonPath(operacion + ".description").value(org.hamcrest.Matchers.containsString("2 s")))
+        .andExpect(
+            jsonPath(operacion + ".description")
+                .value(org.hamcrest.Matchers.containsString("autor actual")))
+        .andExpect(jsonPath(operacion + ".responses['204'].content").doesNotExist());
+  }
+
+  @Test
   void guardarPublicaElEsquemaDeInspeccion() throws Exception {
     mvc.perform(get("/api/docs"))
         .andExpect(status().isOk())
