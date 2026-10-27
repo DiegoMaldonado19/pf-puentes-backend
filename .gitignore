@@ -61,7 +61,10 @@ Thumbs.db
 !.mvn/wrapper/maven-wrapper.jar
 
 # API validation runner deps
-scripts/
+scripts/*
+# Los scripts del host sí se versionan (docs/guia-respaldo-y-restauracion.md)
+!scripts/respaldo.sh
+!scripts/restaurar.sh
 
 # El .env.example si se versiona.
 !.env.example
