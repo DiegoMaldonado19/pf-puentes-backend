@@ -9,6 +9,12 @@ Fuentes: `organización/P7/02-revision-academica.md`, RN-REV-01/03 y contratos d
 
 El GET admite omitir estado para consultar ENVIADA y EN_REVISION. Devuelve `content`, `number`, `size`, `total_elements`, `total_pages`, sin calificación ni datos del formulario. Cada fila contiene contexto académico y `revision_id` si existe un ciclo activo. El POST no requiere cuerpo y devuelve 201 con `id`, `inspeccion_id`, `revisor_id`, `creado_en`. 400 para filtro inválido; 401 sin sesión; 403 por rol/cuenta; 404 para inspección ajena, propia o inexistente; 409 por estado incompatible o ciclo activo.
 
+## Compatibilidad tras integrar Foro
+
+El listener de Foro participa en la publicación de Inspecciones y crea un hilo por inspección publicada. La limpieza de fixtures de Revisión elimina únicamente los comentarios/hilos vinculados a sus inspecciones, en orden de FK, antes de borrarlas. La prueba de aprobación verifica un único hilo público incluso después de rechazar un segundo veredicto. No se desactiva el listener ni se elimina contenido de otros fixtures.
+
+Comprobación de migraciones: 40 archivos, sin versiones repetidas; las migraciones existentes en `origin/develop` y `origin/main` no fueron alteradas ni eliminadas. `V2026_10_27_1200__crear_aviso_revision.sql` sigue siendo una adición propia de la rama, no una modificación de un esquema ya publicado.
+
 Pruebas focalizadas:
 
 ```bash

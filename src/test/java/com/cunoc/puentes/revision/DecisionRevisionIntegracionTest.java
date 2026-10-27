@@ -137,6 +137,12 @@ class DecisionRevisionIntegracionTest extends PruebaIntegracion {
                 .single())
         .isEqualByComparingTo("85");
     decidir("APROBADA", "Repetido").andExpect(status().isConflict());
+    assertThat(
+            jdbc.sql("select count(*) from hilo where inspeccion_id = :id")
+                .param("id", INSPECCION)
+                .query(Long.class)
+                .single())
+        .isEqualTo(1);
   }
 
   @Test
