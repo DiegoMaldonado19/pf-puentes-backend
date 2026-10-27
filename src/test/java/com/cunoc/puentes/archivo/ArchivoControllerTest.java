@@ -35,6 +35,8 @@ class ArchivoControllerTest {
   @Autowired MockMvc mvc;
 
   @MockitoBean ArchivoService servicio;
+  @MockitoBean DocumentoIdempotenciaService documentos;
+  @MockitoBean BajaArchivoIdempotenciaService bajas;
 
   @ParameterizedTest
   @EnumSource(

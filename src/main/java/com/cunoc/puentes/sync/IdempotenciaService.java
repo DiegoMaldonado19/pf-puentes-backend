@@ -6,10 +6,12 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.Duration;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.locks.LockSupport;
 import java.util.function.Supplier;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
@@ -29,9 +31,20 @@ public class IdempotenciaService {
   private final TransactionTemplate transacciones;
   private final JdbcTemplate jdbc;
   private final IdempotenciaRepository repositorio;
+  private final List<IntencionIdempotencia> intenciones;
 
   public IdempotenciaService(
       PlatformTransactionManager gestor, JdbcTemplate jdbc, IdempotenciaRepository repositorio) {
+    this(gestor, jdbc, repositorio, List.of());
+  }
+
+  @Autowired
+  public IdempotenciaService(
+      PlatformTransactionManager gestor,
+      JdbcTemplate jdbc,
+      IdempotenciaRepository repositorio,
+      List<IntencionIdempotencia> intenciones) {
+    this.intenciones = List.copyOf(intenciones);
     this.transacciones = new TransactionTemplate(gestor);
     this.transacciones.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRED);
     this.transacciones.setIsolationLevel(TransactionDefinition.ISOLATION_READ_COMMITTED);
@@ -75,6 +88,19 @@ public class IdempotenciaService {
       Supplier<RespuestaIdempotente> operacion,
       long claveBloqueo) {
     adquirirBloqueo(claveBloqueo, esperaMaxima);
+    // READ_COMMITTED ve la intención independiente incluso si la ejecución anterior revirtió.
+    // No se bloquea otra vez la clave: REQUIRES_NEW solo confirma la evidencia del integrador.
+    for (IntencionIdempotencia intencion : intenciones) {
+      intencion
+          .buscarHuella(usuarioId, clave)
+          .ifPresent(
+              guardada -> {
+                if (guardada.version() != huella.version()
+                    || !MessageDigest.isEqual(guardada.sha256(), huella.sha256())) {
+                  throw claveIncompatible();
+                }
+              });
+    }
 
     Optional<IdempotenciaRepository.ResultadoGuardado> existente =
         repositorio.buscarResultado(usuarioId, clave);

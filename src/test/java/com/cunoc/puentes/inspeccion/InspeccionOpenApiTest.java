@@ -18,6 +18,121 @@ class InspeccionOpenApiTest extends PruebaIntegracion {
   @Autowired MockMvc mvc;
 
   @Test
+  void altaPublicaContratoYEsquemaDeReplay() throws Exception {
+    mvc.perform(get("/api/docs"))
+        .andExpect(status().isOk())
+        .andExpect(
+            jsonPath(
+                    "$.paths['/api/v1/inspecciones'].post.responses['201'].content['application/json'].schema['$ref']")
+                .value("#/components/schemas/InspeccionDTO"))
+        .andExpect(
+            jsonPath(
+                    "$.paths['/api/v1/inspecciones'].post.parameters[?(@.name == 'Idempotency-Key')].in")
+                .value(org.hamcrest.Matchers.hasItem("header")))
+        .andExpect(
+            jsonPath("$.paths['/api/v1/inspecciones'].post.description")
+                .value(org.hamcrest.Matchers.containsString("2 segundos")));
+  }
+
+  @Test
+  void contextoCapturaPublicaContratosSeparadosYDtoTipado() throws Exception {
+    for (String operacion :
+        new String[] {
+          "$.paths['/api/v1/inspecciones/{id}/confirmacion-datos-permanentes'].post",
+          "$.paths['/api/v1/inspecciones/{id}/acompanantes'].put"
+        }) {
+      mvc.perform(get("/api/docs"))
+          .andExpect(status().isOk())
+          .andExpect(
+              jsonPath(operacion + ".responses['200'].content['application/json'].schema['$ref']")
+                  .value("#/components/schemas/InspeccionDTO"))
+          .andExpect(
+              jsonPath(operacion + ".parameters[?(@.name == 'Idempotency-Key')].in")
+                  .value(org.hamcrest.Matchers.hasItem("header")))
+          .andExpect(
+              jsonPath(operacion + ".description")
+                  .value(org.hamcrest.Matchers.containsString("2 segundos")))
+          .andExpect(
+              jsonPath(operacion + ".description")
+                  .value(org.hamcrest.Matchers.containsString("200")))
+          .andExpect(
+              jsonPath(operacion + ".description")
+                  .value(org.hamcrest.Matchers.containsString("heredado")));
+    }
+  }
+
+  @Test
+  void pdfPublica201TipadoYContrato() throws Exception {
+    String operacion = "$.paths['/api/v1/inspecciones/{inspeccionId}/documentos'].post";
+    mvc.perform(get("/api/docs"))
+        .andExpect(status().isOk())
+        .andExpect(
+            jsonPath(operacion + ".responses['201'].content['application/json'].schema['$ref']")
+                .value("#/components/schemas/ArchivoDTO"))
+        .andExpect(
+            jsonPath(operacion + ".parameters[?(@.name == 'Idempotency-Key')].in")
+                .value(org.hamcrest.Matchers.hasItem("header")))
+        .andExpect(
+            jsonPath(operacion + ".description").value(org.hamcrest.Matchers.containsString("2 s")))
+        .andExpect(
+            jsonPath(operacion + ".description")
+                .value(org.hamcrest.Matchers.containsString("MIME")));
+  }
+
+  @Test
+  void fotoPublica201TipadoYContratoDeDosObjetos() throws Exception {
+    String operacion = "$.paths['/api/v1/inspecciones/{inspeccionId}/fotos'].post";
+    mvc.perform(get("/api/docs"))
+        .andExpect(status().isOk())
+        .andExpect(
+            jsonPath(operacion + ".responses['201'].content['application/json'].schema['$ref']")
+                .value("#/components/schemas/ArchivoDTO"))
+        .andExpect(
+            jsonPath(operacion + ".parameters[?(@.name == 'Idempotency-Key')].in")
+                .value(org.hamcrest.Matchers.hasItem("header")))
+        .andExpect(
+            jsonPath(operacion + ".description").value(org.hamcrest.Matchers.containsString("2 s")))
+        .andExpect(
+            jsonPath(operacion + ".description")
+                .value(org.hamcrest.Matchers.containsString("miniatura")));
+  }
+
+  @Test
+  void bajaPublicaReplay204VacioYClaveOpcional() throws Exception {
+    String operacion = "$.paths['/api/v1/archivos/{id}'].delete";
+    mvc.perform(get("/api/docs"))
+        .andExpect(status().isOk())
+        .andExpect(
+            jsonPath(operacion + ".parameters[?(@.name == 'Idempotency-Key')].in")
+                .value(org.hamcrest.Matchers.hasItem("header")))
+        .andExpect(
+            jsonPath(operacion + ".description")
+                .value(org.hamcrest.Matchers.containsString("204 vacío")))
+        .andExpect(
+            jsonPath(operacion + ".description").value(org.hamcrest.Matchers.containsString("2 s")))
+        .andExpect(jsonPath(operacion + ".responses['204'].content").doesNotExist());
+  }
+
+  @Test
+  void bajaBorradorPublicaReplay204VacioYAutorizacionTrasBaja() throws Exception {
+    String operacion = "$.paths['/api/v1/inspecciones/{id}'].delete";
+    mvc.perform(get("/api/docs"))
+        .andExpect(status().isOk())
+        .andExpect(
+            jsonPath(operacion + ".parameters[?(@.name == 'Idempotency-Key')].in")
+                .value(org.hamcrest.Matchers.hasItem("header")))
+        .andExpect(
+            jsonPath(operacion + ".description")
+                .value(org.hamcrest.Matchers.containsString("204 vacío")))
+        .andExpect(
+            jsonPath(operacion + ".description").value(org.hamcrest.Matchers.containsString("2 s")))
+        .andExpect(
+            jsonPath(operacion + ".description")
+                .value(org.hamcrest.Matchers.containsString("autor actual")))
+        .andExpect(jsonPath(operacion + ".responses['204'].content").doesNotExist());
+  }
+
+  @Test
   void guardarPublicaElEsquemaDeInspeccion() throws Exception {
     mvc.perform(get("/api/docs"))
         .andExpect(status().isOk())

@@ -11,4 +11,11 @@ public interface AlmacenamientoArchivos {
   String obtenerUrlFirmada(String clave);
 
   void eliminar(String clave);
+
+  /**
+   * Lee el contenido real; solo ausencia confirmada devuelve vacío, nunca un fallo de transporte.
+   */
+  java.util.Optional<Integridad> inspeccionar(String clave);
+
+  record Integridad(long tamano, String tipoMime, String sha256) {}
 }

@@ -10,7 +10,9 @@ import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -25,6 +27,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Import;
 import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
@@ -44,12 +47,14 @@ class IdempotenciaServiceTest extends PruebaIntegracion {
   @Autowired private IdempotenciaService servicio;
   @Autowired private JdbcTemplate jdbc;
   @Autowired private PlatformTransactionManager gestorTransacciones;
+  @Autowired private IntencionDePrueba intenciones;
 
   private final List<UUID> usuarios = new ArrayList<>();
   private UUID usuarioId;
 
   @BeforeEach
   void prepararUsuario() {
+    intenciones.huellas.clear();
     usuarios.clear();
     usuarioId = crearUsuario();
   }
@@ -554,6 +559,63 @@ class IdempotenciaServiceTest extends PruebaIntegracion {
     assertThat(callbackEjecutado).isFalse();
   }
 
+  @Test
+  @DisplayName("consulta intenciones bajo bloqueo y rechaza otra huella sin callback ni resultado")
+  void intencionDurableVinculaClaveSinCambiarResultadosAdmitidos() {
+    String clave = "intencion-sin-resultado";
+    intenciones.huellas.put(new Identidad(usuarioId, clave), huella(1, 91));
+    AtomicInteger ejecuciones = new AtomicInteger();
+    assertConflicto(TIPO_INCOMPATIBLE, clave, huella(1, 92), ejecuciones);
+    assertConflicto(TIPO_INCOMPATIBLE, clave, huella(2, 91), ejecuciones);
+    assertThat(ejecuciones).hasValue(0);
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT count(*) FROM idempotencia WHERE usuario_id = ? AND clave = ?",
+                Long.class,
+                usuarioId,
+                clave))
+        .isZero();
+    assertThat(intenciones.huellas.get(new Identidad(usuarioId, clave)).sha256())
+        .containsExactly(digest(91));
+
+    UUID otroUsuario = crearUsuario();
+    RespuestaIdempotente aislada =
+        servicio.ejecutar(
+            otroUsuario,
+            clave,
+            huella(2, 92),
+            Duration.ofSeconds(1),
+            () -> new RespuestaIdempotente(204, new byte[0]));
+    assertThat(aislada.estadoHttp()).isEqualTo(204);
+    assertThat(aislada.cuerpo()).isEmpty();
+
+    byte[] bytes = " resultado original ".getBytes(StandardCharsets.UTF_8);
+    RespuestaIdempotente original =
+        servicio.ejecutar(
+            usuarioId,
+            clave,
+            huella(1, 91),
+            Duration.ofSeconds(1),
+            () -> {
+              ejecuciones.incrementAndGet();
+              return new RespuestaIdempotente(207, bytes);
+            });
+    RespuestaIdempotente replay =
+        servicio.ejecutar(
+            usuarioId,
+            clave,
+            huella(1, 91),
+            Duration.ofSeconds(1),
+            () -> {
+              throw new AssertionError("no ejecutar durante replay compatible con intención");
+            });
+    assertThat(original.estadoHttp()).isEqualTo(207);
+    assertThat(original.cuerpo()).containsExactly(bytes);
+    assertThat(replay.estadoHttp()).isEqualTo(207);
+    assertThat(replay.cuerpo()).containsExactly(bytes);
+    assertThat(ejecuciones).hasValue(1);
+  }
+
   private void assertConflicto(
       String tipo, String clave, HuellaIdempotencia huella, AtomicInteger ejecuciones) {
     assertThatThrownBy(
@@ -621,5 +683,33 @@ class IdempotenciaServiceTest extends PruebaIntegracion {
   @EnableAutoConfiguration
   @EnableJpaRepositories(basePackageClasses = IdempotenciaRepository.class)
   @Import(IdempotenciaService.class)
-  static class ConfiguracionDePruebas {}
+  static class ConfiguracionDePruebas {
+    @Bean
+    IntencionDePrueba intencionDePrueba(JdbcTemplate jdbc) {
+      return new IntencionDePrueba(jdbc);
+    }
+  }
+
+  private record Identidad(UUID usuarioId, String clave) {}
+
+  /** Fuente controlada del puerto; la durabilidad real se prueba por HTTP en archivos. */
+  static class IntencionDePrueba implements IntencionIdempotencia {
+    private final ConcurrentHashMap<Identidad, HuellaIdempotencia> huellas =
+        new ConcurrentHashMap<>();
+    private final JdbcTemplate jdbc;
+
+    IntencionDePrueba(JdbcTemplate jdbc) {
+      this.jdbc = jdbc;
+    }
+
+    @Override
+    public Optional<HuellaIdempotencia> buscarHuella(UUID usuarioId, String clave) {
+      assertThat(
+              jdbc.queryForObject(
+                  "SELECT count(*) FROM pg_locks WHERE pid = pg_backend_pid() AND locktype = 'advisory' AND granted",
+                  Long.class))
+          .isPositive();
+      return Optional.ofNullable(huellas.get(new Identidad(usuarioId, clave)));
+    }
+  }
 }

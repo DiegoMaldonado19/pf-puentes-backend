@@ -8,8 +8,11 @@ import com.cunoc.puentes.inspeccion.dto.CrearInspeccionDTO;
 import com.cunoc.puentes.inspeccion.dto.InspeccionDTO;
 import com.cunoc.puentes.inspeccion.puerto.ConsultaFormulario;
 import com.cunoc.puentes.inspeccion.puerto.VersionFormularioVista;
+import com.cunoc.puentes.sync.IdempotenciaService;
+import com.cunoc.puentes.sync.RespuestaIdempotente;
 import com.cunoc.puentes.usuario.Rol;
 import java.math.BigDecimal;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -21,6 +24,7 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import tools.jackson.databind.json.JsonMapper;
 
 @Service
 class InicioInspeccionService {
@@ -37,6 +41,8 @@ class InicioInspeccionService {
   private final ConsultaInspeccionService consultas;
   private final CursoService cursos;
   private final InspeccionEnsamblador ensamblador;
+  private final IdempotenciaService idempotencia;
+  private final JsonMapper json;
 
   InicioInspeccionService(
       InspeccionRepository inspecciones,
@@ -47,7 +53,9 @@ class InicioInspeccionService {
       DistanciaAlPuente distancias,
       ConsultaInspeccionService consultas,
       CursoService cursos,
-      InspeccionEnsamblador ensamblador) {
+      InspeccionEnsamblador ensamblador,
+      IdempotenciaService idempotencia,
+      JsonMapper json) {
     this.inspecciones = inspecciones;
     this.escritura = escritura;
     this.referencias = referencias;
@@ -57,10 +65,76 @@ class InicioInspeccionService {
     this.consultas = consultas;
     this.cursos = cursos;
     this.ensamblador = ensamblador;
+    this.idempotencia = idempotencia;
+    this.json = json;
+  }
+
+  RespuestaIdempotente iniciarIdempotente(
+      UUID actorId, Rol rol, CrearInspeccionDTO datos, String encabezado) {
+    String clave = encabezado.strip();
+    if (clave.codePointCount(0, clave.length()) > 100) {
+      throw error(
+          HttpStatus.BAD_REQUEST,
+          "idempotencia-invalida",
+          "Clave de idempotencia inválida",
+          "Idempotency-Key no puede superar 100 caracteres.");
+    }
+    autorizarAlta(actorId, rol, datos, false);
+    RespuestaIdempotente respuesta;
+    try {
+      respuesta = ejecutarAlta(actorId, rol, datos, clave);
+    } catch (RuntimeException fallo) {
+      // La transacción fallida ya terminó: nunca se consulta desde una sesión abortada por PK.
+      if (esConflictoDeAlta(fallo)) {
+        respuesta = ejecutarAlta(actorId, rol, datos, clave);
+      } else if (esViolacion(fallo, CORRECCION_VIVA)) {
+        throw correccionEnCurso();
+      } else {
+        throw fallo;
+      }
+    }
+    // También cubre una baja o pérdida de permiso mientras se esperaba el advisory lock.
+    autorizarAlta(actorId, rol, datos, true);
+    return respuesta;
+  }
+
+  private RespuestaIdempotente ejecutarAlta(
+      UUID actorId, Rol rol, CrearInspeccionDTO datos, String clave) {
+    return idempotencia.ejecutar(
+        actorId,
+        clave,
+        HuellaAltaIdempotencia.crear(datos, json),
+        Duration.ofSeconds(2),
+        () -> {
+          autorizarAlta(actorId, rol, datos, false);
+          return new RespuestaIdempotente(
+              201, json.writeValueAsBytes(iniciar(actorId, rol, datos, true)));
+        });
+  }
+
+  private void autorizarAlta(
+      UUID actorId, Rol rol, CrearInspeccionDTO datos, boolean exigeExistente) {
+    exigirRolInspector(rol);
+    Inspeccion existente = inspecciones.findById(datos.id()).orElse(null);
+    if (existente == null && exigeExistente) {
+      throw ConsultaInspeccionService.noEncontrada();
+    }
+    UUID puenteId = datos.puenteId();
+    if (existente != null) {
+      mismaDelAutor(existente, actorId, rol);
+      puenteId = existente.getPuenteId();
+    }
+    referencias.puente(puenteId).orElseThrow(InicioInspeccionService::puenteNoEncontrado);
+    cursoDelAutor(actorId, rol, datos, puenteId);
   }
 
   @Transactional
   public InspeccionDTO iniciar(UUID actorId, Rol rol, CrearInspeccionDTO datos) {
+    return iniciar(actorId, rol, datos, false);
+  }
+
+  private InspeccionDTO iniciar(
+      UUID actorId, Rol rol, CrearInspeccionDTO datos, boolean participante) {
     exigirRolInspector(rol);
     Inspeccion existente = inspecciones.findById(datos.id()).orElse(null);
     if (existente != null) {
@@ -94,9 +168,15 @@ class InicioInspeccionService {
     Inspeccion inspeccion =
         nueva(datos, actorId, puente.id(), cursoId, version.id(), gps, original);
     try {
-      Inspeccion guardada = escritura.persistir(inspeccion);
+      Inspeccion guardada =
+          participante
+              ? escritura.persistirParticipando(inspeccion)
+              : escritura.persistir(inspeccion);
       return consultas.detalle(guardada.getId(), actorId, rol).conAdvertencias(gps.advertencias());
     } catch (RuntimeException e) {
+      if (participante) {
+        throw e;
+      }
       if (esViolacion(e, CORRECCION_VIVA)) {
         throw correccionEnCurso();
       }

@@ -77,6 +77,34 @@ class AlmacenamientoMinio implements AlmacenamientoArchivos {
     s3.deleteObject(objeto -> objeto.bucket(BUCKET).key(clave));
   }
 
+  @Override
+  public java.util.Optional<Integridad> inspeccionar(String clave) {
+    try (var objeto = s3.getObject(o -> o.bucket(BUCKET).key(clave))) {
+      var digest = java.security.MessageDigest.getInstance("SHA-256");
+      byte[] bloque = new byte[8192];
+      long tamano = 0;
+      int leidos;
+      while ((leidos = objeto.read(bloque)) != -1) {
+        digest.update(bloque, 0, leidos);
+        tamano += leidos;
+      }
+      if (tamano != objeto.response().contentLength()) {
+        throw new IllegalStateException("La lectura del objeto quedó incompleta.");
+      }
+      return java.util.Optional.of(
+          new Integridad(
+              tamano,
+              objeto.response().contentType(),
+              java.util.HexFormat.of().formatHex(digest.digest())));
+    } catch (software.amazon.awssdk.services.s3.model.NoSuchKeyException ausencia) {
+      return java.util.Optional.empty();
+    } catch (java.io.IOException error) {
+      throw new java.io.UncheckedIOException(error);
+    } catch (java.security.NoSuchAlgorithmException error) {
+      throw new IllegalStateException("SHA-256 no está disponible en esta JVM.", error);
+    }
+  }
+
   private static AwsCredentialsProvider credenciales(String usuario, String clave) {
     return StaticCredentialsProvider.create(AwsBasicCredentials.create(usuario, clave));
   }
