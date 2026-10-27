@@ -1,6 +1,6 @@
 # M08 — Baja idempotente de borrador
 
-**Etapa actual: GREEN local y diferencial observados por el padre; dictamen independiente pendiente.** RED observado: job1 exit1/39 s, 72 pruebas/15 fallos/cero errores u omisiones; M08 18/14 fallos, OpenAPI un fallo, informes Surefire: borrador 25/25 y envío 22/22. No acredita cierre de T4, sincronización frontend ni T5. Autoridad: S1–S3 y L29 de `odd/tasks/g7-2-completo.md`; decisión en [ADR 0053](adr/0053-idempotencia-baja-borrador.md).
+**Estado vigente de M08: T4 cerrada localmente; verificación independiente aprobada, sin bloqueantes.** Job5 exit0/30 s: 25/25 (22 pruebas M08 y tres sondas), sin fallos, errores ni omisiones. El gate global T5 del candidato backend `d4156d5` quedó aprobado el 27/10/2026: `./mvnw -B -ntp spotless:check package pmd:check -DskipTests` y `./mvnw -B -ntp clean verify` terminaron exit 0; los XML frescos suman 1781/1781 sin fallos/errores/omitidas y pasan los tres gates JaCoCo. Diccionario sin diferencia y `git diff --check` exit 0. Esto no acredita G9/G10, sincronización frontend ni aceptación integral. La evidencia del RED y las etapas intermedias que sigue se conserva como historial, no como estado actual. Autoridad: S1–S3 de `odd/tasks/g7-2-completo.md`; decisión en [ADR 0053](adr/0053-idempotencia-baja-borrador.md).
 
 ## Petición y resultado
 
@@ -50,4 +50,4 @@ Los cinco cambios son replay keyed 404→204, clave de 101 caracteres 204→400,
 
 ASSESS comunicado por el padre sobre nueve archivos staged/893 líneas: nativeRisk medium, reviewDue false/under_budget y escalación item2 con verificación independiente requerida. No hubo START ni consumo de autoridad nativa. La unidad es coherente: comportamiento, contrato y prueba HTTP determinista permanecen juntos (la prueba concentra aproximadamente 694 líneas); no se separan para satisfacer un objetivo de 400 líneas.
 
-El dictamen independiente aprueba T4/M08 sin bloqueantes; no es una aprobación nativa ni aceptación externa. La matriz y el plan global permanecen en T5, fuera de esta unidad, así como sincronización frontend. No hubo publicación.
+Al cierre de la unidad T4, el dictamen independiente aprobó M08 sin bloqueantes; no es aprobación nativa ni aceptación externa. La matriz y el plan global se consolidaron en T5, cerrado localmente el 27/10/2026 tras el gate backend indicado al inicio; sincronización frontend permanece fuera del cierre local. No hubo publicación.
