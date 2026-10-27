@@ -1,5 +1,13 @@
 # pf-puentes-backend
 
+## Cursos y asignaciones — 27/10/2026
+
+API bajo `/api/v1`: `GET/POST /cursos`, `GET/PATCH /cursos/{cursoId}`, `GET/POST /cursos/{cursoId}/inscripciones`, `GET/POST /cursos/{cursoId}/inscripciones/{inscripcionId}/asignaciones`, `GET /cursos/estudiantes-elegibles`, `GET /cursos/puentes-disponibles` y `GET /mis-asignaciones`. Gestión restringida al Catedrático y sus cursos; asignaciones propias para Estudiante. Colecciones paginadas y selectores con búsqueda `q`.
+
+La inscripción activa estudiantes pendientes con correo verificado mediante `ActivadorDeEstudiante`, dentro de la misma transacción. No se duplican autenticación ni publicación de inspecciones.
+
+`CursoSesionIntegracionTest`: **3 pruebas aprobadas** con login, autorización por rol/propiedad, activación real y renovación/cierre por cookie; Spotless aplicado. Es una ejecución focalizada, no certifica `verify` completo. [Contrato y endpoints](docs/P7/README.md) · [ADR 0018](docs/adr/0018-cursos-asignaciones-y-contratos-p7.md). Revisión académica completa sigue pendiente.
+
 ### Generación automática de propuestas de mantenimiento por daño, detector crítico P4 y fachada oficial de IC (P8, 25/10/2026)
 
 1. **`DetectorCondicionesCriticas` (`RN-IC-05`):** evalúa automáticamente los 6 campos con marcador `"x-anulacion-critica"` del esquema P4 (`SOCAVACION`, `ASENTAMIENTO`, `PERDIDA_SECCION`, `AUSENCIA_PORTANTE`) con umbral configurable por defecto `>= 3` y se conecta también a `EstimacionPreliminarIcService` cuando no se envían banderas explícitas.
