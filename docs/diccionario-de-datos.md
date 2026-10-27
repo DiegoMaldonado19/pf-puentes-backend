@@ -19,6 +19,8 @@
 - [`idempotencia`](#idempotencia): Respuestas guardadas por Idempotency-Key (DT-OFF-07)
 - [`inscripcion`](#inscripcion): Estudiante vinculado a un curso; activarlo y vincularlo es RN-USR-02
 - [`inspeccion`](#inspeccion): Inspección de un puente: columnas tipadas + daños en JSONB (DT-BD-02)
+- [`intento_baja_archivo`](#intento_baja_archivo): Manifiesto durable de baja física y autorización por padre vigente, sin expiración automática
+- [`intento_documento`](#intento_documento): Intención durable de carga PDF o foto/miniatura; sobrevive al rollback y no expira automáticamente.
 - [`invitacion`](#invitacion): Invitaciones del Administrador para roles que no se auto-registran (RN-USR-03)
 - [`municipio`](#municipio): Municipios de Guatemala según el INE
 - [`notificacion`](#notificacion): Notificaciones de la campana (contrato 5)
@@ -395,6 +397,54 @@ Inspección de un puente: columnas tipadas + daños en JSONB (DT-BD-02)
 - `CHECK (((estado_confirmado IS NULL) OR ((estado_confirmado)::text = (estado_calculado)::text) OR (estado_confirmado_por IS NOT NULL))) NOT VALID`
 - `CHECK (((indice_condicion >= (0)::numeric) AND (indice_condicion <= (100)::numeric)))`
 - `CHECK (((precargada_de_id IS NULL) OR (precargada_de_id <> id)))`
+
+## intento_baja_archivo
+
+Manifiesto durable de baja física y autorización por padre vigente, sin expiración automática
+
+| Columna | Tipo | Nulo | Por defecto | Llaves | Descripción |
+|---|---|---|---|---|---|
+| `usuario_id` | uuid | No |  | PK | Usuario de la operación, no concede permisos |
+| `clave` | character varying(100) | No |  | PK | Clave de operación recortada |
+| `archivo_id` | uuid | No |  |  | UUID solicitado, reutilizable tras finalizar |
+| `inspeccion_id` | uuid | No |  |  | Identidad del padre que debe autorizarse actualmente |
+| `clave_objeto` | text | No |  |  | Clave física exacta del objeto principal |
+| `clave_miniatura` | text | Sí |  |  | Clave física exacta de miniatura opcional |
+| `huella_version` | integer | No |  |  | Versión del contrato de huella |
+| `huella_sha256` | bytea | No |  |  | SHA-256 de método y recurso canónico |
+| `finalizada` | boolean | No | false |  | Baja y resultado confirmados atómicamente |
+
+## intento_documento
+
+Intención durable de carga PDF o foto/miniatura; sobrevive al rollback y no expira automáticamente.
+
+| Columna | Tipo | Nulo | Por defecto | Llaves | Descripción |
+|---|---|---|---|---|---|
+| `usuario_id` | uuid | No |  | PK | Usuario que inicia la operación; no reemplaza su autorización vigente |
+| `clave` | character varying(100) | No |  | PK | Clave de idempotencia normalizada del usuario |
+| `huella_version` | integer | No |  |  | Versión del formato de huella de la operación PDF |
+| `huella_sha256` | bytea | No |  |  | SHA-256 de método, recurso, UUID y manifiesto multipart |
+| `archivo_id` | uuid | No |  |  | UUID del archivo proporcionado por el cliente |
+| `inspeccion_id` | uuid | No |  |  | Identidad del padre; siempre se reautoriza contra la inspección vigente |
+| `clave_objeto` | text | No |  |  | Clave S3 estable elegida y confirmada antes del primer efecto externo |
+| `contenido_sha256` | character varying(64) | No |  |  | SHA-256 hexadecimal del contenido PDF esperado |
+| `tamano` | bigint | No |  |  | Cantidad esperada de bytes PDF |
+| `finalizada` | boolean | No | false |  | La fila de archivo y la actividad se confirmaron; actualización atómica con el resultado de la operación cuando lleva clave |
+| `creado_en` | timestamp with time zone | No | now() |  | Momento de confirmación de la intención durable, no de admisión del resultado HTTP |
+| `tipo_mime` | character varying(100) | No | 'application/pdf'::character varying |  | MIME detectado esperado del objeto principal; PDF para intenciones previas. |
+| `clave_miniatura` | text | Sí |  |  | Identidad MinIO estable de la miniatura; nula en PDF. |
+| `miniatura_sha256` | character varying(64) | Sí |  |  | SHA-256 hexadecimal esperado de la miniatura. |
+| `miniatura_tamano` | bigint | Sí |  |  | Longitud esperada de la miniatura en bytes. |
+| `miniatura_mime` | character varying(100) | Sí |  |  | MIME detectado esperado de la miniatura. |
+
+**Restricciones**
+
+- `UNIQUE (clave_objeto)`
+- `CHECK (((contenido_sha256)::text ~ '^[0-9a-f]{64}$'::text))`
+- `CHECK ((octet_length(huella_sha256) = 32))`
+- `CHECK ((huella_version > 0))`
+- `CHECK ((tamano >= 0))`
+- `CHECK ((((clave_miniatura IS NULL) AND (miniatura_sha256 IS NULL) AND (miniatura_tamano IS NULL) AND (miniatura_mime IS NULL)) OR ((clave_miniatura IS NOT NULL) AND (miniatura_sha256 IS NOT NULL) AND (miniatura_tamano IS NOT NULL) AND (miniatura_tamano >= 0) AND (miniatura_mime IS NOT NULL))))`
 
 ## invitacion
 

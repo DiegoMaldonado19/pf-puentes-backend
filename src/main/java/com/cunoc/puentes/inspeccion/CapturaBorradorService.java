@@ -202,6 +202,36 @@ class CapturaBorradorService {
       boolean guardarCopiaConflicto,
       boolean sync) {}
 
+  RespuestaIdempotente reemplazarAcompanantesIdempotente(
+      UUID inspeccionId,
+      UUID actorId,
+      Rol rol,
+      ReemplazarAcompanantesDTO cuerpo,
+      String encabezado) {
+    contrato.propio(inspeccionId, actorId);
+    String clave = encabezado.strip();
+    if (clave.codePointCount(0, clave.length()) > 100) {
+      throw new NegocioException(
+          HttpStatus.BAD_REQUEST,
+          "idempotencia-invalida",
+          "Clave de idempotencia inválida",
+          "Idempotency-Key no puede superar 100 caracteres.");
+    }
+    RespuestaIdempotente respuesta =
+        idempotencia.ejecutar(
+            actorId,
+            clave,
+            HuellaAcompanantesIdempotencia.crear(inspeccionId, cuerpo, json),
+            Duration.ofSeconds(2),
+            () ->
+                new RespuestaIdempotente(
+                    HttpStatus.OK.value(),
+                    json.writeValueAsBytes(
+                        reemplazarAcompanantes(inspeccionId, actorId, rol, cuerpo))));
+    contrato.propio(inspeccionId, actorId);
+    return respuesta;
+  }
+
   @Transactional
   InspeccionDTO reemplazarAcompanantes(
       UUID inspeccionId, UUID actorId, Rol rol, ReemplazarAcompanantesDTO cuerpo) {
@@ -231,6 +261,32 @@ class CapturaBorradorService {
     inspeccion.setAvisoAbandonoEn(null);
     escritura.guardar(inspeccion);
     return consultas.detalle(inspeccion.getId(), actorId, rol);
+  }
+
+  RespuestaIdempotente eliminarIdempotente(UUID inspeccionId, UUID actorId, String encabezado) {
+    contrato.propioParaReplayDeBaja(inspeccionId, actorId);
+    String clave = encabezado.strip();
+    if (clave.codePointCount(0, clave.length()) > 100) {
+      throw new NegocioException(
+          HttpStatus.BAD_REQUEST,
+          "idempotencia-invalida",
+          "Clave de idempotencia inválida",
+          "Idempotency-Key no puede superar 100 caracteres.");
+    }
+    RespuestaIdempotente respuesta =
+        idempotencia.ejecutar(
+            actorId,
+            clave,
+            HuellaBajaBorradorIdempotencia.crear(inspeccionId, json),
+            ESPERA_IDEMPOTENCIA,
+            () -> {
+              // La misma baja auditada participa en la transacción del núcleo. Revalida
+              // propiedad, existencia y editabilidad después de esperar por la clave.
+              eliminar(inspeccionId, actorId);
+              return new RespuestaIdempotente(HttpStatus.NO_CONTENT.value(), new byte[0]);
+            });
+    contrato.propioParaReplayDeBaja(inspeccionId, actorId);
+    return respuesta;
   }
 
   @Transactional

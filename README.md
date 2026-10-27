@@ -6,6 +6,14 @@ Seguimiento añadido: pendientes del autor en `/api/v1/revisiones/mis-pendientes
 
 `GET /api/v1/revisiones/pendientes` y `POST /api/v1/inspecciones/{inspeccionId}/revisiones`: Catedrático activo, cursos propios y nunca autor de la inspección. Apertura con bloqueo, auditoría y transición mediante el servicio de Inspecciones. El detalle `GET /api/v1/revisiones/{id}`, el POST `/veredicto` y GET/POST `/observaciones` permiten decidir y anclar campos del esquema original. Aprobar delega a `publicarPorAprobacion`; cambios/rechazo requieren texto, sin cambiar estados directamente. [Contrato, alcance y pruebas](docs/revision-academica.md).
 
+### Baja idempotente de borrador — T4 verificado localmente
+
+`DELETE /api/v1/inspecciones/{id}` admite `Idempotency-Key` opcional: huella v1 de método/ruta, clave recortada de hasta 100 caracteres Unicode y espera de 2 s. Solo conserva 204 vacío sin Content-Type, con autorización del autor actual sobre la fila original incluso eliminada antes/después del replay; una operación nueva sigue exigiendo borrador propio no eliminado. Sin clave/blanca conserva 204/404 histórico. Baja, versión, auditoría y resultado son atómicos; no hay nuevo esquema, purga ni expiración. Verificación local del padre: 76/76 pruebas focalizadas y 1781/1781 globales, sin fallos/errores/omisiones; formato, empaquetado, PMD, tres gates JaCoCo y diccionario sin cambios aprobados. Diferencial: 38 observaciones iguales, cinco cambios solicitados y cero regresiones; JSON comparado estructuralmente salvo relojes de servidor, replay RAW y 204 vacío sin Content-Type comprobados. Verificación independiente aprobada sin bloqueantes: 25/25 (22 pruebas M08 y tres sondas), exit 0. RED y corrección de la instantánea JPA/JDBC conservados en la guía. [Contrato, pruebas y límites](docs/idempotencia-baja-borrador.md), [ADR 0053](docs/adr/0053-idempotencia-baja-borrador.md). No acredita cierre de T5 ni sincronización frontend.
+
+### Archivos idempotentes — T3 verificado localmente
+
+`DELETE /api/v1/archivos/{id}` incorpora `Idempotency-Key`: solo conserva 204 vacío, autoriza el padre vigente antes/después del replay y reconcilia objetos mediante manifiesto durable. Sin clave/blanco conserva 204/404 histórico salvo reserva pendiente, que exige recuperar la operación original. No hay nueva purga ni expiración. RED comunicado por el padre: 18 pruebas, 11 fallos, cero errores/omitidos. Verificación final: 168/168 pruebas focalizadas y 1758/1758 globales sin fallos/errores/omitidos, JaCoCo/formato/PMD y diccionario aprobados. Verificación independiente sin bloqueantes y diferencial de 90 observaciones por versión sin diferencias inesperadas; [contrato y límites](docs/adr/0052-idempotencia-de-baja-de-archivo.md).
+
 ### Generación automática de propuestas de mantenimiento por daño, detector crítico P4 y fachada oficial de IC (P8, 25/10/2026)
 
 1. **`DetectorCondicionesCriticas` (`RN-IC-05`):** evalúa automáticamente los 6 campos con marcador `"x-anulacion-critica"` del esquema P4 (`SOCAVACION`, `ASENTAMIENTO`, `PERDIDA_SECCION`, `AUSENCIA_PORTANTE`) con umbral configurable por defecto `>= 3` y se conecta también a `EstimacionPreliminarIcService` cuando no se envían banderas explícitas.
@@ -133,6 +141,14 @@ El contrato detallado está en la [guía de idempotencia del borrador](docs/idem
 Guarda status/bytes exactos del 200 ENVIADA/PUBLICADA y 422 `inspeccion-no-publicable`, junto con transición, publicación y avisos persistidos en una transacción PostgreSQL. Tras corregir datos, confirmar permanentes o agregar fotos de un rechazo guardado, use una clave nueva. La espera vence a los 2 segundos: 409 `operacion-en-proceso`, reintentable y no cacheable. Legado JSONB u otra huella: 409 `clave-idempotencia-incompatible`, sin conversión ni ejecución.
 
 Autenticación, permisos, inexistencia, estado no editable, binding y fallos transitorios no se guardan. La atomicidad cubre efectos PostgreSQL, no entrega física exactamente una vez de correo/eventos externos. No cambian PUT, otras operaciones ni retención. [Guía de reintentos](docs/idempotencia-envio.md) y [ADR 0047](docs/adr/0047-idempotencia-del-post-de-envio.md).
+
+### Reintentar PDF con intención durable (G7.2, M06 en verificación)
+
+`POST /api/v1/inspecciones/{id}/documentos` admite `Idempotency-Key` opcional: recortada, hasta 100 caracteres Unicode. Huella v1 de método, padre, UUID y SHA-256/tamaño/MIME declarado del PDF; nombre cliente y boundary quedan fuera. Solo guarda 201 JSON exacto, incluidas sus URLs originales aunque venzan. Autoriza el padre vigente antes y después del núcleo; el replay no exige nueva editabilidad ni existencia del adjunto.
+
+Una intención PostgreSQL confirmada antes de MinIO conserva claves estables y permite inspeccionar el contenido remoto al recuperar un fallo, sin sobrescritura ciega. Resultado, archivo, actividad y finalización se confirman juntos. 409 `operacion-en-proceso` es reintentable; `clave-idempotencia-incompatible` rechaza otra huella/legado y `objeto-archivo-incompatible` protege un objeto remoto distinto. No se cachean rechazos ni errores transitorios, no hay expiración/purga nueva. Sin clave/blanco conserva deduplicación UUID/201.
+
+**Alcance:** PDF, fotos/miniaturas y DELETE idempotente implementados y verificados localmente en T3. No acredita el cierre global de G7.2, aceptación externa ni sincronización frontend. [Contrato/evidencia](docs/idempotencia-archivos.md) y [ADR 0050](docs/adr/0050-idempotencia-y-reconciliacion-de-documentos.md).
 
 ## Desarrollo local
 

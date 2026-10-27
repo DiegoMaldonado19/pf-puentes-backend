@@ -27,6 +27,17 @@ class EscrituraAltaInspeccion {
   @Transactional(propagation = Propagation.REQUIRES_NEW)
   @Auditable(accion = Acciones.CREAR, entidad = "inspeccion", entidadId = "#inspeccion.id")
   public Inspeccion persistir(Inspeccion inspeccion) {
+    return escribir(inspeccion);
+  }
+
+  /** G7.1 es dueño de la transacción; dominio, transición y auditoría participan en ella. */
+  @Transactional(propagation = Propagation.MANDATORY)
+  @Auditable(accion = Acciones.CREAR, entidad = "inspeccion", entidadId = "#inspeccion.id")
+  public Inspeccion persistirParticipando(Inspeccion inspeccion) {
+    return escribir(inspeccion);
+  }
+
+  private Inspeccion escribir(Inspeccion inspeccion) {
     Inspeccion guardada = inspecciones.save(inspeccion);
     TransicionInspeccion alta = new TransicionInspeccion();
     alta.setInspeccion(guardada);

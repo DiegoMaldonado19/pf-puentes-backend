@@ -36,6 +36,21 @@ class AlmacenamientoMinioTest extends PruebaIntegracion {
   }
 
   @Test
+  void inspeccionConfirmaContenidoMimeYAusenciaReal() {
+    String clave = "prueba-integridad/documento.pdf";
+    almacenamiento.guardar(clave, PDF, "application/pdf");
+    try {
+      var integridad = almacenamiento.inspeccionar(clave).orElseThrow();
+      assertThat(integridad.tamano()).isEqualTo(PDF.length);
+      assertThat(integridad.tipoMime()).isEqualTo("application/pdf");
+      assertThat(integridad.sha256()).isEqualTo(HuellaDocumento.sha256(PDF));
+    } finally {
+      almacenamiento.eliminar(clave);
+    }
+    assertThat(almacenamiento.inspeccionar(clave)).isEmpty();
+  }
+
+  @Test
   void laUrlFirmadaDescargaElObjetoSinCredenciales() throws Exception {
     almacenamiento.guardar(CLAVE, PDF, "application/pdf");
 

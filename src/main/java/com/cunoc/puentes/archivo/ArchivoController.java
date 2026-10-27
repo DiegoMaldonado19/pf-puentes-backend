@@ -4,6 +4,9 @@ import com.cunoc.puentes.archivo.dto.ArchivoDTO;
 import com.cunoc.puentes.archivo.dto.SubirDocumentoDTO;
 import com.cunoc.puentes.archivo.dto.SubirFotoDTO;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -11,11 +14,13 @@ import java.security.Principal;
 import java.util.UUID;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
@@ -32,15 +37,32 @@ import org.springframework.web.bind.annotation.RestController;
 class ArchivoController {
 
   private final ArchivoService servicio;
+  private final DocumentoIdempotenciaService documentos;
 
-  ArchivoController(ArchivoService servicio) {
+  @org.springframework.beans.factory.annotation.Autowired
+  private BajaArchivoIdempotenciaService bajas;
+
+  ArchivoController(ArchivoService servicio, DocumentoIdempotenciaService documentos) {
     this.servicio = servicio;
+    this.documentos = documentos;
   }
 
   @Operation(
       summary = "Sube una foto y su miniatura a un borrador propio",
-      description = "Reenviar el mismo id devuelve la foto ya guardada (DT-OFF-05, DT-OFF-07).")
-  @ApiResponse(responseCode = "201", description = "Foto guardada")
+      description =
+          "Sin clave/blanco conserva UUID/201. Idempotency-Key admite hasta 100 caracteres Unicode, "
+              + "recortados; huella v1 de POST, padre, UUID, metadatos y SHA-256/tamaño/MIME de foto y miniatura. "
+              + "Solo 201 JSON se conserva con status/bytes y URL originales; autorización actual antes y después, "
+              + "editabilidad solo para mutación nueva. Espera 2 s; operacion-en-proceso es reintentable. "
+              + "Otra huella/legado: clave-idempotencia-incompatible. Intención durable reconcilia ambos objetos; "
+              + "objeto-archivo-incompatible no sobrescribe. No cachea rechazos ni expira automáticamente.")
+  @ApiResponse(
+      responseCode = "201",
+      description = "Foto guardada o replay exacto",
+      content =
+          @Content(
+              mediaType = "application/json",
+              schema = @Schema(implementation = ArchivoDTO.class)))
   @ApiResponse(responseCode = "400", description = "Falta un campo o su formato no es válido")
   @ApiResponse(
       responseCode = "409",
@@ -53,18 +75,43 @@ class ArchivoController {
       path = "/inspecciones/{inspeccionId}/fotos",
       consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
   @ResponseStatus(HttpStatus.CREATED)
-  ArchivoDTO subirFoto(
+  ResponseEntity<?> subirFoto(
       @PathVariable UUID inspeccionId,
       @Valid @ModelAttribute SubirFotoDTO datos,
+      @Parameter(
+              description =
+                  "Opcional, máximo 100 caracteres Unicode; blanco conserva flujo histórico")
+          @RequestHeader(value = "Idempotency-Key", required = false)
+          String clave,
       Principal usuario) {
-    return servicio.guardarFoto(inspeccionId, idDe(usuario), datos);
+    if (clave == null || clave.isBlank()) {
+      return ResponseEntity.status(HttpStatus.CREATED)
+          .body(servicio.guardarFoto(inspeccionId, idDe(usuario), datos));
+    }
+    var respuesta = documentos.guardarFoto(inspeccionId, idDe(usuario), datos, clave);
+    return ResponseEntity.status(respuesta.estadoHttp())
+        .contentType(MediaType.APPLICATION_JSON)
+        .body(respuesta.cuerpo());
   }
 
   @Operation(
       summary = "Adjunta un PDF a un borrador propio",
       description =
-          "Reenviar el mismo id devuelve el documento ya guardado (DT-OFF-05, DT-OFF-07).")
-  @ApiResponse(responseCode = "201", description = "Documento guardado")
+          "Sin clave o en blanco conserva deduplicación UUID/201. Idempotency-Key no blanca se recorta, "
+              + "máximo 100 caracteres Unicode. Huella SHA-256 v1 de POST, padre, UUID y SHA-256/tamaño/MIME "
+              + "del PDF; excluye nombre y boundary. Solo guarda 201 JSON y reproduce status/bytes originales, "
+              + "incluidas URL vencidas, con autorización actual y sin exigir nueva editabilidad. "
+              + "Espera máxima 2 s por bloqueo; 409 operacion-en-proceso reintentable, "
+              + "clave-idempotencia-incompatible para otra huella/legado. No cachea rechazos ni fallos. "
+              + "Intención durable e inspección del contenido remoto permiten recuperar efectos inciertos; "
+              + "objeto-archivo-incompatible no sobrescribe contenido remoto. Sin expiración automática.")
+  @ApiResponse(
+      responseCode = "201",
+      description = "Documento guardado o replay exacto",
+      content =
+          @Content(
+              mediaType = "application/json",
+              schema = @Schema(implementation = ArchivoDTO.class)))
   @ApiResponse(responseCode = "400", description = "Falta un campo o su formato no es válido")
   @ApiResponse(
       responseCode = "409",
@@ -77,14 +124,34 @@ class ArchivoController {
       path = "/inspecciones/{inspeccionId}/documentos",
       consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
   @ResponseStatus(HttpStatus.CREATED)
-  ArchivoDTO subirDocumento(
+  ResponseEntity<?> subirDocumento(
       @PathVariable UUID inspeccionId,
       @Valid @ModelAttribute SubirDocumentoDTO datos,
+      @Parameter(
+              description =
+                  "Opcional, máximo 100 caracteres Unicode; sin clave/blanco conserva flujo histórico")
+          @RequestHeader(value = "Idempotency-Key", required = false)
+          String clave,
       Principal usuario) {
-    return servicio.guardarDocumento(inspeccionId, idDe(usuario), datos);
+    if (clave == null || clave.isBlank()) {
+      return ResponseEntity.status(HttpStatus.CREATED)
+          .body(servicio.guardarDocumento(inspeccionId, idDe(usuario), datos));
+    }
+    var respuesta = documentos.guardar(inspeccionId, idDe(usuario), datos, clave);
+    return ResponseEntity.status(respuesta.estadoHttp())
+        .contentType(MediaType.APPLICATION_JSON)
+        .body(respuesta.cuerpo());
   }
 
-  @Operation(summary = "Borra una foto o un PDF de un borrador propio")
+  @Operation(
+      summary = "Borra una foto o un PDF de un borrador propio",
+      description =
+          "Sin clave/blanco conserva 204 inicial y 404 posterior. Idempotency-Key: strip, "
+              + "máximo 100 caracteres Unicode; huella v1 DELETE y UUID. Solo conserva 204 vacío. "
+              + "Replay con autorización actual del padre retenido, sin exigir BORRADOR ni repetir DELETE. "
+              + "Espera 2 s por bloqueo; operacion-en-proceso reintentable. Otra huella/legado: "
+              + "clave-idempotencia-incompatible. Manifiesto durable reconcilia ausencia de objetos. "
+              + "Sin expiración ni nueva purga; rechazos y fallos no cacheables.")
   @ApiResponse(responseCode = "204", description = "Archivo borrado")
   @ApiResponse(
       responseCode = "409",
@@ -92,8 +159,19 @@ class ArchivoController {
           "La inspección ya no es un borrador; la evidencia publicada no se borra (RN-ARC-05)")
   @DeleteMapping("/archivos/{id}")
   @ResponseStatus(HttpStatus.NO_CONTENT)
-  void eliminar(@PathVariable UUID id, Principal usuario) {
-    servicio.eliminar(id, idDe(usuario));
+  void eliminar(
+      @PathVariable UUID id,
+      @Parameter(
+              description =
+                  "Opcional; máximo 100 caracteres Unicode, blanco conserva flujo histórico")
+          @RequestHeader(value = "Idempotency-Key", required = false)
+          String clave,
+      Principal usuario) {
+    if (clave == null || clave.isBlank()) {
+      servicio.eliminar(id, idDe(usuario));
+    } else {
+      bajas.eliminar(id, idDe(usuario), clave);
+    }
   }
 
   // Contrato 14: el nombre de la autenticación es el UUID del usuario

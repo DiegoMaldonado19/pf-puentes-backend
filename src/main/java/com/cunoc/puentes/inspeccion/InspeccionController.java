@@ -43,7 +43,6 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
@@ -85,19 +84,60 @@ class InspeccionController {
   }
 
   @PostMapping("/inspecciones")
-  @ResponseStatus(HttpStatus.CREATED)
   @PreAuthorize("hasAnyRole('ESTUDIANTE', 'PROFESIONAL_EXTERNO', 'CATEDRATICO')")
-  @Operation(summary = "Inicia una inspección o una corrección")
-  @ApiResponse(responseCode = "201", description = "Borrador creado o reenviado (idempotente)")
+  @Operation(
+      summary = "Inicia una inspección o una corrección",
+      description =
+          "Idempotency-Key opcional: sin clave o en blanco conserva deduplicación UUID y detalle actual. "
+              + "Clave no blanca recortada, máximo 100 caracteres Unicode. Huella SHA-256 v1 de POST, ruta "
+              + "/api/v1/inspecciones y DTO completo (incluye UUID, puente, asignación, curso, fechas, dispositivo, "
+              + "GPS, origen y motivo de corrección); objetos ordenados, números normalizados y UUID canónicos. "
+              + "Solo se guarda 201 application/json con status y bytes exactos, sin expiración automática. "
+              + "Espera máxima 2 segundos; 409 operacion-en-proceso permite reintentar la misma clave. "
+              + "Legado JSONB u otra huella: 409 clave-idempotencia-incompatible sin convertir ni ejecutar. "
+              + "Autoriza rol, autor, recurso no eliminado y asignación vigente antes del replay; no exige "
+              + "nueva editabilidad, formulario activo ni ausencia de corrección viva para reproducir. "
+              + "La baja posterior conserva 409 inspeccion-en-conflicto, no devuelve el resultado antiguo. "
+              + "Alta, transición, auditoría y resultado comparten transacción PostgreSQL. "
+              + "No se guardan rechazos, binding, permisos ni fallos transitorios. X-Sgp-Sync no aplica al alta.")
+  @ApiResponse(
+      responseCode = "201",
+      description = "Borrador creado, deduplicado por UUID o replay byte-exacto",
+      content =
+          @Content(
+              mediaType = "application/json",
+              schema = @Schema(implementation = InspeccionDTO.class)))
   @ApiResponse(responseCode = "400", description = "DTO o UUID v7 inválidos")
   @ApiResponse(responseCode = "403", description = "Sin derecho a inspeccionar ese puente")
-  @ApiResponse(responseCode = "409", description = "Id ajeno, sin formulario o corrección en curso")
+  @ApiResponse(
+      responseCode = "409",
+      description =
+          "Id ajeno/eliminado, sin formulario, corrección en curso, clave-idempotencia-incompatible u operacion-en-proceso; no se guarda")
+  @ApiResponse(
+      responseCode = "404",
+      description = "Recurso inexistente o identidad del resultado ausente; no se guarda")
+  @ApiResponse(responseCode = "500", description = "Fallo transitorio; revierte alta y resultado")
   @ApiResponse(responseCode = "422", description = "Puente inactivo, fecha o corrección inválida")
-  InspeccionDTO crear(
+  ResponseEntity<?> crear(
       Principal usuario,
       Authentication autenticacion,
+      @Parameter(
+              name = IDEMPOTENCIA,
+              in = ParameterIn.HEADER,
+              description =
+                  "Opcional; se recorta, máximo 100 caracteres Unicode. Misma clave y DTO reproducen el 201 original; sin clave o en blanco conserva el flujo anterior.")
+          @RequestHeader(value = IDEMPOTENCIA, required = false)
+          String clave,
       @Valid @RequestBody CrearInspeccionDTO datos) {
-    return inicio.iniciar(id(usuario), rol(autenticacion), datos);
+    if (clave == null || clave.isBlank()) {
+      return ResponseEntity.status(HttpStatus.CREATED)
+          .body(inicio.iniciar(id(usuario), rol(autenticacion), datos));
+    }
+    RespuestaIdempotente respuesta =
+        inicio.iniciarIdempotente(id(usuario), rol(autenticacion), datos, clave);
+    return ResponseEntity.status(respuesta.estadoHttp())
+        .contentType(MediaType.APPLICATION_JSON)
+        .body(respuesta.cuerpo());
   }
 
   @GetMapping("/inspecciones")
@@ -221,14 +261,47 @@ class InspeccionController {
   }
 
   @DeleteMapping("/inspecciones/{id}")
-  @ResponseStatus(HttpStatus.NO_CONTENT)
   @PreAuthorize("hasAnyRole('ESTUDIANTE', 'PROFESIONAL_EXTERNO', 'CATEDRATICO')")
-  @Operation(summary = "Elimina lógicamente un borrador propio")
-  @ApiResponse(responseCode = "204", description = "Borrador dado de baja")
-  @ApiResponse(responseCode = "404", description = "Inexistente, ajena, eliminada o no visible")
-  @ApiResponse(responseCode = "409", description = "No es un borrador")
-  void eliminar(Principal usuario, @PathVariable UUID id) {
-    captura.eliminar(id, id(usuario));
+  @Operation(
+      summary = "Elimina lógicamente un borrador propio",
+      description =
+          "Idempotency-Key opcional: replay 204 vacío, sin Content-Type ni nuevos efectos. "
+              + "Huella v1 de método DELETE y ruta con UUID. Espera máxima 2 s; "
+              + "409 operacion-en-proceso permite reintentar. Se exige autor actual de la fila "
+              + "original incluso eliminada, antes y después del replay; no exige editabilidad "
+              + "para reproducir. Una ejecución nueva requiere borrador propio no eliminado. "
+              + "Otra huella o resultado heredado devuelve 409 clave-idempotencia-incompatible. "
+              + "Solo se guarda 204; baja, versión, auditoría y resultado son atómicos. "
+              + "Sin clave o en blanco conserva 204/404 histórico. No hay expiración ni purga nueva.")
+  @ApiResponse(responseCode = "204", description = "Baja o replay sin cuerpo", content = @Content)
+  @ApiResponse(
+      responseCode = "400",
+      description = "Clave mayor de 100 caracteres Unicode o UUID inválido")
+  @ApiResponse(responseCode = "401", description = "Sin sesión vigente")
+  @ApiResponse(responseCode = "403", description = "Rol no admitido")
+  @ApiResponse(
+      responseCode = "404",
+      description = "Inexistente, ajena o eliminada sin resultado propio")
+  @ApiResponse(
+      responseCode = "409",
+      description = "No editable, clave incompatible u operación en proceso; no se cachea")
+  @ApiResponse(responseCode = "500", description = "Fallo transitorio; rollback sin resultado")
+  ResponseEntity<Void> eliminar(
+      Principal usuario,
+      @PathVariable UUID id,
+      @Parameter(
+              name = IDEMPOTENCIA,
+              in = ParameterIn.HEADER,
+              description =
+                  "Opcional; se recorta y admite hasta 100 caracteres Unicode. Blanca equivale a ausencia.")
+          @RequestHeader(value = IDEMPOTENCIA, required = false)
+          String idempotencia) {
+    if (idempotencia == null || idempotencia.isBlank()) {
+      captura.eliminar(id, id(usuario));
+      return ResponseEntity.noContent().build();
+    }
+    RespuestaIdempotente respuesta = captura.eliminarIdempotente(id, id(usuario), idempotencia);
+    return ResponseEntity.status(respuesta.estadoHttp()).build();
   }
 
   @GetMapping("/inspecciones/{id}/historial")
@@ -252,17 +325,58 @@ class InspeccionController {
 
   @PostMapping("/inspecciones/{id}/confirmacion-datos-permanentes")
   @PreAuthorize("hasAnyRole('ESTUDIANTE', 'PROFESIONAL_EXTERNO', 'CATEDRATICO')")
-  @Operation(summary = "Confirma o corrige los datos permanentes del borrador")
-  @ApiResponse(responseCode = "200", description = "Permanentes guardados")
-  @ApiResponse(responseCode = "404", description = "Inexistente, ajena o eliminada")
-  @ApiResponse(responseCode = "409", description = "No es un borrador")
-  @ApiResponse(responseCode = "422", description = "Daños en el cuerpo o valores inválidos")
-  InspeccionDTO confirmarPermanentes(
+  @Operation(
+      summary = "Confirma o corrige los datos permanentes del borrador",
+      description =
+          "Idempotency-Key opcional, recortada, máximo 100 caracteres Unicode. Sin clave o en blanco "
+              + "conserva la confirmación anterior. Huella SHA-256 v1 de POST, ruta con UUID canónico y "
+              + "DTO completo: datos con objetos ordenados, números normalizados y arrays en su orden. "
+              + "X-Sgp-Sync no aplica. Solo admite 200 application/json, status y bytes originales, "
+              + "sin expiración automática; ningún rechazo se guarda. Espera 2 segundos por usuario/clave. "
+              + "409 operacion-en-proceso permite reintentar; resultado heredado JSONB u otra huella: "
+              + "409 clave-idempotencia-incompatible, sin convertir ni ejecutar. Autoriza recurso propio "
+              + "no eliminado antes del replay y al terminar la espera; solo una operación nueva exige "
+              + "borrador. No recalcula origen, confirmación ni actividad al reproducir. Datos, procedencia, "
+              + "tiempo, auditoría y resultado comparten transacción PostgreSQL y control optimista de versión.")
+  @ApiResponse(
+      responseCode = "200",
+      description = "Permanentes guardados o replay byte-exacto",
+      content =
+          @Content(
+              mediaType = "application/json",
+              schema = @Schema(implementation = InspeccionDTO.class)))
+  @ApiResponse(responseCode = "400", description = "Binding o clave inválidos; no se guarda")
+  @ApiResponse(responseCode = "403", description = "Rol sin permiso; no se guarda")
+  @ApiResponse(responseCode = "404", description = "Inexistente, ajena o eliminada; no se guarda")
+  @ApiResponse(
+      responseCode = "409",
+      description = "No editable, clave incompatible u operación en proceso; no se guarda")
+  @ApiResponse(
+      responseCode = "422",
+      description = "Daños en el cuerpo o valores inválidos; no se guarda")
+  @ApiResponse(
+      responseCode = "500",
+      description = "Fallo transitorio o carrera optimista; revierte efectos y resultado")
+  ResponseEntity<?> confirmarPermanentes(
       Principal usuario,
       Authentication autenticacion,
       @PathVariable UUID id,
+      @Parameter(
+              name = IDEMPOTENCIA,
+              in = ParameterIn.HEADER,
+              description =
+                  "Opcional; se recorta, máximo 100 caracteres Unicode. Misma clave y huella reproducen el 200 original.")
+          @RequestHeader(value = IDEMPOTENCIA, required = false)
+          String clave,
       @Valid @RequestBody ConfirmarDatosPermanentesDTO datos) {
-    return precarga.confirmar(id, id(usuario), rol(autenticacion), datos);
+    if (clave == null || clave.isBlank()) {
+      return ResponseEntity.ok(precarga.confirmar(id, id(usuario), rol(autenticacion), datos));
+    }
+    RespuestaIdempotente respuesta =
+        precarga.confirmarIdempotente(id, id(usuario), rol(autenticacion), datos, clave);
+    return ResponseEntity.status(respuesta.estadoHttp())
+        .contentType(MediaType.APPLICATION_JSON)
+        .body(respuesta.cuerpo());
   }
 
   @PostMapping("/inspecciones/{id}/envio")
@@ -328,17 +442,60 @@ class InspeccionController {
 
   @PutMapping("/inspecciones/{id}/acompanantes")
   @PreAuthorize("hasAnyRole('ESTUDIANTE', 'PROFESIONAL_EXTERNO', 'CATEDRATICO')")
-  @Operation(summary = "Reemplaza la lista de acompañantes del borrador")
-  @ApiResponse(responseCode = "200", description = "Lista reemplazada")
-  @ApiResponse(responseCode = "404", description = "Inexistente, ajena o eliminada")
-  @ApiResponse(responseCode = "409", description = "No es un borrador")
-  @ApiResponse(responseCode = "422", description = "El autor no puede ser acompañante")
-  InspeccionDTO acompanantes(
+  @Operation(
+      summary = "Reemplaza la lista de acompañantes del borrador",
+      description =
+          "Idempotency-Key opcional, recortada, máximo 100 caracteres Unicode. Sin clave o en blanco "
+              + "conserva el reemplazo anterior. Huella SHA-256 v1 de PUT, ruta con UUID canónico y DTO "
+              + "completo: lista en su orden, nombre sin recortar y usuario_id canónico, incluido null. "
+              + "X-Sgp-Sync no aplica. Solo admite 200 application/json con status y bytes originales, "
+              + "sin expiración automática; ningún rechazo se guarda. Espera 2 segundos por usuario/clave. "
+              + "409 operacion-en-proceso permite reintentar; resultado heredado JSONB u otra huella: "
+              + "409 clave-idempotencia-incompatible, sin convertir ni ejecutar. Autoriza recurso propio "
+              + "no eliminado antes del replay y al terminar la espera; solo una operación nueva exige "
+              + "borrador. No borra/recrea relaciones ni restaura listas antiguas al reproducir. Lista, "
+              + "actividad, auditoría y resultado comparten transacción PostgreSQL y control optimista de versión.")
+  @ApiResponse(
+      responseCode = "200",
+      description = "Lista reemplazada o replay byte-exacto",
+      content =
+          @Content(
+              mediaType = "application/json",
+              schema = @Schema(implementation = InspeccionDTO.class)))
+  @ApiResponse(responseCode = "400", description = "Binding o clave inválidos; no se guarda")
+  @ApiResponse(responseCode = "403", description = "Rol sin permiso; no se guarda")
+  @ApiResponse(responseCode = "404", description = "Inexistente, ajena o eliminada; no se guarda")
+  @ApiResponse(
+      responseCode = "409",
+      description = "No editable, clave incompatible u operación en proceso; no se guarda")
+  @ApiResponse(
+      responseCode = "422",
+      description = "El autor no puede ser acompañante; no se guarda")
+  @ApiResponse(
+      responseCode = "500",
+      description = "Fallo transitorio o carrera optimista; revierte efectos y resultado")
+  ResponseEntity<?> acompanantes(
       Principal usuario,
       Authentication autenticacion,
       @PathVariable UUID id,
+      @Parameter(
+              name = IDEMPOTENCIA,
+              in = ParameterIn.HEADER,
+              description =
+                  "Opcional; se recorta, máximo 100 caracteres Unicode. Misma clave y huella reproducen el 200 original.")
+          @RequestHeader(value = IDEMPOTENCIA, required = false)
+          String clave,
       @Valid @RequestBody ReemplazarAcompanantesDTO datos) {
-    return captura.reemplazarAcompanantes(id, id(usuario), rol(autenticacion), datos);
+    if (clave == null || clave.isBlank()) {
+      return ResponseEntity.ok(
+          captura.reemplazarAcompanantes(id, id(usuario), rol(autenticacion), datos));
+    }
+    RespuestaIdempotente respuesta =
+        captura.reemplazarAcompanantesIdempotente(
+            id, id(usuario), rol(autenticacion), datos, clave);
+    return ResponseEntity.status(respuesta.estadoHttp())
+        .contentType(MediaType.APPLICATION_JSON)
+        .body(respuesta.cuerpo());
   }
 
   @GetMapping("/puentes/{puenteId}/inspecciones")

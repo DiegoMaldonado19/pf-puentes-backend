@@ -7,6 +7,7 @@ import com.cunoc.puentes.archivo.dto.SubirFotoDTO;
 import com.cunoc.puentes.common.NegocioException;
 import com.cunoc.puentes.inspeccion.EstadoInspeccion;
 import com.cunoc.puentes.inspeccion.InspeccionService;
+import com.cunoc.puentes.sync.HuellaIdempotencia;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.time.Instant;
@@ -32,6 +33,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 @Service
@@ -52,10 +54,22 @@ public class ArchivoService {
   private final ArchivoRepository repositorio;
   private final ArchivoMapper mapper;
   private final InspeccionService inspecciones;
+  private final CargaDocumentoService cargas;
+  private final BloqueoArchivo bloqueos;
+  @Autowired private BajaArchivoIntencion bajas;
+  @Autowired private org.springframework.transaction.PlatformTransactionManager gestor;
 
   ArchivoService(
       AlmacenamientoArchivos almacenamiento, ArchivoRepository repositorio, ArchivoMapper mapper) {
     this(almacenamiento, repositorio, mapper, null);
+  }
+
+  ArchivoService(
+      AlmacenamientoArchivos almacenamiento,
+      ArchivoRepository repositorio,
+      ArchivoMapper mapper,
+      InspeccionService inspecciones) {
+    this(almacenamiento, repositorio, mapper, inspecciones, null, null);
   }
 
   @Autowired
@@ -63,26 +77,69 @@ public class ArchivoService {
       AlmacenamientoArchivos almacenamiento,
       ArchivoRepository repositorio,
       ArchivoMapper mapper,
-      InspeccionService inspecciones) {
+      InspeccionService inspecciones,
+      CargaDocumentoService cargas,
+      BloqueoArchivo bloqueos) {
     this.almacenamiento = almacenamiento;
     this.repositorio = repositorio;
     this.mapper = mapper;
     this.inspecciones = inspecciones;
+    this.cargas = cargas;
+    this.bloqueos = bloqueos;
   }
 
   /** DT-ALM-04: la foto comprimida y su miniatura de 300 px llegan ya generadas por el cliente. */
+  @Transactional
   public ArchivoDTO guardarFoto(UUID inspeccionId, UUID usuarioId, SubirFotoDTO datos) {
+    return guardarFoto(inspeccionId, usuarioId, datos, null, null);
+  }
+
+  ArchivoDTO guardarFoto(
+      UUID inspeccionId,
+      UUID usuarioId,
+      SubirFotoDTO datos,
+      String clave,
+      HuellaIdempotencia huella) {
+    if (cargas != null && clave != null) {
+      cargas.exigirHuella(usuarioId, clave, huella);
+    }
     return subir(
         inspeccionId,
         usuarioId,
         datos.id(),
         puenteId -> {
           exigirCupo(inspeccionId, FOTOS, MAX_FOTOS_POR_INSPECCION, "fotos");
-          return foto(carpeta(puenteId, inspeccionId), datos);
+          String carpeta = carpeta(puenteId, inspeccionId);
+          if (clave == null) {
+            return foto(carpeta, datos);
+          }
+          byte[] principal = bytes(datos.foto());
+          byte[] miniatura = bytes(datos.miniatura());
+          TipoArchivo tipo = tipoDeFoto(principal);
+          TipoArchivo tipoMiniatura = tipoDeFoto(miniatura);
+          var intento =
+              cargas.prepararFoto(
+                  usuarioId,
+                  clave,
+                  huella,
+                  datos.id(),
+                  inspeccionId,
+                  carpeta,
+                  principal,
+                  tipo,
+                  miniatura,
+                  tipoMiniatura);
+          cargas.reconciliarFoto(intento, principal, miniatura);
+          cargas.finalizar(intento);
+          Archivo archivo = nuevo(datos.id(), tipo, intento.claveObjeto(), principal.length);
+          archivo.setClaveMiniatura(intento.claveMiniatura());
+          metadatosFoto(archivo, datos);
+          return archivo;
         });
   }
 
   /** RN-MTO-05 (contrato 16): P8 ya validó la orden y quién la cierra. */
+  @Transactional
   public ArchivoDTO guardarEvidencia(UUID ordenId, SubirFotoDTO datos) {
     UUID puenteId =
         repositorio
@@ -93,6 +150,13 @@ public class ArchivoService {
                         "orden-no-encontrada",
                         "La orden no existe",
                         "No hay una orden de mantenimiento con ese id."));
+    // P8 conserva su bloqueo de orden; el UUID coordina también con reservas de inspecciones.
+    if (bloqueos != null) {
+      bloqueos.uuid(datos.id());
+    }
+    if (bajas != null) {
+      bajas.exigirSinPendiente(datos.id());
+    }
     return yaGuardado(datos.id(), ordenId, Archivo::getOrdenMantenimientoId)
         .orElseGet(
             () -> {
@@ -102,7 +166,20 @@ public class ArchivoService {
             });
   }
 
+  @Transactional
   public ArchivoDTO guardarDocumento(UUID inspeccionId, UUID usuarioId, SubirDocumentoDTO datos) {
+    return guardarDocumento(inspeccionId, usuarioId, datos, null, null);
+  }
+
+  ArchivoDTO guardarDocumento(
+      UUID inspeccionId,
+      UUID usuarioId,
+      SubirDocumentoDTO datos,
+      String clave,
+      HuellaIdempotencia huella) {
+    if (cargas != null && clave != null) {
+      cargas.exigirHuella(usuarioId, clave, huella);
+    }
     return subir(
         inspeccionId,
         usuarioId,
@@ -120,14 +197,34 @@ public class ArchivoService {
               EnumSet.of(TipoArchivo.PDF),
               MAX_DOCUMENTOS_POR_INSPECCION,
               "documentos");
-          String nombre = carpeta(puenteId, inspeccionId) + UUID.randomUUID();
+          String carpeta = carpeta(puenteId, inspeccionId);
+          Optional<CargaDocumentoService.Intento> intento =
+              cargas == null
+                  ? Optional.empty()
+                  : cargas.preparar(
+                      usuarioId, clave, huella, datos.id(), inspeccionId, carpeta, pdf);
+          if (intento.isPresent()) {
+            cargas.reconciliar(intento.get(), pdf);
+            cargas.finalizar(intento.get());
+            return nuevo(datos.id(), TipoArchivo.PDF, intento.get().claveObjeto(), pdf.length);
+          }
           return nuevo(
-              datos.id(), TipoArchivo.PDF, guardar(nombre, pdf, TipoArchivo.PDF), pdf.length);
+              datos.id(),
+              TipoArchivo.PDF,
+              guardar(carpeta + UUID.randomUUID(), pdf, TipoArchivo.PDF),
+              pdf.length);
         });
   }
 
   /** RN-ARC-05: solo en un borrador propio; la evidencia de una publicada no se borra. */
+  @Transactional
   public void eliminar(UUID archivoId, UUID usuarioId) {
+    if (bloqueos != null) {
+      bloqueos.baja(archivoId);
+    }
+    if (bajas != null) {
+      bajas.exigirSinPendiente(archivoId);
+    }
     Archivo archivo =
         repositorio
             .findById(archivoId)
@@ -142,7 +239,62 @@ public class ArchivoService {
     exigirBorrador(inspeccionPropia(archivo.getInspeccionId(), usuarioId));
     repositorio.delete(archivo);
     eliminarObjetos(archivo);
+    if (bloqueos != null) {
+      repositorio.flush();
+    }
     tocarActividad(archivo.getInspeccionId());
+  }
+
+  /** Dentro de la transacción G7.1: manifiesto independiente y resultado atómico. */
+  void eliminarIdempotente(
+      UUID id, UUID padre, UUID usuario, String clave, HuellaIdempotencia huella) {
+    bloqueos.archivo(padre, id);
+    exigirBorrador(inspeccionPropia(padre, usuario));
+    bajas.exigirDisponible(id, usuario, clave);
+    var intento =
+        bajas
+            .buscar(usuario, clave)
+            .orElseGet(
+                () -> {
+                  Archivo archivo =
+                      repositorio
+                          .findById(id)
+                          .filter(a -> padre.equals(a.getInspeccionId()))
+                          .orElseThrow(
+                              () ->
+                                  noEncontrado(
+                                      "archivo-no-encontrado",
+                                      "El archivo no existe",
+                                      "No hay un archivo con ese id."));
+                  return bajas.preparar(usuario, clave, huella, archivo);
+                });
+    eliminarObjetoReconciliado(intento.claveObjeto());
+    eliminarObjetoReconciliado(intento.claveMiniatura());
+    repositorio
+        .findById(id)
+        .ifPresent(
+            archivo -> {
+              if (!padre.equals(archivo.getInspeccionId())
+                  || !intento.claveObjeto().equals(archivo.getClave())
+                  || !java.util.Objects.equals(
+                      intento.claveMiniatura(), archivo.getClaveMiniatura())) {
+                throw new IllegalStateException(
+                    "La identidad física cambió durante una baja pendiente.");
+              }
+              repositorio.delete(archivo);
+            });
+    repositorio.flush();
+    tocarActividad(padre);
+    bajas.finalizar(usuario, clave);
+  }
+
+  private void eliminarObjetoReconciliado(String clave) {
+    if (clave != null && almacenamiento.inspeccionar(clave).isPresent()) {
+      almacenamiento.eliminar(clave);
+      if (almacenamiento.inspeccionar(clave).isPresent()) {
+        throw new IllegalStateException("El objeto sigue presente después de DELETE.");
+      }
+    }
   }
 
   /**
@@ -174,7 +326,12 @@ public class ArchivoService {
   }
 
   /** RN-INS-06 (contrato 17): una foto purgada ya no cuenta. */
+  @Transactional
   public long contarFotos(UUID inspeccionId) {
+    // Envío llama este contrato antes de cambiar estado: comparte la fila SQL con cargas/bajas.
+    if (bloqueos != null) {
+      bloqueos.inspeccion(inspeccionId);
+    }
     return repositorio.countByInspeccionIdAndTipoInAndPurgadoEnIsNull(inspeccionId, FOTOS);
   }
 
@@ -187,9 +344,17 @@ public class ArchivoService {
     int purgados = 0;
     for (Archivo archivo : vencidos) {
       try {
-        eliminarObjetos(archivo);
-        archivo.setPurgadoEn(Instant.now());
-        repositorio.save(archivo);
+        if (bloqueos == null) {
+          purgar(archivo);
+        } else {
+          new org.springframework.transaction.support.TransactionTemplate(gestor)
+              .executeWithoutResult(
+                  estado -> {
+                    bloqueos.archivo(archivo.getInspeccionId(), archivo.getId());
+                    bajas.exigirSinPendiente(archivo.getId());
+                    repositorio.findById(archivo.getId()).ifPresent(this::purgar);
+                  });
+        }
         purgados++;
       } catch (RuntimeException ex) {
         // Sin purgado_en: la próxima corrida lo vuelve a intentar
@@ -199,9 +364,21 @@ public class ArchivoService {
     log.info("RN-ARC-06: {} de {} archivos purgados", purgados, vencidos.size());
   }
 
+  private void purgar(Archivo archivo) {
+    eliminarObjetos(archivo);
+    archivo.setPurgadoEn(Instant.now());
+    repositorio.save(archivo);
+  }
+
   private ArchivoDTO subir(
       UUID inspeccionId, UUID usuarioId, UUID id, Function<UUID, Archivo> guardarObjetos) {
+    if (bloqueos != null) {
+      bloqueos.archivo(inspeccionId, id);
+    }
     InspeccionDelArchivo inspeccion = inspeccionPropia(inspeccionId, usuarioId);
+    if (bajas != null) {
+      bajas.exigirSinPendiente(id);
+    }
     return yaGuardado(id, inspeccionId, Archivo::getInspeccionId)
         .orElseGet(
             () -> {
@@ -210,7 +387,12 @@ public class ArchivoService {
               // eliminar), quedan objetos huérfanos; barrerlos si llega a importar
               Archivo archivo = guardarObjetos.apply(inspeccion.getPuenteId());
               archivo.setInspeccionId(inspeccionId);
-              ArchivoDTO dto = aDTO(repositorio.save(archivo));
+              Archivo guardado = repositorio.save(archivo);
+              // registrarActividadAutor limpia el contexto JPA: primero materializar la nueva fila.
+              if (bloqueos != null) {
+                repositorio.flush();
+              }
+              ArchivoDTO dto = aDTO(guardado);
               tocarActividad(inspeccionId);
               return dto;
             });
@@ -235,6 +417,10 @@ public class ArchivoService {
   }
 
   private Archivo foto(String carpeta, SubirFotoDTO datos) {
+    // Solo creación: los UUID ya confirmados conservan yaGuardado, incluso entre tipos.
+    if (cargas != null) {
+      cargas.exigirSinReservaPendiente(datos.id());
+    }
     byte[] foto = bytes(datos.foto());
     byte[] miniatura = bytes(datos.miniatura());
     TipoArchivo tipoFoto = tipoDeFoto(foto);
@@ -242,14 +428,18 @@ public class ArchivoService {
     String nombre = carpeta + UUID.randomUUID();
     Archivo archivo = nuevo(datos.id(), tipoFoto, guardar(nombre, foto, tipoFoto), foto.length);
     archivo.setClaveMiniatura(guardar(nombre + "-miniatura", miniatura, tipoMiniatura));
-    archivo.setElementoRef(datos.elementoRef());
-    archivo.setUbicacion(punto(datos.latitud(), datos.longitud()));
-    archivo.setCapturadaEn(datos.capturadaEn());
+    metadatosFoto(archivo, datos);
     return archivo;
   }
 
+  private static void metadatosFoto(Archivo archivo, SubirFotoDTO datos) {
+    archivo.setElementoRef(datos.elementoRef());
+    archivo.setUbicacion(punto(datos.latitud(), datos.longitud()));
+    archivo.setCapturadaEn(datos.capturadaEn());
+  }
+
   // DT-SEC-04 y Backend/02: la inspección de otro autor no existe para quien pregunta
-  private InspeccionDelArchivo inspeccionPropia(UUID inspeccionId, UUID usuarioId) {
+  InspeccionDelArchivo inspeccionPropia(UUID inspeccionId, UUID usuarioId) {
     return repositorio
         .buscarInspeccion(inspeccionId)
         .filter(inspeccion -> inspeccion.getAutorId().equals(usuarioId))
@@ -326,7 +516,7 @@ public class ArchivoService {
         : WGS84.createPoint(new Coordinate(longitud, latitud));
   }
 
-  private static byte[] bytes(MultipartFile archivo) {
+  static byte[] bytes(MultipartFile archivo) {
     try {
       return archivo.getBytes();
     } catch (IOException ex) {

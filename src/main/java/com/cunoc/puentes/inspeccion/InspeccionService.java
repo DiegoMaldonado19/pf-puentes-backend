@@ -37,6 +37,16 @@ public class InspeccionService {
     return inspeccion;
   }
 
+  /** Solo M08: la fila lógica original permite autorizar su resultado después de la baja. */
+  Inspeccion propioParaReplayDeBaja(UUID inspeccionId, UUID usuarioId) {
+    Inspeccion inspeccion =
+        inspecciones.findById(inspeccionId).orElseThrow(ConsultaInspeccionService::noEncontrada);
+    if (!usuarioId.equals(inspeccion.getAutorId())) {
+      throw ConsultaInspeccionService.noEncontrada();
+    }
+    return inspeccion;
+  }
+
   Inspeccion propio(UUID inspeccionId, UUID usuarioId) {
     Inspeccion inspeccion =
         inspecciones
