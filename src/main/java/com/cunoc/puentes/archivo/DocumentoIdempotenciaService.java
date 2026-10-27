@@ -28,6 +28,40 @@ class DocumentoIdempotenciaService {
   }
 
   RespuestaIdempotente guardar(UUID padre, UUID autor, SubirDocumentoDTO datos, String encabezado) {
+    return ejecutar(
+        padre,
+        autor,
+        encabezado,
+        () ->
+            HuellaDocumento.crear(
+                padre,
+                datos.id(),
+                ArchivoService.bytes(datos.pdf()),
+                datos.pdf().getContentType(),
+                json),
+        (clave, huella) -> archivos.guardarDocumento(padre, autor, datos, clave, huella));
+  }
+
+  RespuestaIdempotente guardarFoto(
+      UUID padre, UUID autor, com.cunoc.puentes.archivo.dto.SubirFotoDTO datos, String encabezado) {
+    return ejecutar(
+        padre,
+        autor,
+        encabezado,
+        () -> HuellaFoto.crear(padre, datos, json),
+        (clave, huella) -> archivos.guardarFoto(padre, autor, datos, clave, huella));
+  }
+
+  private RespuestaIdempotente ejecutar(
+      UUID padre,
+      UUID autor,
+      String encabezado,
+      java.util.function.Supplier<com.cunoc.puentes.sync.HuellaIdempotencia> calcular,
+      java.util.function.BiFunction<
+              String,
+              com.cunoc.puentes.sync.HuellaIdempotencia,
+              com.cunoc.puentes.archivo.dto.ArchivoDTO>
+          guardar) {
     archivos.inspeccionPropia(padre, autor);
     String clave = encabezado.strip();
     if (clave.codePointCount(0, clave.length()) > 100) {
@@ -37,13 +71,7 @@ class DocumentoIdempotenciaService {
           "Clave de idempotencia inválida",
           "Idempotency-Key no puede superar 100 caracteres.");
     }
-    var huella =
-        HuellaDocumento.crear(
-            padre,
-            datos.id(),
-            ArchivoService.bytes(datos.pdf()),
-            datos.pdf().getContentType(),
-            json);
+    var huella = calcular.get();
     RespuestaIdempotente resultado;
     try {
       resultado =
@@ -55,9 +83,7 @@ class DocumentoIdempotenciaService {
               () -> {
                 jdbc.sql("set local lock_timeout = '2s'").update();
                 return new RespuestaIdempotente(
-                    201,
-                    json.writeValueAsBytes(
-                        archivos.guardarDocumento(padre, autor, datos, clave, huella)));
+                    201, json.writeValueAsBytes(guardar.apply(clave, huella)));
               });
     } catch (RuntimeException error) {
       for (Throwable causa = error; causa != null; causa = causa.getCause()) {

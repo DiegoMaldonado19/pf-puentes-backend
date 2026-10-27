@@ -1,6 +1,18 @@
-# Reintentar cargas PDF sin duplicar archivos
+# Reintentar cargas de archivos sin duplicarlos
 
-El corte M06 de T3 integra `POST /api/v1/inspecciones/{id}/documentos` con G7.1 e intención durable PostgreSQL–MinIO. **Verificado localmente: M06 tiene GREEN y verificación independiente; no acredita aceptación externa ni el cierre integral de T3.** M05 fotos y M09 DELETE idempotente siguen pendientes; no se habilitaron por compartir módulo.
+## M05: foto y miniatura — verificación local
+
+`POST /api/v1/inspecciones/{id}/fotos` admite `Idempotency-Key` con alcance por usuario, recorte `strip` y máximo 100 puntos de código Unicode. Sin clave/blanco conserva UUID/201 histórico. Solo guarda 201 JSON exacto, incluidos enlaces originales; no renueva URLs en replay. Espera por clave y bloqueo SQL de 2 s, con `operacion-en-proceso` reintentable. Los rechazos y transitorios no se cachean.
+
+La huella v1 liga método/ruta/UUID canónicos, ambos blobs (SHA-256/tamaño/MIME declarado), elemento_ref, coordenadas e instante de captura. Normaliza números e instante UTC; excluye nombres, boundary, orden multipart, parámetros ajenos al DTO y X-Sgp-Sync. Cambiar contenido/metadatos con la misma clave da `clave-idempotencia-incompatible`, sin efectos. Autoriza antes y después del replay; BORRADOR solo se exige para mutación nueva.
+
+El journal de M06 se extiende con integridad e identidad estable de miniatura. Confirma ambas identidades antes de MinIO, inspecciona cada contenido y completa únicamente objetos ausentes; lectura incierta no significa ausencia. Un objeto incompatible se conserva y devuelve `objeto-archivo-incompatible`. Rollback final conserva intención pendiente/objetos y revierte fila/actividad/resultado. No hay nueva purga, retención ni compensación. Mantenimiento y PDF mantienen sus contratos y bloqueos; la reserva UUID pendiente es común.
+
+Diseño: [ADR 0051](adr/0051-idempotencia-y-reconciliacion-de-fotos.md). RED observado por el padre: 12 M05/8 fallos/0 errores/0 omitidos y 19 PDF aprobadas, exit 1/29 s. Casos adicionales preparados sin RED separado. Job9 aprobó 113/113 pruebas focalizadas y 1725/1725 globales, sin errores/fallos/omitidos; JaCoCo, Spotless/package/PMD y diccionario generado, exit 0. Verificación independiente: 37/37, tres sondas de recuperación/reserva y 94/94 originales, además de package; sin bloqueantes reproducidos. El único fallo previo del intento GREEN fue el fixture de sustitución multipart de miniatura, corregido sin cambiar producto ni expectativas. Diferencial contra e1f7f0d aprobado, ambos Maven exit 0: 105 observaciones base y 101 candidato, sin diferencias inesperadas. Clasifica clave de 101 caracteres y reutilización PDF→foto como cambios solicitados, incluidas las ausencias derivadas; tres rechazos de binding se comparan semánticamente con todos los campos y multiconjunto de errores. Replay foto/PDF RAW, sin normalización. M09 continúa fuera de selección e implementación.
+
+## Evidencia histórica del corte M06
+
+El corte M06 de T3 integra `POST /api/v1/inspecciones/{id}/documentos` con G7.1 e intención durable PostgreSQL–MinIO. **Verificado localmente: M06 tiene GREEN y verificación independiente; no acredita aceptación externa ni el cierre integral de T3.** En aquel corte M05 y M09 seguían pendientes; M05 se verifica ahora en la sección anterior y M09 aún no se implementó.
 
 ## Camino rápido
 
@@ -40,7 +52,7 @@ Si se perdió autorización/editabilidad, no finalizar la carga pendiente ni inv
 ## Cortes y trabajo pendiente
 
 1. **M06 verificado localmente:** PDF, intención mínima compartida e inspección real de contenido; evidencia final y límites detallados abajo.
-2. **M05 siguiente:** extender a manifiesto foto/miniatura, metadatos/anclaje y recuperación parcial de dos objetos; preservar mantenimiento.
+2. **M05 actual:** manifiesto foto/miniatura, metadatos/anclaje y recuperación parcial de dos objetos; GREEN, verificación independiente y diferencial aprobados localmente.
 3. **M09 siguiente:** identidad retenida archivo→inspección, recuperación de baja parcial y replay 204 autorizado después de ausencia. DELETE actual sigue sin idempotencia por encabezado.
 
 T4 y T5 global no forman parte de este corte. Cada entrega conserva código, pruebas, docs y migración propios; no se propone un commit de pruebas aislado como entrega funcional.

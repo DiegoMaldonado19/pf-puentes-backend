@@ -89,13 +89,50 @@ public class ArchivoService {
   /** DT-ALM-04: la foto comprimida y su miniatura de 300 px llegan ya generadas por el cliente. */
   @Transactional
   public ArchivoDTO guardarFoto(UUID inspeccionId, UUID usuarioId, SubirFotoDTO datos) {
+    return guardarFoto(inspeccionId, usuarioId, datos, null, null);
+  }
+
+  ArchivoDTO guardarFoto(
+      UUID inspeccionId,
+      UUID usuarioId,
+      SubirFotoDTO datos,
+      String clave,
+      HuellaIdempotencia huella) {
+    if (cargas != null && clave != null) {
+      cargas.exigirHuella(usuarioId, clave, huella);
+    }
     return subir(
         inspeccionId,
         usuarioId,
         datos.id(),
         puenteId -> {
           exigirCupo(inspeccionId, FOTOS, MAX_FOTOS_POR_INSPECCION, "fotos");
-          return foto(carpeta(puenteId, inspeccionId), datos);
+          String carpeta = carpeta(puenteId, inspeccionId);
+          if (clave == null) {
+            return foto(carpeta, datos);
+          }
+          byte[] principal = bytes(datos.foto());
+          byte[] miniatura = bytes(datos.miniatura());
+          TipoArchivo tipo = tipoDeFoto(principal);
+          TipoArchivo tipoMiniatura = tipoDeFoto(miniatura);
+          var intento =
+              cargas.prepararFoto(
+                  usuarioId,
+                  clave,
+                  huella,
+                  datos.id(),
+                  inspeccionId,
+                  carpeta,
+                  principal,
+                  tipo,
+                  miniatura,
+                  tipoMiniatura);
+          cargas.reconciliarFoto(intento, principal, miniatura);
+          cargas.finalizar(intento);
+          Archivo archivo = nuevo(datos.id(), tipo, intento.claveObjeto(), principal.length);
+          archivo.setClaveMiniatura(intento.claveMiniatura());
+          metadatosFoto(archivo, datos);
+          return archivo;
         });
   }
 
@@ -314,10 +351,14 @@ public class ArchivoService {
     String nombre = carpeta + UUID.randomUUID();
     Archivo archivo = nuevo(datos.id(), tipoFoto, guardar(nombre, foto, tipoFoto), foto.length);
     archivo.setClaveMiniatura(guardar(nombre + "-miniatura", miniatura, tipoMiniatura));
+    metadatosFoto(archivo, datos);
+    return archivo;
+  }
+
+  private static void metadatosFoto(Archivo archivo, SubirFotoDTO datos) {
     archivo.setElementoRef(datos.elementoRef());
     archivo.setUbicacion(punto(datos.latitud(), datos.longitud()));
     archivo.setCapturadaEn(datos.capturadaEn());
-    return archivo;
   }
 
   // DT-SEC-04 y Backend/02: la inspección de otro autor no existe para quien pregunta

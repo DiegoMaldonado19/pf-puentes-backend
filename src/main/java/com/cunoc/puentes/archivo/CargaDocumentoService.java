@@ -63,6 +63,64 @@ class CargaDocumentoService implements IntencionIdempotencia {
     return buscar(usuario, clave);
   }
 
+  @Transactional(propagation = Propagation.REQUIRES_NEW)
+  public Intento prepararFoto(
+      UUID usuario,
+      String clave,
+      HuellaIdempotencia huella,
+      UUID archivo,
+      UUID padre,
+      String carpeta,
+      byte[] foto,
+      TipoArchivo tipo,
+      byte[] miniatura,
+      TipoArchivo tipoMiniatura) {
+    exigirHuella(usuario, clave, huella);
+    var anterior = buscar(usuario, clave);
+    if (anterior.isPresent()) {
+      return anterior.get();
+    }
+    exigirSinReservaPendiente(archivo);
+    String nombre = carpeta + UUID.randomUUID();
+    jdbc.sql(
+            """
+        insert into intento_documento (usuario_id, clave, huella_version, huella_sha256,
+          archivo_id, inspeccion_id, clave_objeto, contenido_sha256, tamano,
+          tipo_mime, clave_miniatura, miniatura_sha256, miniatura_tamano, miniatura_mime)
+        values (:usuario, :clave, :version, :huella, :archivo, :padre, :objeto, :contenido,
+          :tamano, :mime, :miniatura, :miniHash, :miniTamano, :miniMime)
+        """)
+        .param("usuario", usuario)
+        .param("clave", clave)
+        .param("version", huella.version())
+        .param("huella", huella.sha256())
+        .param("archivo", archivo)
+        .param("padre", padre)
+        .param("objeto", nombre + "." + tipo.extension)
+        .param("contenido", HuellaDocumento.sha256(foto))
+        .param("tamano", foto.length)
+        .param("mime", tipo.mime)
+        .param("miniatura", nombre + "-miniatura." + tipoMiniatura.extension)
+        .param("miniHash", HuellaDocumento.sha256(miniatura))
+        .param("miniTamano", miniatura.length)
+        .param("miniMime", tipoMiniatura.mime)
+        .update();
+    return buscar(usuario, clave).orElseThrow();
+  }
+
+  void reconciliarFoto(Intento intento, byte[] foto, byte[] miniatura) {
+    reconciliarObjeto(
+        intento.claveObjeto(),
+        foto,
+        new AlmacenamientoArchivos.Integridad(
+            intento.tamano(), intento.tipoMime(), intento.contenidoSha256()));
+    reconciliarObjeto(
+        intento.claveMiniatura(),
+        miniatura,
+        new AlmacenamientoArchivos.Integridad(
+            intento.miniaturaTamano(), intento.miniaturaMime(), intento.miniaturaSha256()));
+  }
+
   /** Bajo el bloqueo UUID común, antes de crear objetos de cualquier tipo o padre. */
   void exigirSinReservaPendiente(UUID archivo) {
     boolean pendiente =
@@ -102,10 +160,15 @@ class CargaDocumentoService implements IntencionIdempotencia {
     var esperado =
         new AlmacenamientoArchivos.Integridad(
             intento.tamano(), TipoArchivo.PDF.mime, intento.contenidoSha256());
-    var actual = almacenamiento.inspeccionar(intento.claveObjeto());
+    reconciliarObjeto(intento.claveObjeto(), contenido, esperado);
+  }
+
+  private void reconciliarObjeto(
+      String clave, byte[] contenido, AlmacenamientoArchivos.Integridad esperado) {
+    var actual = almacenamiento.inspeccionar(clave);
     if (actual.isEmpty()) {
-      almacenamiento.guardar(intento.claveObjeto(), contenido, TipoArchivo.PDF.mime);
-      actual = almacenamiento.inspeccionar(intento.claveObjeto());
+      almacenamiento.guardar(clave, contenido, esperado.tipoMime());
+      actual = almacenamiento.inspeccionar(clave);
     }
     if (actual.isEmpty()) {
       throw new IllegalStateException("El PDF no existe después de guardarlo.");
@@ -155,5 +218,10 @@ class CargaDocumentoService implements IntencionIdempotencia {
       String contenidoSha256,
       long tamano,
       boolean finalizada,
-      java.time.Instant creadoEn) {}
+      java.time.Instant creadoEn,
+      String tipoMime,
+      String claveMiniatura,
+      String miniaturaSha256,
+      Long miniaturaTamano,
+      String miniaturaMime) {}
 }

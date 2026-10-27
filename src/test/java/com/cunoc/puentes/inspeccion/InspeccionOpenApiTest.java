@@ -62,7 +62,7 @@ class InspeccionOpenApiTest extends PruebaIntegracion {
   }
 
   @Test
-  void pdfPublica201TipadoYContratoSinHabilitarFotosNiBajas() throws Exception {
+  void pdfPublica201TipadoYContrato() throws Exception {
     String operacion = "$.paths['/api/v1/inspecciones/{inspeccionId}/documentos'].post";
     mvc.perform(get("/api/docs"))
         .andExpect(status().isOk())
@@ -77,6 +77,24 @@ class InspeccionOpenApiTest extends PruebaIntegracion {
         .andExpect(
             jsonPath(operacion + ".description")
                 .value(org.hamcrest.Matchers.containsString("MIME")));
+  }
+
+  @Test
+  void fotoPublica201TipadoYContratoDeDosObjetos() throws Exception {
+    String operacion = "$.paths['/api/v1/inspecciones/{inspeccionId}/fotos'].post";
+    mvc.perform(get("/api/docs"))
+        .andExpect(status().isOk())
+        .andExpect(
+            jsonPath(operacion + ".responses['201'].content['application/json'].schema['$ref']")
+                .value("#/components/schemas/ArchivoDTO"))
+        .andExpect(
+            jsonPath(operacion + ".parameters[?(@.name == 'Idempotency-Key')].in")
+                .value(org.hamcrest.Matchers.hasItem("header")))
+        .andExpect(
+            jsonPath(operacion + ".description").value(org.hamcrest.Matchers.containsString("2 s")))
+        .andExpect(
+            jsonPath(operacion + ".description")
+                .value(org.hamcrest.Matchers.containsString("miniatura")));
   }
 
   @Test

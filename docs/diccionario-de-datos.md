@@ -18,7 +18,7 @@
 - [`idempotencia`](#idempotencia): Respuestas guardadas por Idempotency-Key (DT-OFF-07)
 - [`inscripcion`](#inscripcion): Estudiante vinculado a un curso; activarlo y vincularlo es RN-USR-02
 - [`inspeccion`](#inspeccion): Inspección de un puente: columnas tipadas + daños en JSONB (DT-BD-02)
-- [`intento_documento`](#intento_documento): Intención durable de carga PDF antes de MinIO; sin expiración ni purga automática. Identidades sin FK para no depender de filas aún no confirmadas o posteriormente eliminadas
+- [`intento_documento`](#intento_documento): Intención durable de carga PDF o foto/miniatura; sobrevive al rollback y no expira automáticamente.
 - [`invitacion`](#invitacion): Invitaciones del Administrador para roles que no se auto-registran (RN-USR-03)
 - [`municipio`](#municipio): Municipios de Guatemala según el INE
 - [`notificacion`](#notificacion): Notificaciones de la campana (contrato 5)
@@ -387,7 +387,7 @@ Inspección de un puente: columnas tipadas + daños en JSONB (DT-BD-02)
 
 ## intento_documento
 
-Intención durable de carga PDF antes de MinIO; sin expiración ni purga automática. Identidades sin FK para no depender de filas aún no confirmadas o posteriormente eliminadas
+Intención durable de carga PDF o foto/miniatura; sobrevive al rollback y no expira automáticamente.
 
 | Columna | Tipo | Nulo | Por defecto | Llaves | Descripción |
 |---|---|---|---|---|---|
@@ -402,6 +402,11 @@ Intención durable de carga PDF antes de MinIO; sin expiración ni purga automá
 | `tamano` | bigint | No |  |  | Cantidad esperada de bytes PDF |
 | `finalizada` | boolean | No | false |  | La fila de archivo y la actividad se confirmaron; actualización atómica con el resultado de la operación cuando lleva clave |
 | `creado_en` | timestamp with time zone | No | now() |  | Momento de confirmación de la intención durable, no de admisión del resultado HTTP |
+| `tipo_mime` | character varying(100) | No | 'application/pdf'::character varying |  | MIME detectado esperado del objeto principal; PDF para intenciones previas. |
+| `clave_miniatura` | text | Sí |  |  | Identidad MinIO estable de la miniatura; nula en PDF. |
+| `miniatura_sha256` | character varying(64) | Sí |  |  | SHA-256 hexadecimal esperado de la miniatura. |
+| `miniatura_tamano` | bigint | Sí |  |  | Longitud esperada de la miniatura en bytes. |
+| `miniatura_mime` | character varying(100) | Sí |  |  | MIME detectado esperado de la miniatura. |
 
 **Restricciones**
 
@@ -410,6 +415,7 @@ Intención durable de carga PDF antes de MinIO; sin expiración ni purga automá
 - `CHECK ((octet_length(huella_sha256) = 32))`
 - `CHECK ((huella_version > 0))`
 - `CHECK ((tamano >= 0))`
+- `CHECK ((((clave_miniatura IS NULL) AND (miniatura_sha256 IS NULL) AND (miniatura_tamano IS NULL) AND (miniatura_mime IS NULL)) OR ((clave_miniatura IS NOT NULL) AND (miniatura_sha256 IS NOT NULL) AND (miniatura_tamano IS NOT NULL) AND (miniatura_tamano >= 0) AND (miniatura_mime IS NOT NULL))))`
 
 ## invitacion
 

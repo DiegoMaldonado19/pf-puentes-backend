@@ -46,8 +46,20 @@ class ArchivoController {
 
   @Operation(
       summary = "Sube una foto y su miniatura a un borrador propio",
-      description = "Reenviar el mismo id devuelve la foto ya guardada (DT-OFF-05, DT-OFF-07).")
-  @ApiResponse(responseCode = "201", description = "Foto guardada")
+      description =
+          "Sin clave/blanco conserva UUID/201. Idempotency-Key admite hasta 100 caracteres Unicode, "
+              + "recortados; huella v1 de POST, padre, UUID, metadatos y SHA-256/tamaño/MIME de foto y miniatura. "
+              + "Solo 201 JSON se conserva con status/bytes y URL originales; autorización actual antes y después, "
+              + "editabilidad solo para mutación nueva. Espera 2 s; operacion-en-proceso es reintentable. "
+              + "Otra huella/legado: clave-idempotencia-incompatible. Intención durable reconcilia ambos objetos; "
+              + "objeto-archivo-incompatible no sobrescribe. No cachea rechazos ni expira automáticamente.")
+  @ApiResponse(
+      responseCode = "201",
+      description = "Foto guardada o replay exacto",
+      content =
+          @Content(
+              mediaType = "application/json",
+              schema = @Schema(implementation = ArchivoDTO.class)))
   @ApiResponse(responseCode = "400", description = "Falta un campo o su formato no es válido")
   @ApiResponse(
       responseCode = "409",
@@ -60,11 +72,23 @@ class ArchivoController {
       path = "/inspecciones/{inspeccionId}/fotos",
       consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
   @ResponseStatus(HttpStatus.CREATED)
-  ArchivoDTO subirFoto(
+  ResponseEntity<?> subirFoto(
       @PathVariable UUID inspeccionId,
       @Valid @ModelAttribute SubirFotoDTO datos,
+      @Parameter(
+              description =
+                  "Opcional, máximo 100 caracteres Unicode; blanco conserva flujo histórico")
+          @RequestHeader(value = "Idempotency-Key", required = false)
+          String clave,
       Principal usuario) {
-    return servicio.guardarFoto(inspeccionId, idDe(usuario), datos);
+    if (clave == null || clave.isBlank()) {
+      return ResponseEntity.status(HttpStatus.CREATED)
+          .body(servicio.guardarFoto(inspeccionId, idDe(usuario), datos));
+    }
+    var respuesta = documentos.guardarFoto(inspeccionId, idDe(usuario), datos, clave);
+    return ResponseEntity.status(respuesta.estadoHttp())
+        .contentType(MediaType.APPLICATION_JSON)
+        .body(respuesta.cuerpo());
   }
 
   @Operation(
