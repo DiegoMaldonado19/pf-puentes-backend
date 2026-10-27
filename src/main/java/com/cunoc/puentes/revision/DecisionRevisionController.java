@@ -1,5 +1,6 @@
 package com.cunoc.puentes.revision;
 
+import com.cunoc.puentes.archivo.dto.ArchivoDTO;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -52,6 +53,13 @@ class DecisionRevisionController {
   @ApiResponse(responseCode = "200", description = "Observaciones del ciclo")
   List<ObservacionRevisionDTO> listar(Principal actor, @PathVariable UUID revisionId) {
     return servicio.listar(UUID.fromString(actor.getName()), revisionId);
+  }
+
+  @GetMapping("/archivos")
+  @Operation(summary = "Lista fotos y documentos de la inspección con URLs firmadas")
+  @ApiResponse(responseCode = "200", description = "Archivos autorizados para la revisión")
+  List<ArchivoDTO> archivos(Principal actor, @PathVariable UUID revisionId) {
+    return servicio.archivos(UUID.fromString(actor.getName()), revisionId);
   }
 
   @PostMapping("/observaciones")

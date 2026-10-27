@@ -1,5 +1,7 @@
 package com.cunoc.puentes.revision;
 
+import com.cunoc.puentes.archivo.ArchivoService;
+import com.cunoc.puentes.archivo.dto.ArchivoDTO;
 import com.cunoc.puentes.common.NegocioException;
 import com.cunoc.puentes.common.auditoria.Acciones;
 import com.cunoc.puentes.common.auditoria.Auditable;
@@ -25,6 +27,7 @@ public class DecisionRevisionService {
   private final EstadoCuentaService cuentas;
   private final PublicacionInspeccionService publicaciones;
   private final ObjectMapper json;
+  private final ArchivoService archivos;
 
   DecisionRevisionService(
       RevisionRepository revisiones,
@@ -32,13 +35,15 @@ public class DecisionRevisionService {
       BandejaRevisionRepository contexto,
       EstadoCuentaService cuentas,
       PublicacionInspeccionService publicaciones,
-      ObjectMapper json) {
+      ObjectMapper json,
+      ArchivoService archivos) {
     this.revisiones = revisiones;
     this.observaciones = observaciones;
     this.contexto = contexto;
     this.cuentas = cuentas;
     this.publicaciones = publicaciones;
     this.json = json;
+    this.archivos = archivos;
   }
 
   @Transactional(readOnly = true)
@@ -106,6 +111,12 @@ public class DecisionRevisionService {
     return observaciones.findByRevision_IdOrderByCreadoEnAscIdAsc(id).stream()
         .map(ObservacionRevisionDTO::de)
         .toList();
+  }
+
+  @Transactional(readOnly = true)
+  public List<ArchivoDTO> archivos(UUID actor, UUID id) {
+    Revision revision = exigir(actor, id, false);
+    return archivos.listar(revision.getInspeccionId());
   }
 
   @Transactional
