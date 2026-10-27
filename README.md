@@ -1,5 +1,11 @@
 # pf-puentes-backend
 
+## Revisión académica — 27/10/2026
+
+Seguimiento añadido: pendientes del autor en `/api/v1/revisiones/mis-pendientes`, acceso a sus historiales desde `/revisiones/mis-inspecciones`, resolución por PATCH `/observaciones/{id}/resolucion` e historial paginado por inspección. La calificación es un GET/PUT privado separado por ciclo, sin fuga hacia DTO generales o bitácora. El job diario de 15 días notifica mediante el servicio compartido y deduplica por envío/destinatario con una migración nueva. [ADR 0050](docs/adr/0050-seguimiento-calificacion-privada-y-avisos-de-revision.md).
+
+`GET /api/v1/revisiones/pendientes` y `POST /api/v1/inspecciones/{inspeccionId}/revisiones`: Catedrático activo, cursos propios y nunca autor de la inspección. Apertura con bloqueo, auditoría y transición mediante el servicio de Inspecciones. El detalle `GET /api/v1/revisiones/{id}`, el POST `/veredicto` y GET/POST `/observaciones` permiten decidir y anclar campos del esquema original. Aprobar delega a `publicarPorAprobacion`; cambios/rechazo requieren texto, sin cambiar estados directamente. [Contrato, alcance y pruebas](docs/revision-academica.md).
+
 ### Generación automática de propuestas de mantenimiento por daño, detector crítico P4 y fachada oficial de IC (P8, 25/10/2026)
 
 1. **`DetectorCondicionesCriticas` (`RN-IC-05`):** evalúa automáticamente los 6 campos con marcador `"x-anulacion-critica"` del esquema P4 (`SOCAVACION`, `ASENTAMIENTO`, `PERDIDA_SECCION`, `AUSENCIA_PORTANTE`) con umbral configurable por defecto `>= 3` y se conecta también a `EstimacionPreliminarIcService` cuando no se envían banderas explícitas.

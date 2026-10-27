@@ -24,7 +24,9 @@ class SaneadorDeAuditoriaTest {
         "TokenAcceso",
         "password",
         "jwt_secret",
-        "clave_secreto"
+        "clave_secreto",
+        "calificacion",
+        "CalificacionPrivada"
       })
   void omiteLosCamposSensibles(String campo) {
     Map<String, Object> limpio =
