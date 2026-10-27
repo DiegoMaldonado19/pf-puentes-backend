@@ -1,5 +1,11 @@
 # pf-puentes-backend
 
+## Revisión académica — 27/10/2026
+
+Seguimiento añadido: pendientes del autor en `/api/v1/revisiones/mis-pendientes`, acceso a sus historiales desde `/revisiones/mis-inspecciones`, resolución por PATCH `/observaciones/{id}/resolucion` e historial paginado por inspección. La calificación es un GET/PUT privado separado por ciclo, sin fuga hacia DTO generales o bitácora. El job diario de 15 días notifica mediante el servicio compartido y deduplica por envío/destinatario con una migración nueva. [ADR 0050](docs/adr/0050-seguimiento-calificacion-privada-y-avisos-de-revision.md).
+
+`GET /api/v1/revisiones/pendientes` y `POST /api/v1/inspecciones/{inspeccionId}/revisiones`: Catedrático activo, cursos propios y nunca autor de la inspección. Apertura con bloqueo, auditoría y transición mediante el servicio de Inspecciones. El detalle `GET /api/v1/revisiones/{id}`, el POST `/veredicto` y GET/POST `/observaciones` permiten decidir y anclar campos del esquema original. Aprobar delega a `publicarPorAprobacion`; cambios/rechazo requieren texto, sin cambiar estados directamente. [Contrato, alcance y pruebas](docs/revision-academica.md).
+
 ### Baja idempotente de borrador — T4 verificado localmente
 
 `DELETE /api/v1/inspecciones/{id}` admite `Idempotency-Key` opcional: huella v1 de método/ruta, clave recortada de hasta 100 caracteres Unicode y espera de 2 s. Solo conserva 204 vacío sin Content-Type, con autorización del autor actual sobre la fila original incluso eliminada antes/después del replay; una operación nueva sigue exigiendo borrador propio no eliminado. Sin clave/blanca conserva 204/404 histórico. Baja, versión, auditoría y resultado son atómicos; no hay nuevo esquema, purga ni expiración. Verificación local del padre: 76/76 pruebas focalizadas y 1781/1781 globales, sin fallos/errores/omisiones; formato, empaquetado, PMD, tres gates JaCoCo y diccionario sin cambios aprobados. Diferencial: 38 observaciones iguales, cinco cambios solicitados y cero regresiones; JSON comparado estructuralmente salvo relojes de servidor, replay RAW y 204 vacío sin Content-Type comprobados. Verificación independiente aprobada sin bloqueantes: 25/25 (22 pruebas M08 y tres sondas), exit 0. RED y corrección de la instantánea JPA/JDBC conservados en la guía. [Contrato, pruebas y límites](docs/idempotencia-baja-borrador.md), [ADR 0053](docs/adr/0053-idempotencia-baja-borrador.md). No acredita cierre de T5 ni sincronización frontend.
@@ -285,6 +291,7 @@ GitHub Actions (`.github/workflows/ci-cd.yml`) corre cuatro etapas: build → te
 - **Deploy:** el job escribe el `.env` del entorno desde su GitHub Environment y corre `docker compose up --wait`. Si un contenedor no queda sano, el job falla.
 - **Acceso:** el backend, postgres y minio no publican puertos. La API se alcanza por el nginx del frontend en `https://pf-puentes.duckdns.org[:puerto]/api`, y las fotos por las URL firmadas de `/archivos/` ([ADR 0013](docs/adr/0013-url-firmadas-de-minio-servidas-por-nginx.md)).
 - **Revisar un entorno:** `cd ~/puentes/<entorno>/pf-puentes-backend && docker compose ps`
+- **Respaldos:** `scripts/respaldo.sh <entorno>` cada noche desde el cron del host, y `scripts/restaurar.sh` para probarlos ([guía de respaldo y restauración](docs/guia-respaldo-y-restauracion.md)).
 
 Las decisiones están en [docs/adr](docs/adr/). Los secretos y variables por configurar están en el [ADR 0004](docs/adr/0004-configuracion-por-entorno-con-github-environments.md).
 

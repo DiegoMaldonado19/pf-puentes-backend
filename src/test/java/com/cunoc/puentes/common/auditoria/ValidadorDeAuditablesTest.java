@@ -108,6 +108,20 @@ class ValidadorDeAuditablesTest {
     void modificar(java.util.UUID id) {}
   }
 
+  static class ProyeccionInvalida {
+    @Auditable(accion = Acciones.MODERAR, entidad = "comentario", valorNuevo = "#result.(")
+    Object moderar() {
+      return null;
+    }
+  }
+
+  @Test
+  void unaProyeccionInvalidaImpideElArranque() {
+    contexto
+        .withBean(ProyeccionInvalida.class)
+        .run(c -> assertThat(c).hasFailed().getFailure().hasMessageContaining("#result.("));
+  }
+
   @Test
   void unaCondicionInvalidaImpideElArranque() {
     contexto

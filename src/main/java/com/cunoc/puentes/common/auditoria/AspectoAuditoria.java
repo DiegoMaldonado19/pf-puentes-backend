@@ -55,7 +55,9 @@ class AspectoAuditoria {
     Object[] argumentos = punto.getArgs();
     UUID idPrevio = expresiones.idPrevio(auditable.entidadId(), metodo, argumentos);
     Map<String, Object> anterior =
-        idPrevio == null ? null : estados.leer(auditable.entidad(), idPrevio).orElse(null);
+        idPrevio == null || !auditable.valorAnterior().isBlank()
+            ? null
+            : estados.leer(auditable.entidad(), idPrevio).orElse(null);
     String motivo = expresiones.motivo(auditable.motivo(), metodo, argumentos);
 
     Object resultado = proceder(punto);
@@ -72,7 +74,13 @@ class AspectoAuditoria {
           "No se pudo determinar el id auditable de %s".formatted(metodo.toGenericString()));
     }
     estados.sincronizar();
-    Map<String, Object> posterior = estados.leer(auditable.entidad(), id).orElse(null);
+    if (!auditable.valorAnterior().isBlank()) {
+      anterior = expresiones.valores(auditable.valorAnterior(), metodo, argumentos, resultado);
+    }
+    Map<String, Object> posterior =
+        auditable.valorNuevo().isBlank()
+            ? estados.leer(auditable.entidad(), id).orElse(null)
+            : expresiones.valores(auditable.valorNuevo(), metodo, argumentos, resultado);
     auditoria.registrar(auditable.accion(), auditable.entidad(), id, anterior, posterior, motivo);
     return resultado;
   }
