@@ -171,6 +171,27 @@ class DecisionRevisionIntegracionTest extends PruebaIntegracion {
   }
 
   @Test
+  void aprobarTambienExigeObservacion() throws Exception {
+    decidir("APROBADA", "").andExpect(status().isUnprocessableContent());
+    decidir("APROBADA", "   ")
+        .andExpect(status().isUnprocessableContent())
+        .andExpect(
+            jsonPath("$.type").value(org.hamcrest.Matchers.endsWith("observacion-requerida")));
+    mvc.perform(
+            post(base() + "/veredicto")
+                .with(como(Rol.CATEDRATICO, DOCENTE))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"veredicto\":\"APROBADA\"}"))
+        .andExpect(status().isUnprocessableContent());
+    assertThat(
+            jdbc.sql("select veredicto from revision where id = :id")
+                .param("id", revision)
+                .query(String.class)
+                .optional())
+        .isEmpty();
+  }
+
+  @Test
   void autorizaCadaOperacionPorRolYRevisor() throws Exception {
     mvc.perform(get(base())).andExpect(status().isUnauthorized());
     mvc.perform(get(base()).with(como(Rol.ESTUDIANTE, AJENO))).andExpect(status().isForbidden());

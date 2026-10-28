@@ -521,14 +521,14 @@ class ArchivoBajaIdempotenciaHttpTest extends ArchivoIdempotenciaHttpTest {
     var antes = estado();
     // No hay endpoint de purga: se verifica su entrada pública programada, no almacenamiento
     // interno.
-    servicioArchivo.purgarBorradoresAbandonados();
+    ejecutarSiguienteCorridaDePurga();
     assertThat(estado()).isEqualTo(antes);
     vacia(borrar(id, "reserva-purga", AUTOR));
     UUID historico = crear(true);
     jdbc.sql("update inspeccion set actualizado_en = now() - interval '211 days' where id = :id")
         .param("id", PADRE)
         .update();
-    servicioArchivo.purgarBorradoresAbandonados();
+    ejecutarSiguienteCorridaDePurga();
     assertThat(objetos()).isEmpty();
     assertThat(
             jdbc.sql("select purgado_en is not null from archivo where id = :id")
@@ -536,6 +536,18 @@ class ArchivoBajaIdempotenciaHttpTest extends ArchivoIdempotenciaHttpTest {
                 .query(Boolean.class)
                 .single())
         .isTrue();
+  }
+
+  private void ejecutarSiguienteCorridaDePurga() {
+    // Simula cron sucesivos, sin depender de cuánto retenga ShedLock la corrida anterior.
+    jdbc.sql(
+            """
+            update shedlock
+            set lock_until = timezone('utc', clock_timestamp()) - interval '1 second'
+            where name = 'purga-de-archivos'
+            """)
+        .update();
+    servicioArchivo.purgarBorradoresAbandonados();
   }
 
   private MvcResult competir(String competidor, UUID id) throws Exception {

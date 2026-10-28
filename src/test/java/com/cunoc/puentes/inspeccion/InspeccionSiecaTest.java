@@ -55,6 +55,7 @@ class InspeccionSiecaTest extends PruebaIntegracion {
   @Autowired MockMvc mvc;
   @Autowired JdbcClient jdbc;
   @Autowired AlmacenamientoArchivos almacenamiento;
+  @Autowired com.cunoc.puentes.formulario.FormularioValidacionServiceImpl validacion;
 
   @AfterEach
   void borrarObjetosDeFotos() {
@@ -71,6 +72,52 @@ class InspeccionSiecaTest extends PruebaIntegracion {
         .query(String.class)
         .list()
         .forEach(almacenamiento::eliminar);
+  }
+
+  @Test
+  void identificacionSigueLasReferenciasAunqueSeRenombreLaSeccion() throws Exception {
+    UUID version = UUID.fromString("0192b000-0000-7000-8000-000000000001");
+    String esquema =
+        jdbc.sql("select esquema::text from formulario_version where id = :id")
+            .param("id", version)
+            .query(String.class)
+            .single();
+    try {
+      jdbc.sql("update formulario_version set esquema = cast(:esquema as jsonb) where id = :id")
+          .param("id", version)
+          .param("esquema", esquema.replace("\"identificacion\"", "\"registro\""))
+          .update();
+      validacion.invalidarCache(version);
+      mvc.perform(
+              post(BASE)
+                  .contentType(MediaType.APPLICATION_JSON)
+                  .content(alta())
+                  .with(csrf())
+                  .with(como(Rol.ESTUDIANTE, ESTUDIANTE)))
+          .andExpect(status().isCreated())
+          .andExpect(jsonPath("$.datos.registro.codigo").value(CODIGO_PUENTE))
+          .andExpect(jsonPath("$.datos.identificacion").doesNotExist());
+      mvc.perform(
+              post(BASE + "/" + BORRADOR + "/confirmacion-datos-permanentes")
+                  .contentType(MediaType.APPLICATION_JSON)
+                  .content("{\"datos\":{\"registro\":{\"codigo\":\"FALSO\"}}}")
+                  .with(csrf())
+                  .with(como(Rol.ESTUDIANTE, ESTUDIANTE)))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.datos.registro.codigo").value(CODIGO_PUENTE));
+      guardarAvance(ESTUDIANTE, Rol.ESTUDIANTE, DATOS_GENERALES);
+      subirFotos(ESTUDIANTE, Rol.ESTUDIANTE);
+      enviar(ESTUDIANTE, Rol.ESTUDIANTE)
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.datos.registro.codigo").value(CODIGO_PUENTE))
+          .andExpect(jsonPath("$.datos.identificacion").doesNotExist());
+    } finally {
+      jdbc.sql("update formulario_version set esquema = cast(:esquema as jsonb) where id = :id")
+          .param("id", version)
+          .param("esquema", esquema)
+          .update();
+      validacion.invalidarCache(version);
+    }
   }
 
   @Test

@@ -1,6 +1,8 @@
 package com.cunoc.puentes.inspeccion;
 
 import com.cunoc.puentes.inspeccion.dto.PuenteInspeccionableDTO;
+import com.cunoc.puentes.inspeccion.puerto.RutasDatos;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -36,6 +38,19 @@ class ReferenciasInspeccion {
   }
 
   /** Sección 1 del formulario, de los datos del inventario y del catálogo INE (RN-INV-03). */
+  Map<String, Object> identificacion(UUID puenteId, Map<String, String> rutas) {
+    Map<String, Object> inventario = identificacion(puenteId);
+    Map<String, Object> datos = new LinkedHashMap<>();
+    rutas.forEach(
+        (referencia, ruta) -> {
+          Object valor = RutasDatos.leer(inventario, referencia);
+          if (valor != null) {
+            RutasDatos.escribir(datos, ruta, valor);
+          }
+        });
+    return datos;
+  }
+
   Map<String, Object> identificacion(UUID puenteId) {
     Map<String, Object> seccion =
         jdbc.sql(

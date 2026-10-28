@@ -63,6 +63,16 @@ class ConsultaFormularioProvisional implements ConsultaFormulario {
   }
 
   @Override
+  public Map<String, String> rutasPorReferencia(UUID versionId) {
+    return Map.of(
+        "identificacion.codigo", "identificacion.codigo",
+        "identificacion.nombre", "identificacion.nombre",
+        "identificacion.ruta", "identificacion.ruta",
+        "identificacion.departamento", "identificacion.departamento",
+        "identificacion.municipio", "identificacion.municipio");
+  }
+
+  @Override
   @Transactional(readOnly = true)
   public Optional<VersionFormularioVista> versionActiva() {
     List<FormularioVersion> activas =

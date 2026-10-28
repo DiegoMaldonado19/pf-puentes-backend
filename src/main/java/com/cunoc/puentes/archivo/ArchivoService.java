@@ -1,11 +1,9 @@
 package com.cunoc.puentes.archivo;
 
-import com.cunoc.puentes.archivo.ArchivoRepository.InspeccionDelArchivo;
 import com.cunoc.puentes.archivo.dto.ArchivoDTO;
 import com.cunoc.puentes.archivo.dto.SubirDocumentoDTO;
 import com.cunoc.puentes.archivo.dto.SubirFotoDTO;
 import com.cunoc.puentes.common.NegocioException;
-import com.cunoc.puentes.inspeccion.EstadoInspeccion;
 import com.cunoc.puentes.inspeccion.InspeccionService;
 import com.cunoc.puentes.sync.HuellaIdempotencia;
 import java.io.IOException;
@@ -236,7 +234,7 @@ public class ArchivoService {
                         "archivo-no-encontrado",
                         "El archivo no existe",
                         "No hay un archivo con ese id."));
-    exigirBorrador(inspeccionPropia(archivo.getInspeccionId(), usuarioId));
+    inspecciones.exigirBorradorPropio(archivo.getInspeccionId(), usuarioId);
     repositorio.delete(archivo);
     eliminarObjetos(archivo);
     if (bloqueos != null) {
@@ -249,7 +247,7 @@ public class ArchivoService {
   void eliminarIdempotente(
       UUID id, UUID padre, UUID usuario, String clave, HuellaIdempotencia huella) {
     bloqueos.archivo(padre, id);
-    exigirBorrador(inspeccionPropia(padre, usuario));
+    inspecciones.exigirBorradorPropio(padre, usuario);
     bajas.exigirDisponible(id, usuario, clave);
     var intento =
         bajas
@@ -339,29 +337,40 @@ public class ArchivoService {
   @Scheduled(cron = "0 0 3 * * *", zone = "America/Guatemala")
   @SchedulerLock(name = "purga-de-archivos")
   public void purgarBorradoresAbandonados() {
-    List<Archivo> vencidos =
-        repositorio.buscarParaPurgar(Instant.now().minus(DIAS_PARA_PURGAR, ChronoUnit.DAYS));
+    Instant limite = Instant.now().minus(DIAS_PARA_PURGAR, ChronoUnit.DAYS);
+    List<Archivo> vencidos = repositorio.buscarParaPurgar(limite);
     int purgados = 0;
     for (Archivo archivo : vencidos) {
       try {
+        boolean purgado;
         if (bloqueos == null) {
-          purgar(archivo);
+          purgado = purgarSiVencido(archivo.getId(), limite);
         } else {
-          new org.springframework.transaction.support.TransactionTemplate(gestor)
-              .executeWithoutResult(
-                  estado -> {
-                    bloqueos.archivo(archivo.getInspeccionId(), archivo.getId());
-                    bajas.exigirSinPendiente(archivo.getId());
-                    repositorio.findById(archivo.getId()).ifPresent(this::purgar);
-                  });
+          purgado =
+              Boolean.TRUE.equals(
+                  new org.springframework.transaction.support.TransactionTemplate(gestor)
+                      .execute(
+                          estado -> {
+                            bloqueos.archivo(archivo.getInspeccionId(), archivo.getId());
+                            bajas.exigirSinPendiente(archivo.getId());
+                            return purgarSiVencido(archivo.getId(), limite);
+                          }));
         }
-        purgados++;
+        if (purgado) {
+          purgados++;
+        }
       } catch (RuntimeException ex) {
         // Sin purgado_en: la próxima corrida lo vuelve a intentar
         log.error("RN-ARC-06: no se pudo purgar el archivo {}", archivo.getId(), ex);
       }
     }
     log.info("RN-ARC-06: {} de {} archivos purgados", purgados, vencidos.size());
+  }
+
+  private boolean purgarSiVencido(UUID id, Instant limite) {
+    Optional<Archivo> vigente = repositorio.buscarPurgable(id, limite);
+    vigente.ifPresent(this::purgar);
+    return vigente.isPresent();
   }
 
   private void purgar(Archivo archivo) {
@@ -375,17 +384,17 @@ public class ArchivoService {
     if (bloqueos != null) {
       bloqueos.archivo(inspeccionId, id);
     }
-    InspeccionDelArchivo inspeccion = inspeccionPropia(inspeccionId, usuarioId);
+    UUID puenteId = inspeccionPropia(inspeccionId, usuarioId);
     if (bajas != null) {
       bajas.exigirSinPendiente(id);
     }
     return yaGuardado(id, inspeccionId, Archivo::getInspeccionId)
         .orElseGet(
             () -> {
-              exigirBorrador(inspeccion);
+              inspecciones.exigirBorradorPropio(inspeccionId, usuarioId);
               // ponytail: si la BD falla después de MinIO (o MinIO después de borrar la fila, en
               // eliminar), quedan objetos huérfanos; barrerlos si llega a importar
-              Archivo archivo = guardarObjetos.apply(inspeccion.getPuenteId());
+              Archivo archivo = guardarObjetos.apply(puenteId);
               archivo.setInspeccionId(inspeccionId);
               Archivo guardado = repositorio.save(archivo);
               // registrarActividadAutor limpia el contexto JPA: primero materializar la nueva fila.
@@ -439,33 +448,12 @@ public class ArchivoService {
   }
 
   // DT-SEC-04 y Backend/02: la inspección de otro autor no existe para quien pregunta
-  InspeccionDelArchivo inspeccionPropia(UUID inspeccionId, UUID usuarioId) {
-    return repositorio
-        .buscarInspeccion(inspeccionId)
-        .filter(inspeccion -> inspeccion.getAutorId().equals(usuarioId))
-        .orElseThrow(
-            () ->
-                noEncontrado(
-                    "inspeccion-no-encontrada",
-                    "La inspección no existe",
-                    "No tienes una inspección con ese id."));
+  UUID inspeccionPropia(UUID inspeccionId, UUID usuarioId) {
+    return inspecciones.exigirPropia(inspeccionId, usuarioId);
   }
 
-  // RN-INS-15 y RN-ARC-05
-  private static void exigirBorrador(InspeccionDelArchivo inspeccion) {
-    if (inspeccion.getEstado() != EstadoInspeccion.BORRADOR) {
-      throw new NegocioException(
-          HttpStatus.CONFLICT,
-          "inspeccion-no-editable",
-          "La inspección ya no se puede modificar",
-          "Solo se agregan o quitan archivos mientras la inspección es un borrador.");
-    }
-  }
-
-  // ponytail: contar sin bloquear deja pasar dos subidas simultáneas sobre el tope; P6 sube de una
-  // en una (RN-OFF-05)
   private void exigirCupo(UUID inspeccionId, Set<TipoArchivo> tipos, int maximo, String nombre) {
-    if (repositorio.countByInspeccionIdAndTipoIn(inspeccionId, tipos) >= maximo) {
+    if (repositorio.countByInspeccionIdAndTipoInAndPurgadoEnIsNull(inspeccionId, tipos) >= maximo) {
       throw new NegocioException(
           HttpStatus.UNPROCESSABLE_CONTENT,
           "limite-de-archivos",

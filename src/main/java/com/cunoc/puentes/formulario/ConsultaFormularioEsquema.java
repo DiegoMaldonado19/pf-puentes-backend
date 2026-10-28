@@ -61,6 +61,20 @@ public class ConsultaFormularioEsquema implements ConsultaFormulario {
 
   @Override
   @Transactional(readOnly = true)
+  public Map<String, String> rutasPorReferencia(UUID versionId) {
+    Map<String, String> rutas = new LinkedHashMap<>();
+    propiedades(esquema(versionId))
+        .forEach(
+            (ruta, propiedad) -> {
+              if (propiedad.get("x-elemento-ref") instanceof String referencia) {
+                rutas.put(referencia, ruta);
+              }
+            });
+    return rutas;
+  }
+
+  @Override
+  @Transactional(readOnly = true)
   public List<GrupoElemento> grupos(UUID versionId) {
     Map<String, Set<String>> porGrupo = new LinkedHashMap<>();
     propiedades(esquema(versionId))
