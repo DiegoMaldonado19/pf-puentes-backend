@@ -1,5 +1,6 @@
 package com.cunoc.puentes.inspeccion;
 
+import com.cunoc.puentes.archivo.dto.ArchivoDTO;
 import com.cunoc.puentes.inspeccion.dto.ConfirmarDatosPermanentesDTO;
 import com.cunoc.puentes.inspeccion.dto.CrearInspeccionDTO;
 import com.cunoc.puentes.inspeccion.dto.DatosPermanentesDTO;
@@ -312,6 +313,18 @@ class InspeccionController {
   List<HistorialTransicionDTO> historial(
       Principal usuario, Authentication autenticacion, @PathVariable UUID id) {
     return consultas.historial(id, id(usuario), rol(autenticacion));
+  }
+
+  @GetMapping("/inspecciones/{id}/archivos")
+  @PreAuthorize("hasAnyRole('ESTUDIANTE', 'PROFESIONAL_EXTERNO', 'CATEDRATICO', 'ADMINISTRADOR')")
+  @Operation(
+      summary = "Fotos y documentos de una inspección visible",
+      description = "URL firmadas que vencen a los 15 minutos (DT-SEC-09).")
+  @ApiResponse(responseCode = "200", description = "Archivos en orden de creación")
+  @ApiResponse(responseCode = "404", description = "Inexistente, eliminada o no visible")
+  List<ArchivoDTO> archivos(
+      Principal usuario, Authentication autenticacion, @PathVariable UUID id) {
+    return consultas.archivos(id, id(usuario), rol(autenticacion));
   }
 
   @GetMapping("/inspecciones/{id}/datos-permanentes")

@@ -13,6 +13,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.cunoc.puentes.common.seguridad.SeguridadDePrueba;
 import com.cunoc.puentes.usuario.dto.PerfilDTO;
+import com.cunoc.puentes.usuario.dto.PersonaMencionableDTO;
+import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -41,6 +43,7 @@ class UsuarioControllerTest {
 
   @MockitoBean PerfilService perfiles;
   @MockitoBean CambioContrasenaService contrasenas;
+  @MockitoBean MencionesService menciones;
 
   @ParameterizedTest
   @EnumSource(Rol.class)
@@ -72,6 +75,19 @@ class UsuarioControllerTest {
         .andExpect(status().isOk());
 
     verify(perfiles).obtener(USUARIO);
+  }
+
+  @ParameterizedTest
+  @EnumSource(Rol.class)
+  void cualquierRolVeLasPersonasMencionablesSinCorreo(Rol rol) throws Exception {
+    when(menciones.mencionables())
+        .thenReturn(List.of(new PersonaMencionableDTO(USUARIO, "Carlos Ruiz")));
+
+    mvc.perform(get("/api/v1/usuarios/mencionables").with(como(rol, USUARIO)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$[0].id").value(USUARIO.toString()))
+        .andExpect(jsonPath("$[0].nombre").value("Carlos Ruiz"))
+        .andExpect(jsonPath("$[0].correo").doesNotExist());
   }
 
   @Test

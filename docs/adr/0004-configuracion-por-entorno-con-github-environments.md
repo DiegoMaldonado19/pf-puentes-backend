@@ -40,6 +40,6 @@ La configuración va en un `.env` fuera de git, documentado en `.env.example`. C
 - Un solo workflow para los tres entornos, y ningún secreto en el repo ni en la imagen.
 - Todos se crean como **secretos**, no como variables del Environment: el workflow solo lee `secrets.*`, así que una variable con el mismo nombre llega vacía.
 - Las contraseñas de postgres solo se aplican al crear el volumen. Para cambiarlas después hay que hacer `ALTER ROLE` ([0007](0007-usuarios-de-base-de-datos.md)).
-- Agregar una variable implica tocar `.env.example`, `.env.local`, `compose.yaml`, el heredoc del workflow y los tres Environments.
-- `.env.local` es la excepción a DT-DEP-05: se versiona porque solo trae valores de desarrollo local, que no son secretos.
+- Agregar una variable implica tocar `.env.example`, `.env.local.example`, `compose.yaml`, el heredoc del workflow y los tres Environments.
+- Ningún `.env` se versiona (DT-DEP-05). `.env.local.example` solo trae valores de desarrollo local, que no son secretos; cada quien lo copia a su `.env`.
 - dev no puede limitarse a `develop`: sus deploys corren en `refs/pull/<n>/merge` y GitHub los rechaza (`Branch "refs/pull/1/merge" is not allowed to deploy to dev`). El workflow ya filtra qué PR despliega a dev (`github.base_ref == 'develop'`).

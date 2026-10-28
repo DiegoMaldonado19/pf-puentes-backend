@@ -1,4 +1,4 @@
-# 0049. Veredictos y observaciones ancladas transaccionales
+# 0056. Veredictos y observaciones ancladas transaccionales
 
 - Fecha: 27/10/2026.
 - Estado: aceptado para este incremento.

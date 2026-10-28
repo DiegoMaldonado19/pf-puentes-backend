@@ -23,7 +23,7 @@ Pruebas focalizadas:
 
 Usan la infraestructura Testcontainers, no la base de desarrollo. La limpieza elimina auditoría, observaciones, transiciones y ciclos antes de inspecciones, formulario y fixtures académicos. No elimina filas ajenas.
 
-Implementación inicial: [ADR 0048](adr/0048-bandeja-y-apertura-de-revision-academica.md).
+Implementación inicial: [ADR 0055](adr/0055-bandeja-y-apertura-de-revision-academica.md).
 
 ## Veredictos y observaciones ancladas
 
@@ -39,7 +39,7 @@ Observación: `{elemento_ref, texto}`. El servicio valida la referencia contra `
 
 Las escrituras bloquean primero la inspección y luego cargan el ciclo, verifican responsable actual y revisor asignado; un ciclo cerrado no admite otro veredicto ni nuevas observaciones. Errores: 400 por cuerpo inválido, 404 por revisión ajena, 409 por ciclo/estado incompatible y 422 por referencia/observación/justificación o cálculo inválidos. Se reutiliza auditoría de revisión y observación, en la misma transacción.
 
-Decisión de veredictos: [ADR 0049](adr/0049-veredictos-y-observaciones-ancladas.md).
+Decisión de veredictos: [ADR 0056](adr/0056-veredictos-y-observaciones-ancladas.md).
 
 ## Seguimiento, nota privada y avisos
 
@@ -54,7 +54,7 @@ Decisión de veredictos: [ADR 0049](adr/0049-veredictos-y-observaciones-ancladas
 
 PUT acepta `{calificacion: 87.50}` o null para retirarla; rango 0–100 y hasta dos decimales. No modifica veredictos anteriores. La nota se omite también de la bitácora general. Resolver es idempotente y preserva texto/ciclo/fecha; no cambia las respuestas ni envía el borrador. Las colecciones usan `page`/`size`, máximo 100, y respuesta `content`, `number`, `size`, `total_elements`, `total_pages`. El historial conserva los ciclos en orden descendente; las observaciones añaden `resuelta_en`.
 
-`AvisoRevisionJob` corre diariamente a las 06:30 GT con ShedLock. A los 15 días naturales exactos desde el envío, ENVIADA o EN_REVISION sin decisión final generan una notificación al responsable activo. La tabla técnica de deduplicación es nueva: `V2026_10_27_1200__crear_aviso_revision.sql`. La marca y la notificación son atómicas, una por envío/destinatario. No configura ni envía correo por su cuenta. [ADR 0050](adr/0050-seguimiento-calificacion-privada-y-avisos-de-revision.md).
+`AvisoRevisionJob` corre diariamente a las 06:30 GT con ShedLock. A los 15 días naturales exactos desde el envío, ENVIADA o EN_REVISION sin decisión final generan una notificación al responsable activo. La tabla técnica de deduplicación es nueva: `V2026_10_27_1200__crear_aviso_revision.sql`. La marca y la notificación son atómicas, una por envío/destinatario. No configura ni envía correo por su cuenta. [ADR 0057](adr/0057-seguimiento-calificacion-privada-y-avisos-de-revision.md).
 
 Pendiente de integración visual real: fotos/documentos firmados y edición/reenvío en la pantalla de Inspecciones. Capturas del manual y recorrido de navegador no se declaran completados por las pruebas automatizadas.
 

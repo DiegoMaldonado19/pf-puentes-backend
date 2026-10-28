@@ -95,7 +95,7 @@ public class FormularioVersionService {
     }
 
     // Validar sintaxis del JSON Schema
-    validacionService.validarConEsquema(datos.esquema(), java.util.Map.of());
+    validacionService.compilar(datos.esquema());
 
     FormularioVersion borrador = new FormularioVersion(datos.codigo().trim(), datos.esquema());
     return mapper.aDTO(repository.save(borrador));
@@ -125,7 +125,7 @@ public class FormularioVersionService {
     }
 
     // Validar sintaxis del esquema
-    validacionService.validarConEsquema(datos.esquema(), java.util.Map.of());
+    validacionService.compilar(datos.esquema());
 
     version.setEsquema(datos.esquema());
     validacionService.invalidarCache(id);

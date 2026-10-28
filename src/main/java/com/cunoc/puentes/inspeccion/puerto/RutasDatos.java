@@ -43,6 +43,14 @@ public final class RutasDatos {
     actual.put(partes[partes.length - 1], valor);
   }
 
+  public static void quitar(Map<String, ?> datos, String ruta) {
+    int corte = ruta.lastIndexOf('.');
+    Object padre = corte < 0 ? datos : leer(datos, ruta.substring(0, corte));
+    if (padre instanceof Map<?, ?> mapa) {
+      mapa.remove(ruta.substring(corte + 1));
+    }
+  }
+
   public static Map<String, Object> extraer(Map<String, ?> origen, Set<String> rutas) {
     Map<String, Object> destino = new LinkedHashMap<>();
     if (origen == null || rutas == null) {

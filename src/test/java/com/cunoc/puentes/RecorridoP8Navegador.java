@@ -6,8 +6,8 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
+import java.util.Map;
 import java.util.UUID;
-import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -35,10 +35,7 @@ class RecorridoP8Navegador extends PruebaIntegracion {
 
   @Test
   void recorreFrontendYApiRealesConDatosDesechables() throws Exception {
-    Path frontend =
-        Path.of(System.getenv().getOrDefault("P8_FRONTEND_DIR", "../pf-puentes-frontend"))
-            .toAbsolutePath()
-            .normalize();
+    Path frontend = NavegadorPlaywright.frontend();
     assertThat(frontend.resolve("playwright.p8.config.ts")).exists();
     String clave = "Prueba-P8-navegador-2026!";
     jdbc.update(
@@ -67,28 +64,20 @@ class RecorridoP8Navegador extends PruebaIntegracion {
     var juegosAntes = jdbc.queryForList("SELECT * FROM version_pesos");
     var pesosAntes = jdbc.queryForList("SELECT * FROM peso_elemento");
     var inspeccionesAntes = jdbc.queryForList("SELECT * FROM inspeccion");
-    Files.createDirectories(frontend.resolve("test-results"));
-    var constructor =
-        new ProcessBuilder(
-                "npm", "exec", "--", "playwright", "test", "-c", "playwright.p8.config.ts")
-            .directory(frontend.toFile())
-            .redirectErrorStream(true)
-            .redirectOutput(frontend.resolve("test-results/p8-ejecucion.log").toFile());
-    constructor.environment().put("P8_BACKEND_URL", "http://127.0.0.1:" + puerto);
-    constructor.environment().put("P8_RECORRIDO_AISLADO", "1");
-    constructor.environment().put("P8_CLAVE_PRUEBA", clave);
     String hoy = LocalDate.now(ZoneOffset.UTC).toString();
-    constructor.environment().put("P8_HOY", hoy);
-    Process proceso = constructor.start();
-    try {
-      assertThat(proceso.waitFor(240, TimeUnit.SECONDS))
-          .as("Playwright debe terminar antes de cuatro minutos")
-          .isTrue();
-      assertThat(proceso.exitValue()).as("Recorrido real del navegador").isZero();
-    } finally {
-      proceso.descendants().forEach(ProcessHandle::destroy);
-      proceso.destroy();
-    }
+    NavegadorPlaywright.ejecutar(
+        frontend,
+        "playwright.p8.config.ts",
+        frontend.resolve("test-results/p8-ejecucion.log"),
+        Map.of(
+            "P8_BACKEND_URL",
+            "http://127.0.0.1:" + puerto,
+            "P8_RECORRIDO_AISLADO",
+            "1",
+            "P8_CLAVE_PRUEBA",
+            clave,
+            "P8_HOY",
+            hoy));
     assertThat(
             jdbc.queryForMap(
                 "SELECT estado,prioridad,responsable,fecha_ejecucion::text AS fecha FROM orden_mantenimiento WHERE id = ?",

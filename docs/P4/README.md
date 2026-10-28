@@ -3,7 +3,7 @@
 Implementación: `com.cunoc.puentes.formulario`. OpenAPI: `/api/docs`, etiqueta **Formularios**.  
 Reglas de negocio asociadas: **RN-FRM-01** a **RN-FRM-08**.  
 Directrices técnicas: **DT-ARQ-01..05**, **DT-BE-01..05**, **DT-BE-10**, **DT-BD-02..03**, **DT-CAL-08..09**.  
-📋 **Guía de Verificación Interactiva con Casillas y Payloads:** [docs-analisis/guia-interaccion-y-pruebas-p4.md](../../../docs-analisis/guia-interaccion-y-pruebas-p4.md).
+📋 **Guía de Verificación Interactiva con Casillas y Payloads:** docs-analisis/guia-interaccion-y-pruebas-p4.md.
 
 ---
 

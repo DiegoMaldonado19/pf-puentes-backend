@@ -34,7 +34,7 @@ Se emplean DTO y MapStruct; las entidades JPA no se exponen por HTTP. La autoriz
 
 Ya existe `PreparacionCalificacionesService.preparar(UUID formularioId, UUID juegoId, Map<String, Object> datos)`. Obtiene el esquema persistido y todos los pesos del juego explícito, comprueba versión/completitud y devuelve `List<CalificacionElemento>` inmutable en orden de referencia. Mantiene las rutas reales como tokens; no usa `elemento_ref` como ruta JSON. Se reutilizan el extractor/lectura de metadatos, repositorios, MapStruct, `JuegoPesos`, `PesoConfigurado` y `CalificacionElemento`. La calculadora y la configuración HTTP conservan sus contratos.
 
-La preparación acepta enteros numéricos 0–4, incluido 2.0. Rechaza ausentes, null, texto/booleanos, fracciones, fuera de rango y no aplicables, sin reemplazarlos por cero ni ignorarlos. Daños dentro de arreglos requieren política de agregación y producen 422; los arreglos sin daños de la semilla no bloquean. Juego ajeno o incompatible → 422; formulario/juego ausente → 404; parámetros Java nulos → `IllegalArgumentException`. Los errores de respuesta usan `ErrorCampo` con la ruta afectada, sin copiar valores privados. [ADR 0041](adr/0041-preparacion-de-calificaciones-desde-respuestas-reales.md).
+La preparación acepta enteros numéricos 0–4, incluido 2.0. Rechaza ausentes, null, texto/booleanos, fracciones, fuera de rango y no aplicables, sin reemplazarlos por cero ni ignorarlos. Daños dentro de arreglos requieren política de agregación y producen 422; los arreglos sin daños de la semilla no bloquean. Juego ajeno o incompatible → 422; formulario/juego ausente → 404; parámetros Java nulos → `IllegalArgumentException`. Los errores de respuesta usan `ErrorCampo` con la ruta afectada, sin copiar valores privados. [ADR 0054](adr/0054-preparacion-de-calificaciones-desde-respuestas-reales.md).
 
 El consumidor debe autorizar al actor y reutilizar `FormularioValidacionService` de P4 para validar la inspección completa. Esta preparación interna no verifica permisos de una inspección ni define políticas para publicar. No se llama a la sobrecarga de cálculo de estado con condiciones críticas falsas: las banderas reales siguen pendientes. No guarda IC, pesos elegidos, causas, estado del puente ni auditoría de mutación. No hay endpoint ni formulario nuevo de P8 en este incremento.
 
@@ -243,7 +243,7 @@ Con sesión real Catedrático/Admin, consulta primero una orden en PROGRAMADA de
 }
 ```
 
-Comprueba 200, CANCELADA y el motivo persistido. Se conservan intervención, prioridades, fecha programada y evidencias previas en solo lectura; no permite iniciar ejecución ni reabrir la orden. Repetir o intentar cancelar desde otro estado responde 409 sin duplicar auditoría. [ADR 0042](adr/0042-cancelacion-auditada-de-ordenes-programadas.md) y [ADR frontend 0029](../../pf-puentes-frontend/docs/adr/0029-cancelacion-con-motivo-desde-el-detalle.md).
+Comprueba 200, CANCELADA y el motivo persistido. Se conservan intervención, prioridades, fecha programada y evidencias previas en solo lectura; no permite iniciar ejecución ni reabrir la orden. Repetir o intentar cancelar desde otro estado responde 409 sin duplicar auditoría. [ADR 0042](adr/0042-cancelacion-auditada-de-ordenes-programadas.md) y [ADR frontend 0029](https://github.com/DiegoMaldonado19/pf-puentes-frontend/blob/develop/docs/adr/0029-cancelacion-con-motivo-desde-el-detalle.md).
 
 ### Prueba de ajuste manual de prioridad con Postman
 

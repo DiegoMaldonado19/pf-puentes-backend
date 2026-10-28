@@ -76,6 +76,25 @@ class FormularioValidacionServiceTest {
   }
 
   @Test
+  @DisplayName("Un esquema con campos obligatorios se compila sin exigir datos")
+  void compilar_esquemaConRequeridos_noLanzaExcepcion() {
+    assertThatCode(() -> service.compilar(esquemaPrueba)).doesNotThrowAnyException();
+  }
+
+  @Test
+  @DisplayName("Un esquema que no cumple el metaesquema draft-07 se rechaza con 422")
+  void compilar_requiredQueNoEsArreglo_lanza422() {
+    Map<String, Object> invalido = Map.of("type", "object", "required", "campo");
+
+    assertThatThrownBy(() -> service.compilar(invalido))
+        .isInstanceOf(NegocioException.class)
+        .satisfies(
+            ex ->
+                assertThat(((NegocioException) ex).getStatusCode())
+                    .isEqualTo(HttpStatus.UNPROCESSABLE_CONTENT));
+  }
+
+  @Test
   @DisplayName("Datos válidos deben pasar la validación sin lanzar excepción")
   void validarConEsquema_datosValidos_noLanzaExcepcion() {
     Map<String, Object> datos =

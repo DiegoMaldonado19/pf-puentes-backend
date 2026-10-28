@@ -1,10 +1,18 @@
 # Entornos dev, stage y prod en la EC2. Los valores vienen del .env que escribe el pipeline.
 name: puentes-${APP_ENV}-backend
 
+# DT-DEP-09: los logs de contenedor rotan; las bitácoras JSON del backend van al volumen logs
+x-registro: &registro
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
 services:
   postgres:
     image: postgis/postgis:17-3.6-alpine
     restart: unless-stopped
+    logging: *registro
     environment:
       POSTGRES_DB: puentes
       POSTGRES_USER: puentes_migrador
@@ -21,10 +29,21 @@ services:
   minio:
     image: pgsty/minio:RELEASE.2026-08-04T00-00-00Z
     restart: unless-stopped
+    logging: *registro
+    # DT-DEP-11: el volumen (nuevo o heredado como root) queda con dueño 1000 y MinIO corre como 1000
+    entrypoint:
+      - sh
+      - -c
+      - '[ "$$(stat -c %u /data)" = 1000 ] || chown -R 1000:1000 /data; exec /usr/bin/docker-entrypoint.sh "$$@"'
+      - "--"
     command: server /data --console-address :9001
     environment:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER}
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+      MINIO_USERNAME: minio
+      MINIO_GROUPNAME: minio
+      MINIO_UID: 1000
+      MINIO_GID: 1000
     volumes:
       - minio-data:/data
     healthcheck:
@@ -35,6 +54,7 @@ services:
   backend:
     image: ${DOCKERHUB_USERNAME}/pf-puentes-backend:${IMAGE_TAG}
     restart: unless-stopped
+    logging: *registro
     depends_on:
       postgres:
         condition: service_healthy
@@ -47,8 +67,9 @@ services:
       DB_MIGRATION_USER: puentes_migrador
       DB_MIGRATION_PASSWORD: ${DB_MIGRATION_PASSWORD}
       MINIO_URL: http://minio:9000
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+      # Cuenta de servicio (scripts/minio-cuenta-servicio.sh); sin ella, cae a la cuenta root
+      MINIO_APP_USER: ${MINIO_APP_USER:-${MINIO_ROOT_USER}}
+      MINIO_APP_PASSWORD: ${MINIO_APP_PASSWORD:-${MINIO_ROOT_PASSWORD}}
       MINIO_URL_PUBLICA: ${MINIO_URL_PUBLICA}
       JWT_SECRET: ${JWT_SECRET}
       # El perfil prod exige sesión en /api/docs (DT-BE-12)
@@ -68,10 +89,14 @@ services:
       SMTP_PORT: ${SMTP_PORT:-587}
       SMTP_USUARIO: ${SMTP_USUARIO:-}
       SMTP_CLAVE: ${SMTP_CLAVE:-}
+      LOGGING_FILE_NAME: /app/logs/sgp.log
+    volumes:
+      - logs:/app/logs
 
 volumes:
   postgres-data:
   minio-data:
+  logs:
 
 # Compartida con el frontend del mismo entorno; la crea el pipeline
 networks:

@@ -23,7 +23,7 @@ import tools.jackson.databind.json.JsonMapper;
 @Sql(
     scripts = "/inspeccion/consulta-limpiar.sql",
     executionPhase = Sql.ExecutionPhase.AFTER_TEST_METHOD)
-class CalculoIndiceProvisionalTest extends PruebaIntegracion {
+class CalculoIndiceDirectoTest extends PruebaIntegracion {
 
   private static final UUID FORMULARIO = UUID.fromString("0199c200-0000-7000-8000-000000000021");
   private static final UUID PESOS = UUID.fromString("0199c200-0000-7000-8000-000000000061");

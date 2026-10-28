@@ -6,6 +6,7 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.math.BigDecimal;
 import java.util.ArrayList;
+import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -83,24 +84,17 @@ public class DetectorCondicionesCriticas {
     if (esquema == null || datos == null) {
       throw new IllegalArgumentException("El esquema y las respuestas son obligatorios.");
     }
-    Map<String, CampoCritico> criticos = extraerCamposCriticos(esquema);
-    boolean socavacion = false;
-    boolean asentamiento = false;
-    boolean perdidaSeccion = false;
-    boolean ausenciaPortante = false;
-
-    for (CampoCritico campo : criticos.values()) {
-      int calificacion = leerCalificacion(campo.ruta(), datos);
-      if (calificacion >= UMBRAL_CALIFICACION_CRITICA) {
-        switch (campo.anulacion()) {
-          case SOCAVACION -> socavacion = true;
-          case ASENTAMIENTO -> asentamiento = true;
-          case PERDIDA_SECCION -> perdidaSeccion = true;
-          case AUSENCIA_PORTANTE -> ausenciaPortante = true;
-        }
+    Set<Anulacion> activas = EnumSet.noneOf(Anulacion.class);
+    for (CampoCritico campo : extraerCamposCriticos(esquema).values()) {
+      if (leerCalificacion(campo.ruta(), datos) >= UMBRAL_CALIFICACION_CRITICA) {
+        activas.add(campo.anulacion());
       }
     }
-    return new CondicionesCriticas(socavacion, asentamiento, perdidaSeccion, ausenciaPortante);
+    return new CondicionesCriticas(
+        activas.contains(Anulacion.SOCAVACION),
+        activas.contains(Anulacion.ASENTAMIENTO),
+        activas.contains(Anulacion.PERDIDA_SECCION),
+        activas.contains(Anulacion.AUSENCIA_PORTANTE));
   }
 
   /** Combina mediante disyunción lógica dos conjuntos de banderas críticas. */
@@ -148,17 +142,13 @@ public class DetectorCondicionesCriticas {
 
   private Map<String, CampoCritico> extraerCamposCriticos(Map<String, Object> esquema) {
     Map<String, CampoCritico> resultado = new HashMap<>();
-    recorrer(esquema, List.of(), false, resultado);
+    recorrer(esquema, List.of(), resultado);
     return Map.copyOf(resultado);
   }
 
   private void recorrer(
-      Map<?, ?> nodo,
-      List<String> rutaActual,
-      boolean repetido,
-      Map<String, CampoCritico> resultado) {
-    if (!repetido
-        && Boolean.TRUE.equals(nodo.get("x-dano"))
+      Map<?, ?> nodo, List<String> rutaActual, Map<String, CampoCritico> resultado) {
+    if (Boolean.TRUE.equals(nodo.get("x-dano"))
         && nodo.get("x-elemento-ref") instanceof String ref
         && !ref.isBlank()
         && nodo.get("x-anulacion-critica") instanceof String marcador
@@ -173,7 +163,7 @@ public class DetectorCondicionesCriticas {
         if (entrada.getValue() instanceof Map<?, ?> hijo) {
           var siguiente = new ArrayList<>(rutaActual);
           siguiente.add(entrada.getKey().toString());
-          recorrer(hijo, siguiente, repetido, resultado);
+          recorrer(hijo, siguiente, resultado);
         }
       }
     }
