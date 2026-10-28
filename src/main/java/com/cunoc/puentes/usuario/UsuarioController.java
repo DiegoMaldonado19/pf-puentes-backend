@@ -2,11 +2,13 @@ package com.cunoc.puentes.usuario;
 
 import com.cunoc.puentes.usuario.dto.CambiarContrasenaDTO;
 import com.cunoc.puentes.usuario.dto.PerfilDTO;
+import com.cunoc.puentes.usuario.dto.PersonaMencionableDTO;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import java.security.Principal;
+import java.util.List;
 import java.util.UUID;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
@@ -26,12 +28,17 @@ class UsuarioController {
 
   private final PerfilService perfiles;
   private final CambioContrasenaService contrasenas;
+  private final MencionesService menciones;
   private final CookieRenovacion cookie;
 
   UsuarioController(
-      PerfilService perfiles, CambioContrasenaService contrasenas, CookieRenovacion cookie) {
+      PerfilService perfiles,
+      CambioContrasenaService contrasenas,
+      MencionesService menciones,
+      CookieRenovacion cookie) {
     this.perfiles = perfiles;
     this.contrasenas = contrasenas;
+    this.menciones = menciones;
     this.cookie = cookie;
   }
 
@@ -41,6 +48,15 @@ class UsuarioController {
   PerfilDTO perfilPropio(Principal usuario) {
     // Contrato 14: el nombre de la autenticación es el UUID del usuario
     return perfiles.obtener(UUID.fromString(usuario.getName()));
+  }
+
+  @Operation(
+      summary = "Lista las cuentas que se pueden mencionar en el foro (RN-FOR-10)",
+      description = "Cuentas activas ordenadas por nombre; solo id y nombre.")
+  @ApiResponse(responseCode = "200", description = "Id y nombre de cada cuenta activa")
+  @GetMapping("/mencionables")
+  List<PersonaMencionableDTO> mencionables() {
+    return menciones.mencionables();
   }
 
   @Operation(

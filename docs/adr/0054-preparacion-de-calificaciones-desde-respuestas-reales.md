@@ -1,4 +1,4 @@
-# 0041 — Preparación de calificaciones desde respuestas reales
+# 0054 — Preparación de calificaciones desde respuestas reales
 
 Fecha: 25/10/2026. Estado: implementado para el incremento autorizado por el responsable P8. Trazabilidad: RN-IC-02/03/08 y RN-FRM-05. La detección de condiciones críticas de RN-IC-05 y la publicación P5 conservan sus contratos pendientes.
 

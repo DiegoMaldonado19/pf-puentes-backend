@@ -1,5 +1,7 @@
 package com.cunoc.puentes.formulario;
 
+import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.domain.Page;
@@ -15,4 +17,8 @@ public interface FormularioVersionRepository extends JpaRepository<FormularioVer
   boolean existsByCodigo(String codigo);
 
   Page<FormularioVersion> findAllByOrderByCreadoEnDesc(Pageable pageable);
+
+  List<FormularioVersion>
+      findByPublicadaEnGreaterThanAndPublicadaEnLessThanEqualOrderByPublicadaEnAsc(
+          Instant desde, Instant hasta);
 }

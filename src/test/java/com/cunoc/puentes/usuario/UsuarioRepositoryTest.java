@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.cunoc.puentes.PruebaIntegracion;
+import com.cunoc.puentes.usuario.dto.PersonaMencionableDTO;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.util.Arrays;
@@ -26,6 +27,22 @@ class UsuarioRepositoryTest extends PruebaIntegracion {
   @Autowired UsuarioRepository repositorio;
 
   @Autowired TestEntityManager em;
+
+  @Test
+  void mencionablesSoloTraeCuentasActivasOrdenadasPorNombre() {
+    Usuario zoe = Cuentas.estudiante("zoe@correo.com");
+    zoe.setNombre("Zoe Mencionable");
+    Usuario ana = Cuentas.estudiante("ana@correo.com");
+    ana.setNombre("Ana Mencionable");
+    Usuario pendiente = Cuentas.estudiante("pendiente@correo.com");
+    pendiente.setEstado(EstadoUsuario.PENDIENTE);
+    repositorio.saveAllAndFlush(List.of(zoe, ana, pendiente));
+
+    assertThat(repositorio.mencionables())
+        .extracting(PersonaMencionableDTO::id)
+        .containsSubsequence(ana.getId(), zoe.getId())
+        .doesNotContain(pendiente.getId());
+  }
 
   @Test
   void persisteYLeeUnaBajaLogicaCompleta() {

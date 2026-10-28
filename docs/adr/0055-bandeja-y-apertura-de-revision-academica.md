@@ -1,4 +1,4 @@
-# 0048. Bandeja y apertura transaccional de revisión académica
+# 0055. Bandeja y apertura transaccional de revisión académica
 
 - Estado: aceptado para este incremento.
 - Fecha: 27/10/2026.

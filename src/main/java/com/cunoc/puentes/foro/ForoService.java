@@ -607,8 +607,7 @@ public class ForoService {
                         "Comentario no encontrado",
                         "El comentario solicitado no existe."));
 
-    if (comentario.getHilo().getInspeccionId() != null
-        || !comentario.getAutorId().equals(autorId)
+    if (!comentario.getAutorId().equals(autorId)
         || comentario.getOcultoEn() != null
         || comentario.getEliminadoEn() != null) {
       throw new NegocioException(
@@ -650,9 +649,7 @@ public class ForoService {
                         "Comentario no encontrado",
                         "El comentario solicitado no existe."));
 
-    if (comentario.getHilo().getInspeccionId() != null
-        || !comentario.getAutorId().equals(autorId)
-        || comentario.getOcultoEn() != null) {
+    if (!comentario.getAutorId().equals(autorId) || comentario.getOcultoEn() != null) {
       throw new NegocioException(
           HttpStatus.NOT_FOUND,
           "comentario-no-encontrado",
@@ -697,14 +694,6 @@ public class ForoService {
                         "comentario-no-encontrado",
                         "Comentario no encontrado",
                         "El comentario solicitado no existe."));
-
-    if (comentario.getHilo().getInspeccionId() != null) {
-      throw new NegocioException(
-          HttpStatus.NOT_FOUND,
-          "comentario-no-encontrado",
-          "Comentario no encontrado",
-          "El comentario solicitado no existe.");
-    }
 
     if (comentario.getOcultoEn() != null) {
       return new ResultadoModeracion(false, comentarioId, null, null, List.of());
@@ -764,7 +753,7 @@ public class ForoService {
                         HttpStatus.NOT_FOUND,
                         "hilo-no-encontrado",
                         "Hilo no encontrado",
-                        "El hilo solicitado no existe o no pertenece al foro permanente."));
+                        "El hilo solicitado no existe."));
 
     if (hilo.getCerradoEn() != null) {
       return new ResultadoModeracion(false, hiloId, null, null, List.of());

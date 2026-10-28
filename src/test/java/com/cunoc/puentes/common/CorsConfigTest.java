@@ -31,6 +31,15 @@ class CorsConfigTest {
     mvc.perform(preflightDesde("https://otro-sitio.com")).andExpect(status().isForbidden());
   }
 
+  @Test
+  void permiteElEncabezadoDeSincronizacion() throws Exception {
+    mvc.perform(
+            preflightDesde("http://localhost:4200")
+                .header(HttpHeaders.ACCESS_CONTROL_REQUEST_HEADERS, "X-Sgp-Sync"))
+        .andExpect(status().isOk())
+        .andExpect(header().string(HttpHeaders.ACCESS_CONTROL_ALLOW_HEADERS, "X-Sgp-Sync"));
+  }
+
   private static MockHttpServletRequestBuilder preflightDesde(String origen) {
     return options("/api/v1/puentes")
         .header(HttpHeaders.ORIGIN, origen)

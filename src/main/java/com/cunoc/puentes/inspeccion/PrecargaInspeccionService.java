@@ -150,7 +150,8 @@ class PrecargaInspeccionService {
         RutasDatos.escribir(actual, ruta, valor);
       }
     }
-    inspeccion.setDatos(actual);
+    inspeccion.setDatos(
+        RutasDatos.fusionar(actual, referencias.identificacion(inspeccion.getPuenteId())));
     inspeccion.setDatosPermanentesConfirmadosEn(Instant.now());
     inspeccion.setPrecargadaDeId(
         ultimaPublicada(inspeccion.getPuenteId()).map(Inspeccion::getId).orElse(null));
@@ -163,13 +164,18 @@ class PrecargaInspeccionService {
   private DatosPermanentesDTO armar(UUID puenteId, UUID versionId) {
     ReferenciasInspeccion.PuenteVista puente = referencias.puente(puenteId).orElse(null);
     Integer anio = puente == null ? null : puente.anioConstruccion();
+    Map<String, Object> identificacion =
+        puente == null ? Map.of() : referencias.identificacion(puenteId);
     Inspeccion origen = ultimaPublicada(puenteId).orElse(null);
     if (origen == null) {
-      return new DatosPermanentesDTO(Map.of(), null, anio);
+      return new DatosPermanentesDTO(identificacion, null, anio);
     }
+    Map<String, Object> datosOrigen =
+        formularios.traducir(origen.getDatos(), origen.getFormularioVersionId(), versionId);
     Map<String, Object> permanentes =
-        RutasDatos.extraer(origen.getDatos(), formularios.rutasPermanentes(versionId));
-    return new DatosPermanentesDTO(permanentes, origen.getId(), anio);
+        RutasDatos.extraer(datosOrigen, formularios.rutasPermanentes(versionId));
+    return new DatosPermanentesDTO(
+        RutasDatos.fusionar(permanentes, identificacion), origen.getId(), anio);
   }
 
   private java.util.Optional<Inspeccion> ultimaPublicada(UUID puenteId) {

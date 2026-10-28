@@ -306,6 +306,8 @@
 								<include>**/indice/PesoConfigurado.class</include>
 								<include>**/indice/JuegoPesos.class</include>
 								<include>**/indice/ElementosDeDano.class</include>
+								<include>**/indice/CalculoIndiceCondicionService.class</include>
+								<include>**/indice/DetectorCondicionesCriticas.class</include>
 							</includes>
 							<rules>
 								<rule>

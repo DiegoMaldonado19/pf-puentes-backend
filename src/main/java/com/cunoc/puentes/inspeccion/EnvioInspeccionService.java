@@ -6,6 +6,7 @@ import com.cunoc.puentes.common.NegocioException;
 import com.cunoc.puentes.inspeccion.dto.EnviarInspeccionDTO;
 import com.cunoc.puentes.inspeccion.dto.InspeccionDTO;
 import com.cunoc.puentes.inspeccion.puerto.ConsultaFormulario;
+import com.cunoc.puentes.inspeccion.puerto.RutasDatos;
 import com.cunoc.puentes.sync.IdempotenciaService;
 import com.cunoc.puentes.sync.RespuestaIdempotente;
 import com.cunoc.puentes.usuario.Rol;
@@ -139,6 +140,7 @@ class EnvioInspeccionService {
     if (inspeccion.getEstado() == EstadoInspeccion.ENVIADA) {
       return consultas.detalle(inspeccionId, actorId, rol);
     }
+    inspeccion.setDatos(conIdentificacion(inspeccion));
     Instant dispositivo =
         cuerpo != null && cuerpo.enviadaEn() != null ? cuerpo.enviadaEn() : Instant.now();
     Instant servidor = Instant.now();
@@ -153,14 +155,18 @@ class EnvioInspeccionService {
     return consultas.detalle(inspeccionId, actorId, rol);
   }
 
+  /**
+   * ADR 0062: la sección 1 que se envía es la del inventario, aunque el cliente la haya cambiado.
+   */
+  private Map<String, Object> conIdentificacion(Inspeccion inspeccion) {
+    return RutasDatos.fusionar(
+        inspeccion.getDatos(), referencias.identificacion(inspeccion.getPuenteId()));
+  }
+
   private void exigirPublicable(Inspeccion inspeccion) {
+    Map<String, Object> datos = conIdentificacion(inspeccion);
     List<ErrorCampo> errores = new ArrayList<>();
-    recoger(
-        () ->
-            formularios.validarCompleto(
-                inspeccion.getDatos() == null ? Map.of() : inspeccion.getDatos(),
-                inspeccion.getFormularioVersionId()),
-        errores);
+    recoger(() -> formularios.validarCompleto(datos, inspeccion.getFormularioVersionId()), errores);
     if (inspeccion.getDatosPermanentesConfirmadosEn() == null) {
       errores.add(
           new ErrorCampo(

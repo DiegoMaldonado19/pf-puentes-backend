@@ -1,5 +1,7 @@
 package com.cunoc.puentes.inspeccion;
 
+import com.cunoc.puentes.archivo.ArchivoService;
+import com.cunoc.puentes.archivo.dto.ArchivoDTO;
 import com.cunoc.puentes.common.NegocioException;
 import com.cunoc.puentes.inspeccion.dto.AcompananteDTO;
 import com.cunoc.puentes.inspeccion.dto.HistorialTransicionDTO;
@@ -29,18 +31,21 @@ class ConsultaInspeccionService {
   private final AcompananteInspeccionRepository acompanantes;
   private final ReferenciasInspeccion referencias;
   private final InspeccionEnsamblador ensamblador;
+  private final ArchivoService archivoService;
 
   ConsultaInspeccionService(
       InspeccionRepository inspecciones,
       TransicionInspeccionRepository transiciones,
       AcompananteInspeccionRepository acompanantes,
       ReferenciasInspeccion referencias,
-      InspeccionEnsamblador ensamblador) {
+      InspeccionEnsamblador ensamblador,
+      ArchivoService archivoService) {
     this.inspecciones = inspecciones;
     this.transiciones = transiciones;
     this.acompanantes = acompanantes;
     this.referencias = referencias;
     this.ensamblador = ensamblador;
+    this.archivoService = archivoService;
   }
 
   @Transactional(readOnly = true)
@@ -102,6 +107,12 @@ class ConsultaInspeccionService {
                     fila.getMotivo(),
                     fila.getCreadoEn()))
         .toList();
+  }
+
+  @Transactional(readOnly = true)
+  List<ArchivoDTO> archivos(UUID inspeccionId, UUID actorId, Rol rol) {
+    visible(inspeccionId, actorId, rol);
+    return archivoService.listar(inspeccionId);
   }
 
   private Inspeccion visible(UUID inspeccionId, UUID actorId, Rol rol) {
