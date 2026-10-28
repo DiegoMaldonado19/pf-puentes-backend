@@ -55,6 +55,88 @@ class InspeccionInicioTest extends PruebaIntegracion {
   @Autowired MockMvc mvc;
   @Autowired JdbcClient jdbc;
   @Autowired InicioInspeccionService inicio;
+  @Autowired EscrituraAltaInspeccion altas;
+  @Autowired jakarta.persistence.EntityManager em;
+  @Autowired com.cunoc.puentes.common.seguridad.TokenService tokens;
+
+  @Test
+  void profesionalRequiereCuentaActivaYColegiadoVerificadoTambienConJwtAnterior() throws Exception {
+    String bearer = "Bearer " + tokens.emitirAcceso(PROFESIONAL, Rol.PROFESIONAL_EXTERNO);
+    mvc.perform(get("/api/v1/puentes-inspeccionables").header("Authorization", bearer))
+        .andExpect(status().isOk());
+    mvc.perform(
+            crear(InspeccionConsultaTest.id(0xbc1), LAS_ROSAS, hoy(), null, null)
+                .header("Authorization", bearer))
+        .andExpect(status().isCreated());
+
+    jdbc.sql(
+            """
+        update usuario set estado = 'PENDIENTE',
+          colegiado_verificado_en = null, colegiado_verificado_por = null
+        where id = :id
+        """)
+        .param("id", PROFESIONAL)
+        .update();
+    mvc.perform(get("/api/v1/puentes-inspeccionables").header("Authorization", bearer))
+        .andExpect(status().isUnauthorized());
+    mvc.perform(
+            crear(InspeccionConsultaTest.id(0xbc2), LAS_ROSAS, hoy(), null, null)
+                .header("Authorization", bearer))
+        .andExpect(status().isUnauthorized());
+    org.assertj.core.api.Assertions.assertThatThrownBy(
+            () ->
+                jdbc.sql("update usuario set estado = 'ACTIVO' where id = :id")
+                    .param("id", PROFESIONAL)
+                    .update())
+        .isInstanceOf(org.springframework.dao.DataIntegrityViolationException.class);
+  }
+
+  @Test
+  @org.springframework.transaction.annotation.Transactional
+  void altaAuditadaConPuentesAppNoNecesitaUpdateEnBitacora() {
+    jdbc.sql(
+            "do $$ begin if not exists (select from pg_roles where rolname = 'puentes_app') then create role puentes_app; end if; end $$")
+        .update();
+    jdbc.sql("grant usage on schema public to puentes_app").update();
+    jdbc.sql("grant select on all tables in schema public to puentes_app").update();
+    jdbc.sql("grant insert on inspeccion, transicion_inspeccion, auditoria to puentes_app")
+        .update();
+    jdbc.sql("grant update on inspeccion to puentes_app").update();
+    jdbc.sql("revoke update, delete on auditoria from puentes_app").update();
+    jdbc.sql("set local role puentes_app").update();
+    Inspeccion nueva = new Inspeccion();
+    UUID id = UUID.randomUUID();
+    nueva.setId(id);
+    nueva.setPuenteId(LAS_ROSAS);
+    nueva.setAutorId(E1);
+    nueva.setFormularioVersionId(
+        jdbc.sql("select id from formulario_version where estado = 'ACTIVA'")
+            .query(UUID.class)
+            .single());
+    nueva.setFechaInspeccion(hoy());
+    nueva.setDispositivoId("tablet-restringida");
+    nueva.setDatos(java.util.Map.of("identificacion", java.util.Map.of("numero_tramos", 1L)));
+    autenticar(E1, Rol.ESTUDIANTE);
+    try {
+      altas.persistirParticipando(nueva);
+      em.flush();
+      // Una segunda consulta obliga a revisar también el snapshot JSON numérico de la auditoría.
+      assertThat(
+              jdbc.sql("select count(*) from auditoria where entidad_id = :id")
+                  .param("id", id)
+                  .query(Long.class)
+                  .single())
+          .isEqualTo(1);
+      assertThat(
+              jdbc.sql("select has_table_privilege(current_user, 'auditoria', 'UPDATE')")
+                  .query(Boolean.class)
+                  .single())
+          .isFalse();
+    } finally {
+      jdbc.sql("reset role").update();
+      SecurityContextHolder.clearContext();
+    }
+  }
 
   @Test
   void estudianteVeSoloPuentesDeCursosVigentesYMarcaBorradorEnCurso() throws Exception {
@@ -417,7 +499,8 @@ class InspeccionInicioTest extends PruebaIntegracion {
         .andExpect(status().isCreated())
         .andExpect(
             jsonPath("$.supersede_a_id").value(InspeccionConsultaTest.PUBLICADA_PRO.toString()))
-        .andExpect(jsonPath("$.datos").isEmpty());
+        .andExpect(jsonPath("$.datos.identificacion.codigo").value("GT-09-0901-9201"))
+        .andExpect(jsonPath("$.datos.subestructura").doesNotExist());
     mvc.perform(
             crear(
                     InspeccionConsultaTest.id(0xb17),

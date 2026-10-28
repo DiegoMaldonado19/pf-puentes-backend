@@ -151,7 +151,11 @@ class PrecargaInspeccionService {
       }
     }
     inspeccion.setDatos(
-        RutasDatos.fusionar(actual, referencias.identificacion(inspeccion.getPuenteId())));
+        RutasDatos.fusionar(
+            actual,
+            referencias.identificacion(
+                inspeccion.getPuenteId(),
+                formularios.rutasPorReferencia(inspeccion.getFormularioVersionId()))));
     inspeccion.setDatosPermanentesConfirmadosEn(Instant.now());
     inspeccion.setPrecargadaDeId(
         ultimaPublicada(inspeccion.getPuenteId()).map(Inspeccion::getId).orElse(null));
@@ -165,7 +169,9 @@ class PrecargaInspeccionService {
     ReferenciasInspeccion.PuenteVista puente = referencias.puente(puenteId).orElse(null);
     Integer anio = puente == null ? null : puente.anioConstruccion();
     Map<String, Object> identificacion =
-        puente == null ? Map.of() : referencias.identificacion(puenteId);
+        puente == null
+            ? Map.of()
+            : referencias.identificacion(puenteId, formularios.rutasPorReferencia(versionId));
     Inspeccion origen = ultimaPublicada(puenteId).orElse(null);
     if (origen == null) {
       return new DatosPermanentesDTO(identificacion, null, anio);

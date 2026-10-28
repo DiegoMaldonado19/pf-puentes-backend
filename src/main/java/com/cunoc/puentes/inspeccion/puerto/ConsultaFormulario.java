@@ -15,6 +15,8 @@ public interface ConsultaFormulario {
 
   Set<String> rutasDeDano(UUID versionId);
 
+  Map<String, String> rutasPorReferencia(UUID versionId);
+
   List<GrupoElemento> grupos(UUID versionId);
 
   void validarParcial(Map<String, Object> datos, UUID versionId);

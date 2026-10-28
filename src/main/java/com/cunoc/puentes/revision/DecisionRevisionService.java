@@ -74,12 +74,12 @@ public class DecisionRevisionService {
     Revision revision = exigir(actor, id, true);
     exigirAbierta(revision);
     if (decision.veredicto() == null
-        || (decision.veredicto() != Veredicto.APROBADA
-            && (decision.observacion() == null || decision.observacion().isBlank()))) {
+        || decision.observacion() == null
+        || decision.observacion().isBlank()) {
       throw error(
           HttpStatus.UNPROCESSABLE_CONTENT,
           "observacion-requerida",
-          "Cambios y rechazo exigen una observación escrita no vacía.");
+          "Todo veredicto exige una observación escrita no vacía.");
     }
     revision.setVeredicto(decision.veredicto());
     revision.setObservacion(decision.observacion() == null ? null : decision.observacion().strip());

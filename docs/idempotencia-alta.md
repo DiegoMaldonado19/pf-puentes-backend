@@ -4,6 +4,12 @@
 
 ## Camino rápido
 
+El catálogo de puentes inspeccionables y el alta admiten profesionales únicamente
+con cuenta ACTIVA: el filtro JWT consulta ese estado en cada petición, incluso con
+un token emitido antes de una baja. El CHECK de `usuario` exige colegiado verificado
+para activar a un profesional externo; no se confía en un claim del cliente.
+`InspeccionInicioTest` verifica ambos controles con JWT real y PostgreSQL.
+
 1. Genere el UUID v7 de la inspección antes del primer envío.
 2. Asigne una clave estable a la operación; conserve el DTO completo enviado.
 3. Reintente con el mismo usuario, clave y DTO si pierde la respuesta o recibe un fallo transitorio.

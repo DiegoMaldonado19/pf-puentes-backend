@@ -24,6 +24,41 @@ class AuditoriaRepositoryTest extends PruebaIntegracion {
   @Autowired TestEntityManager em;
 
   @Test
+  void bitacoraAppendOnlyNoActualizaJsonNumericoConRolRestringido() {
+    em.getEntityManager()
+        .createNativeQuery(
+            "do $$ begin if not exists (select from pg_roles where rolname = 'puentes_app') then create role puentes_app; end if; end $$")
+        .executeUpdate();
+    em.getEntityManager()
+        .createNativeQuery("grant usage on schema public to puentes_app")
+        .executeUpdate();
+    em.getEntityManager()
+        .createNativeQuery("grant select, insert on auditoria to puentes_app")
+        .executeUpdate();
+    em.getEntityManager()
+        .createNativeQuery("revoke update, delete on auditoria from puentes_app")
+        .executeUpdate();
+    em.getEntityManager().createNativeQuery("set local role puentes_app").executeUpdate();
+    Auditoria auditoria = registro("CREAR", "inspeccion");
+    auditoria.setValorNuevo(new java.util.LinkedHashMap<>(Map.of("version", 1L)));
+    UUID id = repositorio.saveAndFlush(auditoria).getId();
+    // Fuerza el mismo dirty checking que puede disparar la normalización Long -> Integer del JSON.
+    auditoria.getValorNuevo().put("version", 2);
+    auditoria.setMotivo("No debe modificarse");
+    em.flush();
+    em.clear();
+    Auditoria persistida = repositorio.findById(id).orElseThrow();
+    assertThat(persistida.getValorNuevo().get("version")).isEqualTo(1);
+    assertThat(persistida.getMotivo()).isNull();
+    assertThat(
+            em.getEntityManager()
+                .createNativeQuery(
+                    "select has_table_privilege(current_user, 'auditoria', 'UPDATE')")
+                .getSingleResult())
+        .isEqualTo(false);
+  }
+
+  @Test
   void persisteYLeeUnRegistroCompletoConSusValoresJson() {
     UUID entidadId = UUID.randomUUID();
     UUID correlacion = UUID.randomUUID();

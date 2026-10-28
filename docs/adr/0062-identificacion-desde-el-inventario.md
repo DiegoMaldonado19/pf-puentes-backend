@@ -8,6 +8,11 @@
 Los cinco campos de `identificacion` del esquema SIECA (`codigo`, `nombre`, `ruta`, `departamento` y `municipio`) son `readOnly`. Su valor debe venir del puente y del catálogo INE, no de lo que escriba el inspector. La precarga de RN-INS-09 solo copiaba los permanentes de la última inspección publicada.
 
 ## Decisión
+Las cinco referencias estables `identificacion.{codigo,nombre,ruta,departamento,municipio}`
+se ubican mediante `ConsultaFormulario.rutasPorReferencia` (`x-elemento-ref`), no
+mediante nombres fijos de propiedades. Alta, precarga, confirmación y envío usan
+esa resolución; renombrar la sección no cambia el origen del inventario.
+
 `ReferenciasInspeccion.identificacion` lee esos valores del puente y del catálogo INE. Los fusiona en la precarga (`GET /api/v1/inspecciones/{id}/datos-permanentes` y `GET /api/v1/puentes/{puenteId}/datos-permanentes`) y los escribe al confirmar (`POST /api/v1/inspecciones/{id}/confirmacion-datos-permanentes`), donde reemplazan lo que envíe el cliente.
 
 ## Consecuencias
