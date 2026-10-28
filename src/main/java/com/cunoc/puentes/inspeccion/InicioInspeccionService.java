@@ -167,6 +167,8 @@ class InicioInspeccionService {
     Inspeccion original = originalSiCorrige(datos, puente.id(), actorId, rol);
     Inspeccion inspeccion =
         nueva(datos, actorId, puente.id(), cursoId, version.id(), gps, original);
+    inspeccion.setDatos(
+        referencias.identificacion(puente.id(), formularios.rutasPorReferencia(version.id())));
     try {
       Inspeccion guardada =
           participante

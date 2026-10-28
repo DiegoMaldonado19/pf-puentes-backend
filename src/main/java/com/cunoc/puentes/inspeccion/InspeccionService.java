@@ -6,8 +6,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Contrato 15: P1 y P6 exigen un borrador propio antes de tocar archivos o sincronizar. 404 si no
- * existe, está eliminada o es de otro autor; 409 si no está en {@code BORRADOR}.
+ * Contrato 15: titularidad antes del replay y borrador propio antes de una escritura nueva. 404 si
+ * no existe, está eliminada o es de otro autor; 409 al escribir fuera de {@code BORRADOR}.
  */
 @Service
 public class InspeccionService {
@@ -16,6 +16,11 @@ public class InspeccionService {
 
   InspeccionService(InspeccionRepository inspecciones) {
     this.inspecciones = inspecciones;
+  }
+
+  @Transactional(readOnly = true)
+  public UUID exigirPropia(UUID inspeccionId, UUID usuarioId) {
+    return propio(inspeccionId, usuarioId).getPuenteId();
   }
 
   @Transactional(readOnly = true)

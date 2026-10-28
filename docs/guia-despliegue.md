@@ -74,12 +74,43 @@ Los respaldos diarios de la base y de MinIO (`scripts/respaldo.sh`) van en un cr
 
 ## Datos de demo para calificar
 
+**Solo stage o una base local desechable. No ejecutar este script en prod:** utiliza
+correos ficticios, comparte la contraseña del administrador y omite la comprobación
+real de correo y colegiado. No sirve para aprovisionar usuarios reales.
+
 `scripts/datos-demo.sql` crea un Catedrático, un Estudiante y un Profesional externo verificado (`catedratico.demo`, `estudiante.demo` y `profesional.demo`, con `@sgp.gt`), un curso y un puente asignado al estudiante. Las cuentas entran con la contraseña del administrador inicial, así que ninguna clave queda en el repositorio. Correrlo otra vez no duplica nada. Las inspecciones se hacen en vivo desde la aplicación.
 
 ```sh
 cd ~/puentes/stage/pf-puentes-backend
 docker compose exec -T postgres psql -U puentes_migrador -d puentes -v ON_ERROR_STOP=1 < scripts/datos-demo.sql
 ```
+
+## Usuarios reales en producción
+
+1. Configurar `CORREO_MODO=smtp`, remitente autorizado y `SMTP_*` en el Environment
+   de prod. Comprobar la recepción de un enlace; un registro MX no demuestra que
+   un buzón exista ni que pertenezca a quien lo declara.
+2. Entrar como Administrador y consultar `/api/v1/usuarios`, con sus páginas y
+   filtros de correo. Comprobar rol, estado y verificación antes de crear nada.
+   No reutilizar correos ficticios ni marcar verificaciones mediante SQL.
+3. Para cada correo, acordar su rol antes del alta. Los estudiantes se registran
+   en `/registro`, verifican el enlace recibido y son activados cuando su
+   catedrático los inscribe. La verificación por sí sola no los activa.
+4. Invitar Catedrático o Administrador desde la administración de invitaciones
+   (`POST /api/v1/invitaciones`). El destinatario acepta el enlace recibido y
+   elige su propia contraseña. No copiar el hash del administrador ni enviar
+   contraseñas compartidas. Un Profesional externo también necesita un
+   colegiado real y su aprobación.
+5. Si el correo ya existe, revisar esa cuenta o su invitación; no cambiar su rol
+   ni crear una segunda identidad por SQL. Para recuperar acceso se utiliza el
+   flujo de recuperación de contraseña.
+6. Volver a consultar las cuentas y probar acceso por rol. Guardar la evidencia
+   fuera del repositorio, sin tokens, contraseñas ni datos personales de usuarios.
+
+El bootstrap `ADMIN_INICIAL_*` solo crea el primer administrador si no existe
+ninguno; cambiar esas variables no agrega cuentas a una instalación existente.
+Sin acceso administrativo o SSH autorizado no se puede certificar ni ejecutar el
+aprovisionamiento de prod.
 
 ## Documentación de la API
 

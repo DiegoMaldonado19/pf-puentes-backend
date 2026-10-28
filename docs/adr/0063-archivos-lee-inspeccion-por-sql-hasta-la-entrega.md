@@ -1,6 +1,6 @@
 # 0063. Archivos lee la inspección por SQL hasta después de la entrega
 
-- Estado: aceptado (desvío temporal del contrato 15)
+- Estado: sustituido por la implementación del contrato 15 (28/10/2026)
 - Fecha: 28/10/2026
 - Directriz o regla relacionada: contrato 15 de `docs-analisis/Equipo/02-dependencias-y-contratos.md`; ADR 0010 (lectura cruzada por SQL); ADR 0047 y 0050–0053 (orden de comprobaciones del replay)
 
@@ -22,3 +22,11 @@ Para la entrega, `archivo/` conserva su SQL. Después de la entrega, el camino d
 - Se gana: la entrega no depende de cambiar el orden de las comprobaciones.
 - Se pierde: `archivo/` depende de columnas de `inspeccion` que el compilador no revisa. Un cambio en esa tabla se detecta al ejecutar la consulta.
 - Al hacer el camino de salida, repetir las pruebas de replay de fotos, PDF, baja y envío antes de fusionar.
+
+## Cierre del desvío
+`ArchivoService` autoriza la titularidad con `InspeccionService.exigirPropia` antes
+del replay y exige `exigirBorradorPropio` únicamente para una carga nueva o baja.
+Un UUID ya guardado sigue siendo recuperable después del envío. La purga y los
+bloqueos mantienen SQL; la purga vuelve a comprobar estado, edad y `purgado_en`
+después de obtener el bloqueo, antes de eliminar objetos. Los cupos cuentan solo
+archivos no purgados.

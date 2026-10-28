@@ -4,6 +4,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.cunoc.puentes.PruebaIntegracion;
 import java.net.URI;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Objects;
 import java.util.stream.Stream;
@@ -23,6 +25,25 @@ class PurgaDeArchivosTest extends PruebaIntegracion {
   @Autowired ArchivoRepository repositorio;
 
   @Autowired TestEntityManager em;
+
+  @Test
+  void unCandidatoDejaDeSerPurgableAlEnviarseORecibirActividad() {
+    Instant limite = Instant.now().minus(210, ChronoUnit.DAYS);
+    Archivo candidato = repositorio.buscarParaPurgar(limite).getFirst();
+    assertThat(repositorio.buscarPurgable(candidato.getId(), limite)).isPresent();
+    em.getEntityManager()
+        .createNativeQuery("update inspeccion set estado = 'ENVIADA' where id = :id")
+        .setParameter("id", candidato.getInspeccionId())
+        .executeUpdate();
+    assertThat(repositorio.buscarPurgable(candidato.getId(), limite)).isEmpty();
+    em.getEntityManager()
+        .createNativeQuery(
+            "update inspeccion set estado = 'BORRADOR', actualizado_en = :ahora where id = :id")
+        .setParameter("id", candidato.getInspeccionId())
+        .setParameter("ahora", Instant.now())
+        .executeUpdate();
+    assertThat(repositorio.buscarPurgable(candidato.getId(), limite)).isEmpty();
+  }
 
   @Test
   void borraLosObjetosDelBorradorAbandonadoYConservaTodosLosRegistros() {

@@ -14,12 +14,12 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
-import com.cunoc.puentes.archivo.ArchivoRepository.InspeccionDelArchivo;
 import com.cunoc.puentes.archivo.dto.ArchivoDTO;
 import com.cunoc.puentes.archivo.dto.SubirDocumentoDTO;
 import com.cunoc.puentes.archivo.dto.SubirFotoDTO;
 import com.cunoc.puentes.common.NegocioException;
 import com.cunoc.puentes.inspeccion.EstadoInspeccion;
+import com.cunoc.puentes.inspeccion.InspeccionService;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.EnumSet;
@@ -46,8 +46,9 @@ class ArchivoServiceTest {
 
   private final AlmacenamientoArchivos almacenamiento = mock(AlmacenamientoArchivos.class);
   private final ArchivoRepository repositorio = mock(ArchivoRepository.class);
+  private final InspeccionService inspecciones = mock(InspeccionService.class);
   private final ArchivoService servicio =
-      new ArchivoService(almacenamiento, repositorio, new ArchivoMapperImpl());
+      new ArchivoService(almacenamiento, repositorio, new ArchivoMapperImpl(), inspecciones);
 
   @BeforeEach
   void inspeccionPropiaEnBorrador() {
@@ -55,6 +56,64 @@ class ArchivoServiceTest {
     when(repositorio.save(any())).thenAnswer(guardar -> guardar.getArgument(0));
     when(almacenamiento.obtenerUrlFirmada(anyString()))
         .thenAnswer(firmar -> "https://firmada/" + firmar.getArgument(0));
+  }
+
+  @Test
+  void purgaReevaluaElegibilidadDespuesDelBloqueo() {
+    Archivo candidato = archivo(UUID.randomUUID(), INSPECCION);
+    BloqueoArchivo bloqueos = mock(BloqueoArchivo.class);
+    BajaArchivoIntencion bajas = mock(BajaArchivoIntencion.class);
+    var gestor = mock(org.springframework.transaction.PlatformTransactionManager.class);
+    when(gestor.getTransaction(any()))
+        .thenReturn(new org.springframework.transaction.support.SimpleTransactionStatus());
+    ArchivoService purga =
+        new ArchivoService(
+            almacenamiento, repositorio, new ArchivoMapperImpl(), inspecciones, null, bloqueos);
+    org.springframework.test.util.ReflectionTestUtils.setField(purga, "gestor", gestor);
+    org.springframework.test.util.ReflectionTestUtils.setField(purga, "bajas", bajas);
+    when(repositorio.buscarParaPurgar(any())).thenReturn(List.of(candidato));
+    when(repositorio.buscarPurgable(eq(candidato.getId()), any()))
+        .thenReturn(Optional.of(candidato));
+    org.mockito.Mockito.doAnswer(
+            invocacion -> {
+              // El envío (o actividad nueva) gana antes de que la purga obtenga la fila.
+              when(repositorio.buscarPurgable(eq(candidato.getId()), any()))
+                  .thenReturn(Optional.empty());
+              return null;
+            })
+        .when(bloqueos)
+        .archivo(INSPECCION, candidato.getId());
+
+    purga.purgarBorradoresAbandonados();
+
+    var orden = inOrder(repositorio, bloqueos);
+    orden.verify(repositorio).buscarParaPurgar(any());
+    orden.verify(bloqueos).archivo(INSPECCION, candidato.getId());
+    orden.verify(repositorio).buscarPurgable(eq(candidato.getId()), any());
+    verifyNoInteractions(almacenamiento);
+    assertThat(candidato.getPurgadoEn()).isNull();
+  }
+
+  @Test
+  void permiteReemplazarFotosPurgadasSinConsumirCupo() {
+    when(repositorio.countByInspeccionIdAndTipoIn(
+            INSPECCION, EnumSet.of(TipoArchivo.JPEG, TipoArchivo.WEBP)))
+        .thenReturn(60L);
+    when(repositorio.countByInspeccionIdAndTipoInAndPurgadoEnIsNull(eq(INSPECCION), any()))
+        .thenReturn(59L);
+    servicio.guardarFoto(INSPECCION, AUTOR, foto());
+    verify(repositorio).save(any());
+  }
+
+  @Test
+  void replayDeUnaEnviadaAutorizaPropiedadPeroNoExigeBorrador() {
+    enEstado(EstadoInspeccion.ENVIADA);
+    UUID id = UUID.randomUUID();
+    when(repositorio.findById(id)).thenReturn(Optional.of(archivo(id, INSPECCION)));
+    assertThat(servicio.guardarFoto(INSPECCION, AUTOR, foto(id, WEBP, JPEG)).id()).isEqualTo(id);
+    verify(inspecciones).exigirPropia(INSPECCION, AUTOR);
+    verify(inspecciones, never()).exigirBorradorPropio(any(), any());
+    verify(almacenamiento, never()).guardar(anyString(), any(), anyString());
   }
 
   @Test
@@ -109,6 +168,11 @@ class ArchivoServiceTest {
 
   @Test
   void laInspeccionDeOtroAutorNoExisteParaElUsuario() {
+    when(inspecciones.exigirPropia(
+            eq(INSPECCION), org.mockito.ArgumentMatchers.argThat(u -> !AUTOR.equals(u))))
+        .thenThrow(
+            new NegocioException(
+                HttpStatus.NOT_FOUND, "inspeccion-no-encontrada", "No existe", "No existe"));
     assertThatExceptionOfType(NegocioException.class)
         .isThrownBy(() -> servicio.guardarFoto(INSPECCION, UUID.randomUUID(), foto()))
         .extracting(NegocioException::getStatusCode)
@@ -139,7 +203,8 @@ class ArchivoServiceTest {
 
   @Test
   void respetaElLimiteDe60FotosY10Documentos() {
-    when(repositorio.countByInspeccionIdAndTipoIn(eq(INSPECCION), any())).thenReturn(60L, 10L);
+    when(repositorio.countByInspeccionIdAndTipoInAndPurgadoEnIsNull(eq(INSPECCION), any()))
+        .thenReturn(60L, 10L);
 
     assertThatExceptionOfType(NegocioException.class)
         .isThrownBy(() -> servicio.guardarFoto(INSPECCION, AUTOR, foto()))
@@ -204,6 +269,8 @@ class ArchivoServiceTest {
     falla.setClave("falla.webp");
     Archivo vencido = archivo(UUID.randomUUID(), INSPECCION);
     when(repositorio.buscarParaPurgar(any())).thenReturn(List.of(falla, vencido));
+    when(repositorio.buscarPurgable(eq(falla.getId()), any())).thenReturn(Optional.of(falla));
+    when(repositorio.buscarPurgable(eq(vencido.getId()), any())).thenReturn(Optional.of(vencido));
     doThrow(new IllegalStateException("MinIO caído")).when(almacenamiento).eliminar("falla.webp");
 
     servicio.purgarBorradoresAbandonados();
@@ -289,25 +356,15 @@ class ArchivoServiceTest {
   }
 
   private void enEstado(EstadoInspeccion estado) {
-    when(repositorio.buscarInspeccion(INSPECCION))
-        .thenReturn(
-            Optional.of(
-                new InspeccionDelArchivo() {
-                  @Override
-                  public UUID getPuenteId() {
-                    return PUENTE;
-                  }
-
-                  @Override
-                  public UUID getAutorId() {
-                    return AUTOR;
-                  }
-
-                  @Override
-                  public EstadoInspeccion getEstado() {
-                    return estado;
-                  }
-                }));
+    when(inspecciones.exigirPropia(INSPECCION, AUTOR)).thenReturn(PUENTE);
+    if (estado == EstadoInspeccion.BORRADOR) {
+      when(inspecciones.exigirBorradorPropio(INSPECCION, AUTOR)).thenReturn(PUENTE);
+    } else {
+      when(inspecciones.exigirBorradorPropio(INSPECCION, AUTOR))
+          .thenThrow(
+              new NegocioException(
+                  HttpStatus.CONFLICT, "inspeccion-no-editable", "No editable", "Solo borradores"));
+    }
   }
 
   private Archivo guardado() {

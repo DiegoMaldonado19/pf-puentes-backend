@@ -33,7 +33,7 @@ Implementación inicial: [ADR 0055](adr/0055-bandeja-y-apertura-de-revision-acad
 | POST     | `/revisiones/{revisionId}/veredicto`     | Emite APROBADA, CAMBIOS_SOLICITADOS o RECHAZADA                                         |
 | GET/POST | `/revisiones/{revisionId}/observaciones` | Lista o agrega observaciones del ciclo                                                  |
 
-Veredicto: `{veredicto, observacion, estado_confirmado?, justificacion_estado?}`. Cambios/rechazo exigen observación no vacía. Aprobar llama a `publicarPorAprobacion`, que calcula el IC, publica y emite el evento oficial. No se modifica directamente el estado. Si faltan pesos o falla la publicación, el veredicto y su fecha también se revierten. Cambios usa `emitirVeredicto` de Inspecciones y su retorno a BORRADOR; rechazo es terminal.
+Veredicto: `{veredicto, observacion, estado_confirmado?, justificacion_estado?}`. Todo veredicto, incluida la aprobación, exige observación no vacía según la rúbrica. Aprobar llama a `publicarPorAprobacion`, que calcula el IC, publica y emite el evento oficial. No se modifica directamente el estado. Si faltan pesos o falla la publicación, el veredicto y su fecha también se revierten. Cambios usa `emitirVeredicto` de Inspecciones y su retorno a BORRADOR; rechazo es terminal.
 
 Observación: `{elemento_ref, texto}`. El servicio valida la referencia contra `properties` del esquema de la versión original, usando `x-elemento-ref` cuando existe y la ruta real en otro caso. Rechaza referencias ambiguas/inexistentes y texto vacío. Los arreglos se anclan como campo completo, sin inventar índices por fila. Se conserva `resuelta_en = NULL`; la consulta/resolución del estudiante será un incremento posterior.
 

@@ -74,6 +74,11 @@ class InspeccionBorradorTest extends PruebaIntegracion {
 
   @Test
   void guardarAvanceParcialSubeVersionYActividadSinExigirObligatorios() throws Exception {
+    // La actividad real usa la JVM; el now() del fixture corre en otro reloj (PostgreSQL).
+    jdbc.sql("update inspeccion set ultima_actividad_en = :actividad where id = :id")
+        .param("actividad", Timestamp.from(Instant.now().minusSeconds(1)))
+        .param("id", BORRADOR)
+        .update();
     long version = version(BORRADOR);
     Instant actividad =
         jdbc.sql("select ultima_actividad_en from inspeccion where id = :id")

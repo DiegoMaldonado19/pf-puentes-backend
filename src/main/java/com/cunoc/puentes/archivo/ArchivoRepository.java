@@ -52,6 +52,16 @@ interface ArchivoRepository extends JpaRepository<Archivo, UUID> {
       nativeQuery = true)
   List<Archivo> buscarParaPurgar(Instant limite);
 
+  @Query(
+      value =
+          """
+          SELECT a.* FROM archivo a JOIN inspeccion i ON i.id = a.inspeccion_id
+          WHERE a.id = :id AND i.estado = 'BORRADOR'
+            AND i.actualizado_en < :limite AND a.purgado_en IS NULL
+          """,
+      nativeQuery = true)
+  Optional<Archivo> buscarPurgable(UUID id, Instant limite);
+
   interface InspeccionDelArchivo {
 
     UUID getPuenteId();

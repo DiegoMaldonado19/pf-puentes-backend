@@ -160,7 +160,10 @@ class EnvioInspeccionService {
    */
   private Map<String, Object> conIdentificacion(Inspeccion inspeccion) {
     return RutasDatos.fusionar(
-        inspeccion.getDatos(), referencias.identificacion(inspeccion.getPuenteId()));
+        inspeccion.getDatos(),
+        referencias.identificacion(
+            inspeccion.getPuenteId(),
+            formularios.rutasPorReferencia(inspeccion.getFormularioVersionId())));
   }
 
   private void exigirPublicable(Inspeccion inspeccion) {
