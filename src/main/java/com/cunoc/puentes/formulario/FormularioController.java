@@ -36,6 +36,7 @@ public class FormularioController {
   }
 
   @GetMapping("/activo")
+  @PreAuthorize("isAuthenticated()")
   @ApiResponse(responseCode = "200", description = "Versión activa")
   @ApiResponse(responseCode = "404", description = "No hay versión activa")
   @ApiResponse(responseCode = "401", description = "Sin sesión")
@@ -46,6 +47,7 @@ public class FormularioController {
   }
 
   @GetMapping("/versiones/{codigo}")
+  @PreAuthorize("isAuthenticated()")
   @ApiResponse(responseCode = "200", description = "Versión por código")
   @ApiResponse(responseCode = "404", description = "Código inexistente")
   @ApiResponse(responseCode = "401", description = "Sin sesión")
@@ -55,6 +57,7 @@ public class FormularioController {
   }
 
   @GetMapping("/{id}")
+  @PreAuthorize("isAuthenticated()")
   @ApiResponse(responseCode = "200", description = "Detalle de la versión")
   @ApiResponse(responseCode = "404", description = "Versión inexistente")
   @ApiResponse(responseCode = "401", description = "Sin sesión")

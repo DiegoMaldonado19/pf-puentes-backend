@@ -4,7 +4,9 @@ import com.cunoc.puentes.common.ErrorCampo;
 import com.cunoc.puentes.common.NegocioException;
 import com.cunoc.puentes.inspeccion.puerto.ConsultaFormulario;
 import com.cunoc.puentes.inspeccion.puerto.GrupoElemento;
+import com.cunoc.puentes.inspeccion.puerto.RutasDatos;
 import com.cunoc.puentes.inspeccion.puerto.VersionFormularioVista;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -90,6 +92,46 @@ public class ConsultaFormularioEsquema implements ConsultaFormulario {
     faltantes(esquema(versionId), "", contenido, errores);
     errores.addAll(validacion.erroresCompletos(versionId, contenido));
     lanzarSiHay(errores, "Faltan campos obligatorios o hay valores inválidos.");
+  }
+
+  @Override
+  @Transactional(readOnly = true)
+  public Map<String, Object> traducir(Map<String, Object> datos, UUID origen, UUID destino) {
+    Instant desde = publicadaEn(origen);
+    Instant hasta = publicadaEn(destino);
+    if (desde == null || hasta == null || !desde.isBefore(hasta)) {
+      return datos;
+    }
+    Map<String, Object> traducidos = datos;
+    for (FormularioVersion version :
+        versiones.findByPublicadaEnGreaterThanAndPublicadaEnLessThanEqualOrderByPublicadaEnAsc(
+            desde, hasta)) {
+      traducidos = aplicarMapeo(traducidos, version.getMapeo());
+    }
+    return traducidos;
+  }
+
+  /** Mapeo {"ruta.antigua": "ruta.nueva"}; un destino que no es texto marca el campo eliminado. */
+  static Map<String, Object> aplicarMapeo(Map<String, Object> datos, Map<String, Object> mapeo) {
+    if (mapeo == null || mapeo.isEmpty()) {
+      return datos;
+    }
+    Map<String, Object> resultado = RutasDatos.copiar(datos);
+    mapeo.keySet().forEach(antigua -> RutasDatos.quitar(resultado, antigua));
+    mapeo.forEach(
+        (antigua, nueva) -> {
+          Object valor = RutasDatos.leer(datos, antigua);
+          if (nueva instanceof String ruta && valor != null) {
+            RutasDatos.escribir(resultado, ruta, valor);
+          }
+        });
+    return resultado;
+  }
+
+  private Instant publicadaEn(UUID versionId) {
+    return versionId == null
+        ? null
+        : versiones.findById(versionId).map(FormularioVersion::getPublicadaEn).orElse(null);
   }
 
   private Map<String, Object> esquema(UUID versionId) {

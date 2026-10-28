@@ -72,6 +72,15 @@ Un deploy nuevo es un push (o PR) al repositorio correspondiente. El job `deploy
 
 Los respaldos diarios de la base y de MinIO (`scripts/respaldo.sh`) van en un cron del host. Procedimiento completo, prueba de restauración y pasos de restauración real: [guía de respaldo y restauración](guia-respaldo-y-restauracion.md).
 
+## Datos de demo para calificar
+
+`scripts/datos-demo.sql` crea un Catedrático, un Estudiante y un Profesional externo verificado (`catedratico.demo`, `estudiante.demo` y `profesional.demo`, con `@sgp.gt`), un curso y un puente asignado al estudiante. Las cuentas entran con la contraseña del administrador inicial, así que ninguna clave queda en el repositorio. Correrlo otra vez no duplica nada. Las inspecciones se hacen en vivo desde la aplicación.
+
+```sh
+cd ~/puentes/stage/pf-puentes-backend
+docker compose exec -T postgres psql -U puentes_migrador -d puentes -v ON_ERROR_STOP=1 < scripts/datos-demo.sql
+```
+
 ## Documentación de la API
 
 La especificación OpenAPI se publica en `/api/docs` (interfaz en `/api/docs/swagger-ui.html`). En prod exige sesión (DT-BE-12). En CI, el job de pruebas sube el JSON como artefacto `openapi`, que es el que se entrega.

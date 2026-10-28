@@ -67,3 +67,5 @@
 | 0061 | Coordenadas de puentes en Malo públicas, sin restricción por estado | [0061-coordenadas-de-puentes-en-malo-publicas.md](0061-coordenadas-de-puentes-en-malo-publicas.md) |
 | 0062 | Identificación del puente desde el inventario, no desde la captura | [0062-identificacion-desde-el-inventario.md](0062-identificacion-desde-el-inventario.md) |
 | 0063 | Archivos lee la inspección por SQL hasta después de la entrega | [0063-archivos-lee-inspeccion-por-sql-hasta-la-entrega.md](0063-archivos-lee-inspeccion-por-sql-hasta-la-entrega.md) |
+| 0064 | El mapeo entre versiones se aplica en la precarga | [0064-mapeo-entre-versiones-en-la-precarga.md](0064-mapeo-entre-versiones-en-la-precarga.md) |
+| 0065 | Edición, borrado y moderación también en hilos de inspección; menciones por id | [0065-edicion-y-moderacion-en-hilos-de-inspeccion.md](0065-edicion-y-moderacion-en-hilos-de-inspeccion.md) |

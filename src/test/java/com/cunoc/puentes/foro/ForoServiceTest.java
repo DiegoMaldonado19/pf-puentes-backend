@@ -694,7 +694,7 @@ class ForoServiceTest {
   }
 
   @Test
-  void ocultarComentario_hiloConInspeccion_lanza404() {
+  void ocultarComentario_hiloDeInspeccion_loOculta() {
     Comentario comentario = new Comentario();
     setId(comentario, COMENTARIO_ID);
     Hilo hilo = new Hilo();
@@ -704,14 +704,29 @@ class ForoServiceTest {
     when(comentarioRepositorio.buscarParaModificar(COMENTARIO_ID))
         .thenReturn(Optional.of(comentario));
 
-    assertThatThrownBy(() -> servicio.ocultarComentario(COMENTARIO_ID, "Spam"))
-        .isInstanceOf(NegocioException.class)
-        .satisfies(
-            ex ->
-                assertThat(((NegocioException) ex).getStatusCode())
-                    .isEqualTo(HttpStatus.NOT_FOUND));
+    ResultadoModeracion resultado = servicio.ocultarComentario(COMENTARIO_ID, "Spam");
 
-    verify(comentarioRepositorio, never()).saveAndFlush(any());
+    assertThat(resultado.modificado()).isTrue();
+    assertThat(comentario.getOcultoEn()).isNotNull();
+    verify(comentarioRepositorio).saveAndFlush(comentario);
+  }
+
+  @Test
+  void eliminarComentario_hiloDeInspeccion_asignaEliminadoEn() {
+    Comentario comentario = new Comentario();
+    setId(comentario, COMENTARIO_ID);
+    comentario.setAutorId(AUTOR_ID);
+    Hilo hilo = new Hilo();
+    hilo.setInspeccionId(UUID.randomUUID());
+    comentario.setHilo(hilo);
+
+    when(comentarioRepositorio.buscarParaModificar(COMENTARIO_ID))
+        .thenReturn(Optional.of(comentario));
+
+    servicio.eliminarComentario(COMENTARIO_ID, AUTOR_ID);
+
+    assertThat(comentario.getEliminadoEn()).isNotNull();
+    verify(comentarioRepositorio).saveAndFlush(comentario);
   }
 
   @Test
@@ -1189,17 +1204,6 @@ class ForoServiceTest {
         .isInstanceOf(NegocioException.class);
 
     when(comentarioRepositorio.buscarParaModificar(COMENTARIO_ID)).thenReturn(Optional.empty());
-    assertThatThrownBy(
-            () ->
-                servicio.editarComentario(
-                    COMENTARIO_ID, AUTOR_ID, new EditarComentarioDTO("Texto")))
-        .isInstanceOf(NegocioException.class);
-    assertThatThrownBy(() -> servicio.eliminarComentario(COMENTARIO_ID, AUTOR_ID))
-        .isInstanceOf(NegocioException.class);
-
-    padreDeInspeccion.setAutorId(AUTOR_ID);
-    when(comentarioRepositorio.buscarParaModificar(COMENTARIO_ID))
-        .thenReturn(Optional.of(padreDeInspeccion));
     assertThatThrownBy(
             () ->
                 servicio.editarComentario(

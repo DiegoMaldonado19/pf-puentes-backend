@@ -170,8 +170,10 @@ class PrecargaInspeccionService {
     if (origen == null) {
       return new DatosPermanentesDTO(identificacion, null, anio);
     }
+    Map<String, Object> datosOrigen =
+        formularios.traducir(origen.getDatos(), origen.getFormularioVersionId(), versionId);
     Map<String, Object> permanentes =
-        RutasDatos.extraer(origen.getDatos(), formularios.rutasPermanentes(versionId));
+        RutasDatos.extraer(datosOrigen, formularios.rutasPermanentes(versionId));
     return new DatosPermanentesDTO(
         RutasDatos.fusionar(permanentes, identificacion), origen.getId(), anio);
   }

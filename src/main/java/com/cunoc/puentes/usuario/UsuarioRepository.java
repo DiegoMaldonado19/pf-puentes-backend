@@ -1,7 +1,9 @@
 package com.cunoc.puentes.usuario;
 
+import com.cunoc.puentes.usuario.dto.PersonaMencionableDTO;
 import jakarta.persistence.LockModeType;
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -71,4 +73,10 @@ interface UsuarioRepository
       "SELECT u.rol FROM Usuario u WHERE u.id = :id"
           + " AND u.estado = com.cunoc.puentes.usuario.EstadoUsuario.ACTIVO")
   Optional<Rol> buscarRolActivo(UUID id);
+
+  @Query(
+      "SELECT new com.cunoc.puentes.usuario.dto.PersonaMencionableDTO(u.id, u.nombre)"
+          + " FROM Usuario u WHERE u.estado = com.cunoc.puentes.usuario.EstadoUsuario.ACTIVO"
+          + " ORDER BY u.nombre")
+  List<PersonaMencionableDTO> mencionables();
 }

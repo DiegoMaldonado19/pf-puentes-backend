@@ -68,7 +68,7 @@ interface HiloRepository extends JpaRepository<Hilo, UUID> {
   Optional<Hilo> findByIdAndInspeccionIdIsNull(UUID id);
 
   @Lock(LockModeType.PESSIMISTIC_WRITE)
-  @Query("SELECT h FROM Hilo h WHERE h.id = :id AND h.inspeccionId IS NULL")
+  @Query("SELECT h FROM Hilo h WHERE h.id = :id")
   Optional<Hilo> buscarParaModificar(@Param("id") UUID id);
 
   boolean existsByIdAndInspeccionIdIsNull(UUID id);

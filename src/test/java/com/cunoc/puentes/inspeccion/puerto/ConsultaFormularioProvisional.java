@@ -129,6 +129,11 @@ class ConsultaFormularioProvisional implements ConsultaFormulario {
     lanzarSiHay(errores, "Faltan campos obligatorios o hay valores inválidos.");
   }
 
+  @Override
+  public Map<String, Object> traducir(Map<String, Object> datos, UUID origen, UUID destino) {
+    return datos;
+  }
+
   private static void lanzarSiHay(List<ErrorCampo> errores, String detalle) {
     if (errores.isEmpty()) {
       return;
