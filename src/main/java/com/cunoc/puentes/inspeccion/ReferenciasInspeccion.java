@@ -35,6 +35,30 @@ class ReferenciasInspeccion {
         .optional();
   }
 
+  /** Sección 1 del formulario, de los datos del inventario y del catálogo INE (RN-INV-03). */
+  Map<String, Object> identificacion(UUID puenteId) {
+    Map<String, Object> seccion =
+        jdbc.sql(
+                """
+                select p.codigo, p.nombre, p.ruta, d.nombre as departamento, m.nombre as municipio
+                from puente p
+                join municipio m on m.codigo = p.municipio_codigo
+                join departamento d on d.codigo = m.departamento_codigo
+                where p.id = :id
+                """)
+            .param("id", puenteId)
+            .query(
+                (rs, numero) ->
+                    Map.<String, Object>of(
+                        "codigo", rs.getString("codigo"),
+                        "nombre", rs.getString("nombre"),
+                        "ruta", rs.getString("ruta"),
+                        "departamento", rs.getString("departamento"),
+                        "municipio", rs.getString("municipio")))
+            .single();
+    return Map.<String, Object>of("identificacion", seccion);
+  }
+
   Map<UUID, PuenteVista> puentes(Set<UUID> ids) {
     if (ids.isEmpty()) {
       return Map.of();

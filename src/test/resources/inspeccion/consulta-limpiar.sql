@@ -141,3 +141,8 @@ DELETE FROM puente WHERE id IN (
   '0199c200-0000-7000-8000-000000000003',
   '0199c200-0000-7000-8000-000000000004',
   '0199c200-0000-7000-8000-000000000005');
+
+-- Las pruebas del formulario real esperan V1.0.0 activa: consulta.sql la retira.
+UPDATE formulario_version SET estado = 'ACTIVA'
+WHERE id = '0192b000-0000-7000-8000-000000000001'
+  AND NOT EXISTS (SELECT 1 FROM formulario_version WHERE estado = 'ACTIVA');

@@ -2,7 +2,7 @@
 
 ## Revisión académica — 27/10/2026
 
-Seguimiento añadido: pendientes del autor en `/api/v1/revisiones/mis-pendientes`, acceso a sus historiales desde `/revisiones/mis-inspecciones`, resolución por PATCH `/observaciones/{id}/resolucion` e historial paginado por inspección. La calificación es un GET/PUT privado separado por ciclo, sin fuga hacia DTO generales o bitácora. El job diario de 15 días notifica mediante el servicio compartido y deduplica por envío/destinatario con una migración nueva. [ADR 0050](docs/adr/0050-seguimiento-calificacion-privada-y-avisos-de-revision.md).
+Seguimiento añadido: pendientes del autor en `/api/v1/revisiones/mis-pendientes`, acceso a sus historiales desde `/revisiones/mis-inspecciones`, resolución por PATCH `/observaciones/{id}/resolucion` e historial paginado por inspección. La calificación es un GET/PUT privado separado por ciclo, sin fuga hacia DTO generales o bitácora. El job diario de 15 días notifica mediante el servicio compartido y deduplica por envío/destinatario con una migración nueva. [ADR 0057](docs/adr/0057-seguimiento-calificacion-privada-y-avisos-de-revision.md).
 
 `GET /api/v1/revisiones/pendientes` y `POST /api/v1/inspecciones/{inspeccionId}/revisiones`: Catedrático activo, cursos propios y nunca autor de la inspección. Apertura con bloqueo, auditoría y transición mediante el servicio de Inspecciones. El detalle `GET /api/v1/revisiones/{id}`, el POST `/veredicto` y GET/POST `/observaciones` permiten decidir y anclar campos del esquema original. Aprobar delega a `publicarPorAprobacion`; cambios/rechazo requieren texto, sin cambiar estados directamente. [Contrato, alcance y pruebas](docs/revision-academica.md).
 
@@ -30,7 +30,7 @@ Seguimiento añadido: pendientes del autor en `/api/v1/revisiones/mis-pendientes
 
 ### Preparar calificaciones desde respuestas reales (P8, 25/10/2026)
 
-`PreparacionCalificacionesService.preparar(formularioId, juegoId, datos)` es una operación interna de solo lectura que entrega entradas inmutables para la calculadora IC existente. Reutiliza el extractor P4, los repositorios, MapStruct y las validaciones del dominio. Lee cada daño por su ruta real, comprueba versión/cobertura completa del juego indicado y obtiene todos los pesos. Ausentes, null, no aplicables y daños repetidos sin contrato producen error; cero sigue siendo válido. No interpreta condiciones críticas ni produce un IC oficial. [Contrato y límites: ADR 0041](docs/adr/0041-preparacion-de-calificaciones-desde-respuestas-reales.md), [manual técnico](docs/manual-tecnico-p8.md).
+`PreparacionCalificacionesService.preparar(formularioId, juegoId, datos)` es una operación interna de solo lectura que entrega entradas inmutables para la calculadora IC existente. Reutiliza el extractor P4, los repositorios, MapStruct y las validaciones del dominio. Lee cada daño por su ruta real, comprueba versión/cobertura completa del juego indicado y obtiene todos los pesos. Ausentes, null, no aplicables y daños repetidos sin contrato producen error; cero sigue siendo válido. No interpreta condiciones críticas ni produce un IC oficial. [Contrato y límites: ADR 0054](docs/adr/0054-preparacion-de-calificaciones-desde-respuestas-reales.md), [manual técnico](docs/manual-tecnico-p8.md).
 
 No hay nueva pantalla o API: el siguiente consumidor será el flujo de inspección P5, que aún debe aportar autorización, validación completa P4 y publicación. La creación completa de pesos ya está implementada; las menciones anteriores a su ausencia son históricas.
 
@@ -155,15 +155,15 @@ Una intención PostgreSQL confirmada antes de MinIO conserva claves estables y p
 Requisitos: Docker con Compose 2.32 o superior. En Windows, Docker Desktop con la integración de WSL activada.
 
 ```bash
-cp .env.local .env   # valores locales compartidos; .env.example documenta los de la EC2
+cp .env.local.example .env   # valores locales compartidos; .env.example documenta los de la EC2
 docker compose -f compose.local.yaml up --watch
 ```
 
 | Servicio | Dirección | Credenciales |
 |---|---|---|
 | API | http://localhost:8080 | — |
-| PostgreSQL | `localhost:5432`, base `puentes` | `puentes_migrador` / `password` · `puentes_app` / `password` |
-| Consola de MinIO | http://localhost:9001 | `puentes-local` / `password` |
+| PostgreSQL | `localhost:5432`, base `puentes` | `puentes_migrador` · `puentes_app` (claves en `.env.local.example`) |
+| Consola de MinIO | http://localhost:9001 | `puentes-local` (clave en `.env.local.example`) |
 
 El backend crea el bucket `archivos` de MinIO al arrancar. Si tu volumen local se creó con otras contraseñas, recréalo: `docker compose -f compose.local.yaml down -v`.
 
@@ -211,7 +211,7 @@ Al arrancar, si no existe ninguna cuenta con rol `ADMINISTRADOR`, la app crea un
 - **Idempotente:** si ya hay un administrador no hace nada y nunca toca su contraseña; los cambios de contraseña son de US-P2-11.
 - **Sin variables:** avisa con un `WARN` en el log y sigue arrancando; sin administrador no se puede invitar a nadie.
 - **Contraseña débil** (menos de 10 caracteres, sin letra o sin dígito, RN-USR-06): el arranque falla con un mensaje que indica la política, sin mostrar el valor.
-- En local, `.env.local` trae un administrador de desarrollo (`admin@puentes.local`). En dev, stage y prod defínelas como secretos del Environment ([ADR 0004](docs/adr/0004-configuracion-por-entorno-con-github-environments.md)); son opcionales una vez creada la cuenta.
+- En local, `.env.local.example` trae un administrador de desarrollo (`admin@puentes.local`). En dev, stage y prod defínelas como secretos del Environment ([ADR 0004](docs/adr/0004-configuracion-por-entorno-con-github-environments.md)); son opcionales una vez creada la cuenta.
 
 ### Inicio de sesión y bloqueo (RN-USR-07)
 
@@ -293,13 +293,13 @@ GitHub Actions (`.github/workflows/ci-cd.yml`) corre cuatro etapas: build → te
 - **Revisar un entorno:** `cd ~/puentes/<entorno>/pf-puentes-backend && docker compose ps`
 - **Respaldos:** `scripts/respaldo.sh <entorno>` cada noche desde el cron del host, y `scripts/restaurar.sh` para probarlos ([guía de respaldo y restauración](docs/guia-respaldo-y-restauracion.md)).
 
-Las decisiones están en [docs/adr](docs/adr/). Los secretos y variables por configurar están en el [ADR 0004](docs/adr/0004-configuracion-por-entorno-con-github-environments.md).
+La guía paso a paso (primer arranque, secretos, cuenta de servicio de MinIO y actualización de un entorno) está en [docs/guia-despliegue.md](docs/guia-despliegue.md). Las decisiones están en [docs/adr](docs/adr/). Los secretos y variables por configurar están en el [ADR 0004](docs/adr/0004-configuracion-por-entorno-con-github-environments.md).
 
 ## Problemas conocidos
 
 **La app no arranca: `Could not resolve placeholder '...'`**
 
-A tu `.env` le falta una variable que se agregó después de que lo creaste. Copia la línea que falta desde `.env.local`.
+A tu `.env` le falta una variable que se agregó después de que lo creaste. Copia la línea que falta desde `.env.local.example`.
 
 **Maven falla en WSL con `bad_record_mac` o `Tag mismatch`**
 

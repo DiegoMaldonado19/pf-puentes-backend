@@ -18,7 +18,8 @@ class CorsConfig {
     CorsConfiguration cors = new CorsConfiguration();
     cors.setAllowedOrigins(origenes);
     cors.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE"));
-    cors.setAllowedHeaders(List.of("Authorization", "Content-Type", "Idempotency-Key"));
+    cors.setAllowedHeaders(
+        List.of("Authorization", "Content-Type", "Idempotency-Key", "X-Sgp-Sync"));
     cors.setAllowCredentials(true);
     UrlBasedCorsConfigurationSource fuente = new UrlBasedCorsConfigurationSource();
     fuente.registerCorsConfiguration("/**", cors);

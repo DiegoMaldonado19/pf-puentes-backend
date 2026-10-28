@@ -76,7 +76,7 @@ class InspeccionPrecargaTest extends PruebaIntegracion {
                 .with(como(Rol.CATEDRATICO, C1)))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.origen_inspeccion_id").value(org.hamcrest.Matchers.nullValue()))
-        .andExpect(jsonPath("$.datos").isEmpty())
+        .andExpect(jsonPath("$.datos.identificacion.codigo").value("GT-09-0901-9205"))
         .andExpect(jsonPath("$.anio_construccion").value(org.hamcrest.Matchers.nullValue()));
   }
 

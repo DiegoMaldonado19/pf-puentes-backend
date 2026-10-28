@@ -65,6 +65,7 @@ scripts/*
 # Los scripts del host sí se versionan (docs/guia-respaldo-y-restauracion.md)
 !scripts/respaldo.sh
 !scripts/restaurar.sh
+!scripts/minio-cuenta-servicio.sh
 
 # El .env.example si se versiona.
 !.env.example

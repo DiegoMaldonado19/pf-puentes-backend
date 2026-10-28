@@ -13,6 +13,7 @@ FROM eclipse-temurin:25.0.4_7-jre-alpine
 WORKDIR /app
 RUN addgroup -S app && adduser -S app -G app
 COPY --from=build /app/target/*.jar app.jar
+RUN mkdir /app/logs && chown app:app /app/logs
 USER app
 EXPOSE 8080
 HEALTHCHECK --start-period=60s CMD wget -qO- http://localhost:8081/actuator/health || exit 1

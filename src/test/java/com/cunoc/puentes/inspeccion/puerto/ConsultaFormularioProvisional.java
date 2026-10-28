@@ -14,27 +14,52 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
-import java.util.stream.Collectors;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.context.annotation.Primary;
 import org.springframework.http.HttpStatus;
+import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Sustituto de P4 mientras el motor de formularios no esté en {@code develop}. Lee la versión
- * {@code ACTIVA} de {@code formulario_version} y las rutas de {@code sgp.formulario.*}. {@code
- * validarParcial} comprueba tipos y rangos; {@code validarCompleto} exige todas las rutas conocidas
- * (permanentes y daño) de esa versión.
+ * Formulario de pruebas con rutas fijas, anterior al esquema real de P4. Las pruebas de P5 que usan
+ * un esquema {@code {"type":"object"}} dependen de él; {@code sgp.pruebas.formulario-real=true} lo
+ * desactiva.
  */
+@Component
+@Primary
+@ConditionalOnProperty(
+    name = "sgp.pruebas.formulario-real",
+    havingValue = "false",
+    matchIfMissing = true)
 class ConsultaFormularioProvisional implements ConsultaFormulario {
 
-  private final EntityManager em;
-  private final Set<String> permanentes;
-  private final Set<String> danos;
+  private static final List<String> RUTAS_PERMANENTES =
+      List.of(
+          "identificacion.tipologia",
+          "identificacion.material_principal",
+          "identificacion.numero_tramos",
+          "identificacion.longitud_m",
+          "identificacion.ancho_calzada_m",
+          "identificacion.anio_construccion");
+  private static final List<String> RUTAS_DANO =
+      List.of(
+          "subestructura.estribo_entrada.calificacion",
+          "subestructura.estribo_entrada.fisuras",
+          "subestructura.estribo_entrada.humedad",
+          "subestructura.estribo_entrada.desconchado",
+          "subestructura.estribo_entrada.asentamiento",
+          "subestructura.estribo_entrada.socavacion",
+          "subestructura.estribo_salida.calificacion",
+          "superestructura.losa.calificacion",
+          "accesos.entrada.calificacion",
+          "cauce.calificacion");
 
-  ConsultaFormularioProvisional(
-      EntityManager em, List<String> rutasPermanentes, List<String> rutasDano) {
+  private final EntityManager em;
+  private final Set<String> permanentes = new LinkedHashSet<>(RUTAS_PERMANENTES);
+  private final Set<String> danos = new LinkedHashSet<>(RUTAS_DANO);
+
+  ConsultaFormularioProvisional(EntityManager em) {
     this.em = em;
-    this.permanentes = copiar(rutasPermanentes);
-    this.danos = copiar(rutasDano);
   }
 
   @Override
@@ -48,21 +73,6 @@ class ConsultaFormularioProvisional implements ConsultaFormulario {
             .setMaxResults(1)
             .getResultList();
     return activas.stream().findFirst().map(this::vista);
-  }
-
-  @Override
-  @Transactional(readOnly = true)
-  public VersionFormularioVista exigir(UUID id) {
-    Objects.requireNonNull(id, "El id de la versión es obligatorio.");
-    FormularioVersion version = em.find(FormularioVersion.class, id);
-    if (version == null) {
-      throw new NegocioException(
-          HttpStatus.NOT_FOUND,
-          "formulario-no-encontrado",
-          "Versión de formulario no encontrada",
-          "No hay una versión de formulario con ese id.");
-    }
-    return vista(version);
   }
 
   @Override
@@ -192,16 +202,5 @@ class ConsultaFormularioProvisional implements ConsultaFormulario {
 
   private VersionFormularioVista vista(FormularioVersion version) {
     return new VersionFormularioVista(version.getId(), version.getCodigo(), version.getEsquema());
-  }
-
-  private static Set<String> copiar(List<String> rutas) {
-    if (rutas == null) {
-      return Set.of();
-    }
-    return rutas.stream()
-        .filter(Objects::nonNull)
-        .map(String::strip)
-        .filter(ruta -> !ruta.isEmpty())
-        .collect(Collectors.toCollection(LinkedHashSet::new));
   }
 }

@@ -268,9 +268,6 @@ public class CalculoIndiceCondicionService implements CalculoIndice {
   }
 
   private Anulacion seleccionarAnulacionPrincipal(Set<Anulacion> anulaciones) {
-    if (anulaciones == null || anulaciones.isEmpty()) {
-      return null;
-    }
     for (Anulacion candidata : Anulacion.values()) {
       if (anulaciones.contains(candidata)) {
         return candidata;
