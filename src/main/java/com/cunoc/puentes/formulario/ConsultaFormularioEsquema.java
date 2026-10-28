@@ -88,7 +88,7 @@ public class ConsultaFormularioEsquema implements ConsultaFormulario {
     Map<String, Object> contenido = sinNulos(datos);
     List<ErrorCampo> errores = new ArrayList<>();
     faltantes(esquema(versionId), "", contenido, errores);
-    errores.addAll(validacion.erroresDeContenido(versionId, contenido));
+    errores.addAll(validacion.erroresCompletos(versionId, contenido));
     lanzarSiHay(errores, "Faltan campos obligatorios o hay valores inválidos.");
   }
 
@@ -187,7 +187,7 @@ public class ConsultaFormularioEsquema implements ConsultaFormulario {
             "datos-invalidos",
             "Los datos no cumplen el esquema",
             detalle)
-        .conErrores(List.copyOf(errores));
+        .conErrores(errores.stream().distinct().toList());
   }
 
   /** Un valor vacío (null) cuenta como ausente, igual que en el motor del frontend. */
@@ -207,10 +207,7 @@ public class ConsultaFormularioEsquema implements ConsultaFormulario {
       return limpio;
     }
     if (valor instanceof List<?> filas) {
-      return filas.stream()
-          .filter(Objects::nonNull)
-          .map(ConsultaFormularioEsquema::limpiar)
-          .toList();
+      return filas.stream().map(ConsultaFormularioEsquema::limpiar).toList();
     }
     return valor;
   }

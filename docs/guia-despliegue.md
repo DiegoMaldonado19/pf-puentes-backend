@@ -35,14 +35,14 @@ El job `deploy` escribe el `.env` de cada entorno desde su Environment (ADR 0004
 - Backend: `DOCKERHUB_USERNAME`, `DOCKERHUB_TOKEN`, `EC2_HOST`, `EC2_USER`, `EC2_SSH_KEY`, `DB_MIGRATION_PASSWORD`, `DB_APP_PASSWORD`, `MINIO_ROOT_USER`, `MINIO_ROOT_PASSWORD`, `MINIO_APP_USER`, `MINIO_APP_PASSWORD`, `MINIO_URL_PUBLICA`, `JWT_SECRET`, `CORS_ALLOWED_ORIGINS`, `ADMIN_INICIAL_*`, `FRONTEND_URL`, `COOKIE_SECURE`, `CORREO_MODO`, `CORREO_REMITENTE`, `SMTP_*`.
 - Frontend: `DOCKERHUB_USERNAME`, `DOCKERHUB_TOKEN`, `EC2_HOST`, `EC2_USER`, `EC2_SSH_KEY`, `HTTPS_PORT` (dev 8082, stage 8081, prod 443). Si `HTTPS_PORT` falta, el despliegue se detiene.
 
-`MINIO_APP_USER` y `MINIO_APP_PASSWORD` son la cuenta de servicio del backend. Si faltan, el backend usa la cuenta root de MinIO. Antes de cargarlos hay que crear la cuenta (sección siguiente), porque el backend valida el bucket al arrancar.
+`MINIO_APP_USER` y `MINIO_APP_PASSWORD` son la cuenta de servicio del backend; deben configurarse juntos y el usuario debe ser distinto del root. El deploy inicia primero PostgreSQL y MinIO, crea o actualiza la cuenta y su política, y solo después arranca el backend. Si faltan ambos, se conserva la compatibilidad con la cuenta root; si falta uno, el bootstrap falla antes de iniciar el backend.
 
 ## Primer arranque de un entorno
 
 1. Preparar el host: Docker, la carpeta `~/puentes` y el certificado TLS (`scripts/certificado-tls.sh` del frontend, README del frontend). Los tres entornos comparten el certificado de `pf-puentes.duckdns.org`.
 2. Crear la red del entorno: `docker network create puentes-<entorno>` (el job de deploy también lo hace si falta).
-3. Desplegar con el CI. Tras el primer `docker compose up --wait`, el backend ya aplicó sus migraciones Flyway.
-4. Crear la cuenta de servicio de MinIO (sección siguiente). Después, cargar `MINIO_APP_*` en el Environment y volver a correr el deploy.
+3. Configurar los secretos del Environment, incluidos ambos `MINIO_APP_*`.
+4. Desplegar con el CI: espera PostgreSQL y MinIO, ejecuta el bootstrap de la cuenta y después espera el backend, que aplica las migraciones Flyway. No hace falta un primer deploy con root ni crear la cuenta después.
 5. Crear el juego de pesos provisional de la versión activa del formulario desde **/admin/pesos**. Sin él, publicar una inspección responde `ic-no-calculable`. Cada entorno necesita el suyo; no hay siembra automática (ADR 0040 del backend).
 6. Revisar que el healthcheck está sano: `cd ~/puentes/<entorno>/pf-puentes-backend && docker compose ps`.
 
@@ -56,7 +56,7 @@ Para crear la cuenta de servicio, con `MINIO_APP_USER` y `MINIO_APP_PASSWORD` en
 ~/puentes/<entorno>/pf-puentes-backend/scripts/minio-cuenta-servicio.sh <entorno>
 ```
 
-El script es idempotente. La cuenta solo puede leer, escribir y borrar objetos del bucket `archivos`, y listar ese bucket (que es lo que valida el backend al arrancar). No puede crear buckets ni administrar usuarios.
+El pipeline lo ejecuta antes del backend. El comando anterior permite repetirlo manualmente con MinIO ya sano. El script es ejecutable, idempotente y detiene el proceso ante cualquier error; actualizar la cuenta no la elimina primero. La cuenta solo puede leer, escribir y borrar objetos del bucket `archivos`, y listar ese bucket (que es lo que valida el backend al arrancar). No puede crear buckets ni administrar usuarios.
 
 ## Logs (DT-DEP-09)
 
@@ -66,7 +66,7 @@ El script es idempotente. La cuenta solo puede leer, escribir y borrar objetos d
 
 ## Actualizar un entorno
 
-Un deploy nuevo es un push (o PR) al repositorio correspondiente. El job `deploy` hace `git fetch` del commit exacto, escribe el `.env`, descarga la imagen y corre `docker compose up -d --wait`. Si un contenedor no queda sano, el job falla y el entorno anterior sigue corriendo.
+Un deploy nuevo es un push (o PR) al repositorio correspondiente. El job `deploy` hace `git fetch` del commit exacto, escribe el `.env`, descarga la imagen y ejecuta el bootstrap anterior antes de `docker compose up -d --wait`. Si una fase falla, el job falla; Compose no garantiza restaurar automáticamente los contenedores anteriores.
 
 ## Respaldo
 

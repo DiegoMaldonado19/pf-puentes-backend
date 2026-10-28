@@ -146,5 +146,19 @@ jobs:
           {
             ssh ec2 "set -e; [ -d $DIR/.git ] || git clone -q https://github.com/$GITHUB_REPOSITORY.git $DIR; cd $DIR; git fetch -q origin $GITHUB_SHA; git checkout -qf FETCH_HEAD"
             ssh ec2 "umask 077; cat > $DIR/.env" < .env
-            ssh ec2 "set -e; cd $DIR; docker network create puentes-$ENTORNO 2>/dev/null || true; docker compose pull -q; docker compose up -d --remove-orphans --wait; docker image prune -f"
+            ssh ec2 "sh -s -- '$DIR' '$ENTORNO'" <<'SH'
+          set -eu
+          cd "$1"
+          docker network inspect "puentes-$2" >/dev/null 2>&1 || docker network create "puentes-$2"
+          docker compose pull -q
+          docker compose up -d --wait postgres minio
+          set -a
+          . ./.env
+          set +a
+          if [ -n "${MINIO_APP_USER:-}${MINIO_APP_PASSWORD:-}" ]; then
+            ./scripts/minio-cuenta-servicio.sh "$2"
+          fi
+          docker compose up -d --remove-orphans --wait
+          docker image prune -f
+          SH
           }

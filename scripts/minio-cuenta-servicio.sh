@@ -12,13 +12,17 @@ set -a
 set +a
 : "${MINIO_APP_USER:?MINIO_APP_USER vacío en .env}"
 : "${MINIO_APP_PASSWORD:?MINIO_APP_PASSWORD vacío en .env}"
+if [ "$MINIO_APP_USER" = "$MINIO_ROOT_USER" ]; then
+  echo "MINIO_APP_USER debe ser distinto de MINIO_ROOT_USER" >&2
+  exit 1
+fi
 
 docker compose exec -T -e APP_USUARIO="$MINIO_APP_USER" -e APP_CLAVE="$MINIO_APP_PASSWORD" minio sh -c '
+  set -eu
   mc alias set local http://localhost:9000 "$MINIO_ROOT_USER" "$MINIO_ROOT_PASSWORD" >/dev/null
   mc mb --ignore-existing local/archivos >/dev/null
   printf "%s" "{\"Version\":\"2012-10-17\",\"Statement\":[{\"Effect\":\"Allow\",\"Action\":[\"s3:ListBucket\"],\"Resource\":[\"arn:aws:s3:::archivos\"]},{\"Effect\":\"Allow\",\"Action\":[\"s3:GetObject\",\"s3:PutObject\",\"s3:DeleteObject\"],\"Resource\":[\"arn:aws:s3:::archivos/*\"]}]}" > /tmp/sgp-archivos.json
   mc admin policy create local sgp-archivos /tmp/sgp-archivos.json >/dev/null
-  mc admin user remove local "$APP_USUARIO" >/dev/null 2>&1 || true
   mc admin user add local "$APP_USUARIO" "$APP_CLAVE" >/dev/null
   mc admin policy attach local sgp-archivos --user "$APP_USUARIO" >/dev/null
 '

@@ -29,6 +29,9 @@ public interface FormularioValidacionService {
   /** Tipos, rangos y valores permitidos del contenido; no exige los campos obligatorios. */
   List<ErrorCampo> erroresDeContenido(UUID versionId, Map<String, Object> datosPayload);
 
+  /** Todos los errores del esquema, incluidos los obligatorios y las reglas compuestas. */
+  List<ErrorCampo> erroresCompletos(UUID versionId, Map<String, Object> datosPayload);
+
   /**
    * Comprueba que el esquema sea un JSON Schema utilizable.
    *

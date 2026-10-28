@@ -63,6 +63,13 @@ public class FormularioValidacionServiceImpl implements FormularioValidacionServ
   }
 
   @Override
+  public List<ErrorCampo> erroresCompletos(UUID versionId, Map<String, Object> datosPayload) {
+    return mensajes(esquemaDe(versionId), datosPayload).stream()
+        .map(FormularioValidacionServiceImpl::error)
+        .toList();
+  }
+
+  @Override
   public void compilar(Map<String, Object> esquema) {
     Set<ValidationMessage> errores = metaesquema.validate(objectMapper.valueToTree(esquema));
     if (!errores.isEmpty()) {
@@ -121,6 +128,10 @@ public class FormularioValidacionServiceImpl implements FormularioValidacionServ
     } else if (ruta.equals("$") || ruta.isEmpty()) {
       ruta = "datos";
     }
+    if ("required".equals(msg.getType()) && msg.getArguments().length > 0) {
+      String propiedad = String.valueOf(msg.getArguments()[0]);
+      ruta = "datos".equals(ruta) ? propiedad : ruta + "." + propiedad;
+    }
     return new ErrorCampo(ruta, mensaje(msg));
   }
 
@@ -130,6 +141,7 @@ public class FormularioValidacionServiceImpl implements FormularioValidacionServ
       return msg.getMessage();
     }
     return switch (tipo) {
+      case "required" -> "Requerido";
       case "type" -> "El valor no coincide con el tipo esperado.";
       case "minimum", "maximum", "exclusiveMinimum", "exclusiveMaximum" ->
           "El valor está fuera del rango permitido.";
