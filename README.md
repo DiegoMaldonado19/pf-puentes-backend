@@ -92,7 +92,7 @@ Verificación: **1105 pruebas backend aprobadas**, 16 nuevas, PostgreSQL/reloj c
 
 API REST del Sistema de Gestión de Puentes (SGP).
 
-## Estado (20/10/2026)
+## Estado Activo (20/10/2026)
 
 | Paquete | Qué hay | Responsable |
 |---|---|---|
