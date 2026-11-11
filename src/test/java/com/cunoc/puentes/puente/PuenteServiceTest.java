@@ -40,7 +40,7 @@ class PuenteServiceTest {
   private static final UUID ID = UUID.fromString("0192f5a0-0000-7000-8000-000000000301");
   private static final UUID ADMIN = UUID.fromString("0192f5a0-0000-7000-8000-0000000000a1");
   private static final PuenteCercanoDTO CERCANO =
-      new PuenteCercanoDTO(ID, "GT-09-0901-0001", "Las Rosas", 42.5);
+      new PuenteCercanoDTO(ID, "GT-09-0901-0001", "Las Rosas", 14.6, -90.5, 42.5);
 
   @Mock PuenteRepository puentes;
   @Mock MunicipioRepository municipios;
