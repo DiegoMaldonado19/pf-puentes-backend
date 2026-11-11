@@ -1,5 +1,6 @@
 package com.cunoc.puentes.revision;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -8,6 +9,9 @@ import org.springframework.data.repository.query.Param;
 
 interface ObservacionRevisionRepository extends JpaRepository<ObservacionAnclada, UUID> {
   List<ObservacionAnclada> findByRevision_IdOrderByCreadoEnAscIdAsc(UUID revisionId);
+
+  /** Observaciones sin resolver de las revisiones dadas (para el resumen de cada inspección). */
+  List<ObservacionAnclada> findByRevision_IdInAndResueltaEnIsNull(Collection<UUID> revisionIds);
 
   // Solo el último ciclo: las observaciones de ciclos anteriores ya no bloquean el envío
   @Query(

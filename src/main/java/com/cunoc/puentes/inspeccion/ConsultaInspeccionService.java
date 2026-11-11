@@ -8,6 +8,8 @@ import com.cunoc.puentes.inspeccion.dto.HistorialTransicionDTO;
 import com.cunoc.puentes.inspeccion.dto.InspeccionDTO;
 import com.cunoc.puentes.inspeccion.dto.InspeccionResumenDTO;
 import com.cunoc.puentes.inspeccion.dto.PuenteInspeccionableDTO;
+import com.cunoc.puentes.inspeccion.puerto.ConsultaRevision;
+import com.cunoc.puentes.inspeccion.puerto.ResumenRevision;
 import com.cunoc.puentes.usuario.Rol;
 import java.time.LocalDate;
 import java.util.List;
@@ -32,6 +34,7 @@ class ConsultaInspeccionService {
   private final ReferenciasInspeccion referencias;
   private final InspeccionEnsamblador ensamblador;
   private final ArchivoService archivoService;
+  private final ConsultaRevision consultaRevision;
 
   ConsultaInspeccionService(
       InspeccionRepository inspecciones,
@@ -39,13 +42,15 @@ class ConsultaInspeccionService {
       AcompananteInspeccionRepository acompanantes,
       ReferenciasInspeccion referencias,
       InspeccionEnsamblador ensamblador,
-      ArchivoService archivoService) {
+      ArchivoService archivoService,
+      ConsultaRevision consultaRevision) {
     this.inspecciones = inspecciones;
     this.transiciones = transiciones;
     this.acompanantes = acompanantes;
     this.referencias = referencias;
     this.ensamblador = ensamblador;
     this.archivoService = archivoService;
+    this.consultaRevision = consultaRevision;
   }
 
   @Transactional(readOnly = true)
@@ -90,7 +95,8 @@ class ConsultaInspeccionService {
             .map(fila -> new AcompananteDTO(fila.getNombre(), fila.getUsuarioId()))
             .toList(),
         superadaPor(List.of(inspeccion)).get(inspeccion.getId()),
-        List.of());
+        List.of(),
+        consultaRevision.resumenes(List.of(inspeccion.getId())).get(inspeccion.getId()));
   }
 
   @Transactional(readOnly = true)
@@ -132,12 +138,15 @@ class ConsultaInspeccionService {
         referencias.puentes(
             filas.getContent().stream().map(Inspeccion::getPuenteId).collect(Collectors.toSet()));
     Map<UUID, UUID> superadas = superadaPor(filas.getContent());
+    Map<UUID, ResumenRevision> revisiones =
+        consultaRevision.resumenes(filas.getContent().stream().map(Inspeccion::getId).toList());
     return filas.map(
         inspeccion ->
             ensamblador.resumen(
                 inspeccion,
                 puentes.get(inspeccion.getPuenteId()),
-                superadas.get(inspeccion.getId())));
+                superadas.get(inspeccion.getId()),
+                revisiones.get(inspeccion.getId())));
   }
 
   private Map<UUID, UUID> superadaPor(List<Inspeccion> filas) {

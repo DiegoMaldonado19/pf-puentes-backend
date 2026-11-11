@@ -44,7 +44,8 @@ public record InspeccionDTO(
     @JsonProperty("superada_por") UUID superadaPor,
     @JsonProperty("supersede_a_id") UUID supersedeAId,
     @JsonProperty("motivo_correccion") String motivoCorreccion,
-    List<String> advertencias) {
+    List<String> advertencias,
+    RevisionResumenDTO revision) {
 
   public InspeccionDTO conAdvertencias(List<String> extras) {
     return new InspeccionDTO(
@@ -79,6 +80,7 @@ public record InspeccionDTO(
         superadaPor,
         supersedeAId,
         motivoCorreccion,
-        List.copyOf(extras == null ? List.of() : extras));
+        List.copyOf(extras == null ? List.of() : extras),
+        revision);
   }
 }
