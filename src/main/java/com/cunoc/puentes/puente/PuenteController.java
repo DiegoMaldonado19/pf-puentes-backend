@@ -97,7 +97,7 @@ class PuenteController {
     SituacionPuente efectiva =
         situacion != null
             ? situacion
-            : (incluirBajas ? SituacionPuente.TODOS : SituacionPuente.ACTIVOS);
+            : incluirBajas ? SituacionPuente.TODOS : SituacionPuente.ACTIVOS;
     if (efectiva != SituacionPuente.ACTIVOS && !esAdministrador(usuario)) {
       throw new NegocioException(
           HttpStatus.FORBIDDEN,
