@@ -69,18 +69,41 @@ public class VerificacionCorreoService {
         .ifPresent(this::emitir);
   }
 
-  /** Marca el correo como verificado; la cuenta sigue PENDIENTE (RN-USR-02). */
+  /**
+   * Marca el correo como verificado y activa la cuenta pendiente para permitir el inicio de sesión.
+   */
   @Transactional
   public void verificar(String token) {
     Instant ahora = Instant.now();
+    String hash = TokenOpaco.hash(token);
     TokenVerificacion vigente =
         tokens
-            .findByTokenHash(TokenOpaco.hash(token))
+            .findByTokenHash(hash)
             .filter(t -> t.getTipo() == TipoTokenVerificacion.VERIFICACION_CORREO)
             .filter(t -> t.getUsadoEn() == null && t.getExpiraEn().isAfter(ahora))
-            .orElseThrow(VerificacionCorreoService::tokenInvalido);
+            .orElse(null);
+    if (vigente == null) {
+      // Idempotente: reintentos o clics repetidos no fallan si el correo ya quedó verificado
+      boolean yaVerificado =
+          tokens
+              .findByTokenHash(hash)
+              .filter(t -> t.getTipo() == TipoTokenVerificacion.VERIFICACION_CORREO)
+              .filter(t -> t.getUsadoEn() != null)
+              .map(TokenVerificacion::getUsuario)
+              .filter(u -> u.getCorreoVerificadoEn() != null)
+              .isPresent();
+      if (yaVerificado) {
+        return;
+      }
+      throw tokenInvalido();
+    }
     // Atómico: dos peticiones con el mismo enlace no pueden consumirlo las dos
     if (tokens.marcarUsado(vigente.getId(), ahora) == 0) {
+      boolean yaVerificado =
+          vigente.getUsuario() != null && vigente.getUsuario().getCorreoVerificadoEn() != null;
+      if (yaVerificado) {
+        return;
+      }
       throw tokenInvalido();
     }
     marcador.marcar(vigente.getUsuario().getId());
