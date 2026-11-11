@@ -24,8 +24,17 @@ class DatosDemoTest extends PruebaIntegracion {
     jdbc.update("DELETE FROM asignacion WHERE id::text LIKE ?", DEMO);
     jdbc.update("DELETE FROM inscripcion WHERE id::text LIKE ?", DEMO);
     jdbc.update("DELETE FROM curso WHERE id::text LIKE ?", DEMO);
+    jdbc.update(
+        "DELETE FROM orden_mantenimiento WHERE puente_id IN (SELECT id FROM puente WHERE id::text LIKE ?)",
+        DEMO);
     jdbc.update("DELETE FROM puente WHERE id::text LIKE ?", DEMO);
+    jdbc.update(
+        "DELETE FROM notificacion WHERE usuario_id IN (SELECT id FROM usuario WHERE id::text LIKE ?)",
+        DEMO);
     jdbc.update("DELETE FROM usuario WHERE id::text LIKE ?", DEMO);
+    jdbc.update(
+        "DELETE FROM notificacion WHERE usuario_id IN (SELECT id FROM usuario WHERE id = ?)",
+        ADMIN);
     jdbc.update("DELETE FROM usuario WHERE id = ?", ADMIN);
   }
 

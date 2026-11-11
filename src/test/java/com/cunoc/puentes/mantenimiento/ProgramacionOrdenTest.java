@@ -69,8 +69,17 @@ class ProgramacionOrdenTest extends PruebaIntegracion {
     jdbc.update("DELETE FROM orden_mantenimiento WHERE puente_id IN (?, ?)", PUENTE, OTRO);
     jdbc.update("DELETE FROM inspeccion WHERE id = ?", id(8));
     jdbc.update("DELETE FROM formulario_version WHERE id = ?", id(7));
+    jdbc.update(
+        "DELETE FROM orden_mantenimiento WHERE puente_id IN (SELECT id FROM puente WHERE id IN (?, ?))",
+        PUENTE,
+        OTRO);
     jdbc.update("DELETE FROM puente WHERE id IN (?, ?)", PUENTE, OTRO);
+    jdbc.update(
+        "DELETE FROM notificacion WHERE usuario_id IN (SELECT id FROM usuario WHERE id = ?)",
+        id(6));
     jdbc.update("DELETE FROM usuario WHERE id = ?", id(6));
+    jdbc.update(
+        "DELETE FROM notificacion WHERE usuario_id IN (SELECT id FROM usuario WHERE correo LIKE '%@programacion-prueba.com')");
     jdbc.update("DELETE FROM usuario WHERE correo LIKE '%@programacion-prueba.com'");
     jdbc.update("DELETE FROM municipio WHERE codigo = '9393'");
     jdbc.update("DELETE FROM departamento WHERE codigo = '93'");

@@ -38,6 +38,9 @@ class SeguridadIntegracionTest extends PruebaIntegracion {
   @AfterEach
   void limpiar() {
     if (usuario != null) {
+      jdbc.update(
+          "DELETE FROM notificacion WHERE usuario_id IN (SELECT id FROM usuario WHERE id = ?)",
+          usuario);
       jdbc.update("DELETE FROM usuario WHERE id = ?", usuario);
     }
   }

@@ -77,6 +77,10 @@ class InvitacionesTest extends PruebaIntegracion {
             + cuentas
             + ")");
     jdbc.update("DELETE FROM token_renovacion WHERE usuario_id IN (" + cuentas + ")");
+    jdbc.update(
+        "DELETE FROM notificacion WHERE usuario_id IN (SELECT id FROM usuario WHERE correo LIKE '%"
+            + DOMINIO
+            + "')");
     jdbc.update("DELETE FROM usuario WHERE correo LIKE '%" + DOMINIO + "'");
   }
 
