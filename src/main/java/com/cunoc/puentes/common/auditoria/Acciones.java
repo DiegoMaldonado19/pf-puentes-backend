@@ -18,6 +18,7 @@ public final class Acciones {
   public static final String REVOCAR_INVITACION = "REVOCAR_INVITACION";
   public static final String VERIFICAR_COLEGIADO = "VERIFICAR_COLEGIADO";
   public static final String BLOQUEAR_CUENTA = "BLOQUEAR_CUENTA";
+  public static final String EJECUTAR_PROCESO = "EJECUTAR_PROCESO";
 
   public static final Set<String> CATALOGO =
       Set.of(
@@ -30,7 +31,8 @@ public final class Acciones {
           INVITAR,
           REVOCAR_INVITACION,
           VERIFICAR_COLEGIADO,
-          BLOQUEAR_CUENTA);
+          BLOQUEAR_CUENTA,
+          EJECUTAR_PROCESO);
 
   private Acciones() {}
 }

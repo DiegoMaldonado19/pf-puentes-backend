@@ -37,6 +37,14 @@ public class AlertasInspeccionJob {
       zone = "${sgp.procesos.zona:America/Guatemala}")
   @SchedulerLock(name = "alertas-inspeccion-vencida")
   public void ejecutar() {
+    ejecutarSinBloqueo();
+  }
+
+  /**
+   * Cuerpo del proceso sin bloqueo. Lo usa el disparo manual (B10), que toma el mismo bloqueo de
+   * ShedLock por su cuenta; así no se anidan dos bloqueos con el mismo nombre.
+   */
+  public void ejecutarSinBloqueo() {
     var ahora = reloj.instant();
     UUID despues = null;
     var puentes = repositorio.siguientes(despues, ahora);
