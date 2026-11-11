@@ -31,7 +31,10 @@ public class AlertasInspeccionJob {
     this.reloj = reloj;
   }
 
-  @Scheduled(cron = "0 0 6 * * *", zone = "America/Guatemala")
+  // Horario configurable (sgp.procesos.*); por defecto 06:00 de Guatemala, como antes
+  @Scheduled(
+      cron = "${sgp.procesos.alertas-inspeccion.cron:0 0 6 * * *}",
+      zone = "${sgp.procesos.zona:America/Guatemala}")
   @SchedulerLock(name = "alertas-inspeccion-vencida")
   public void ejecutar() {
     var ahora = reloj.instant();
