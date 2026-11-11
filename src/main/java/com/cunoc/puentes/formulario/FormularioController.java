@@ -1,10 +1,13 @@
 package com.cunoc.puentes.formulario;
 
+import com.cunoc.puentes.formulario.dto.ComposicionFormularioDTO;
 import com.cunoc.puentes.formulario.dto.CrearFormularioVersionDTO;
 import com.cunoc.puentes.formulario.dto.EditarFormularioVersionDTO;
+import com.cunoc.puentes.formulario.dto.EsquemaBaseDTO;
 import com.cunoc.puentes.formulario.dto.FormularioVersionDTO;
 import com.cunoc.puentes.formulario.dto.PaginaFormularioVersionDTO;
 import com.cunoc.puentes.formulario.dto.PublicarFormularioVersionDTO;
+import com.cunoc.puentes.formulario.dto.ResultadoValidacionFormularioDTO;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -119,5 +122,26 @@ public class FormularioController {
   public ResponseEntity<FormularioVersionDTO> publicar(
       @PathVariable UUID id, @RequestBody(required = false) PublicarFormularioVersionDTO datos) {
     return ResponseEntity.ok(servicio.publicar(id, datos));
+  }
+
+  @GetMapping("/base")
+  @PreAuthorize("hasRole('ADMINISTRADOR')")
+  @ApiResponse(responseCode = "200", description = "Esquema base y secciones admitidas")
+  @ApiResponse(responseCode = "403", description = "Solo administrador")
+  @ApiResponse(responseCode = "401", description = "Sin sesión")
+  @Operation(summary = "Esquema base SIECA para componer versiones con campos adicionales (B2)")
+  public ResponseEntity<EsquemaBaseDTO> esquemaBase() {
+    return ResponseEntity.ok(servicio.esquemaBase());
+  }
+
+  @PostMapping("/validacion")
+  @PreAuthorize("hasRole('ADMINISTRADOR')")
+  @ApiResponse(responseCode = "200", description = "Resultado; errores vacío si es válida")
+  @ApiResponse(responseCode = "403", description = "Solo administrador")
+  @ApiResponse(responseCode = "401", description = "Sin sesión")
+  @Operation(summary = "Valida campos adicionales en seco, sin guardar nada (B2)")
+  public ResponseEntity<ResultadoValidacionFormularioDTO> validarComposicion(
+      @RequestBody ComposicionFormularioDTO datos) {
+    return ResponseEntity.ok(servicio.validarComposicion(datos.camposExtra()));
   }
 }
