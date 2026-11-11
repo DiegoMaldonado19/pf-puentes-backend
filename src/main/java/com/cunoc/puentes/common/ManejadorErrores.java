@@ -1,9 +1,11 @@
 package com.cunoc.puentes.common;
 
 import java.net.URI;
+import java.sql.SQLException;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import org.slf4j.Logger;
@@ -32,6 +34,9 @@ import tools.jackson.databind.exc.MismatchedInputException;
 class ManejadorErrores extends ResponseEntityExceptionHandler {
 
   private static final Logger log = LoggerFactory.getLogger(ManejadorErrores.class);
+
+  /** 23505 unique_violation: el cliente intentó duplicar un dato único. */
+  private static final Set<String> CONFLICTOS_DEL_CLIENTE = Set.of("23505");
 
   private static final String TIPO_DATOS_INVALIDOS = "datos-invalidos";
   private static final String TITULO_DATOS_INVALIDOS = "Datos no válidos";
@@ -127,10 +132,15 @@ class ManejadorErrores extends ResponseEntityExceptionHandler {
     throw ex;
   }
 
-  // Violación de integridad (duplicado, clave foránea, nulo): es un conflicto con los datos
-  // existentes, no un fallo del servidor. El detalle SQL no sale al cliente (DT-SEC-12).
+  // Solo un duplicado (23505) es culpa del cliente: 409. Las demás violaciones (CHECK 23514, NOT
+  // NULL
+  // 23502, clave foránea 23503 con referencias que vienen de la sesión o de datos ya validados) son
+  // fallos de la aplicación: 500 genérico, reintentable y sin detalles de la base (DT-SEC-12).
   @ExceptionHandler(DataIntegrityViolationException.class)
   ProblemDetail integridad(DataIntegrityViolationException ex, WebRequest request) {
+    if (!CONFLICTOS_DEL_CLIENTE.contains(estadoSql(ex))) {
+      return inesperado(ex, request);
+    }
     log.warn("409 {} {}", request.getDescription(false), origen(ex));
     return problema(
         HttpStatus.CONFLICT,
@@ -263,6 +273,16 @@ class ManejadorErrores extends ResponseEntityExceptionHandler {
       problema.setProperty(ErrorCampo.PROPIEDAD, errores);
     }
     return problema;
+  }
+
+  /** SQLState de PostgreSQL de la causa más cercana que lo tenga; "" si no hay ninguno. */
+  private static String estadoSql(Throwable ex) {
+    for (Throwable causa = ex; causa != null; causa = causa.getCause()) {
+      if (causa instanceof SQLException sql && sql.getSQLState() != null) {
+        return sql.getSQLState();
+      }
+    }
+    return "";
   }
 
   private static Object origen(Exception ex) {

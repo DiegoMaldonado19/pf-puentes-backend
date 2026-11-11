@@ -9,6 +9,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
+import java.sql.SQLException;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -119,6 +120,13 @@ class ManejadorErroresTest {
   }
 
   @Test
+  void unaRestriccionCheckEsUnFalloInternoYNoUnConflicto() throws Exception {
+    mvc.perform(get("/prueba/restriccion"))
+        .andExpect(status().isInternalServerError())
+        .andExpect(jsonPath("$.detail").value("Ocurrió un error inesperado."));
+  }
+
+  @Test
   void traduceLosMensajesPorDefectoDeValidacion() {
     assertThat(ManejadorErrores.mensajeDeValidacion("size must be between 1 and 200"))
         .isEqualTo("Debe tener entre 1 y 200 caracteres.");
@@ -181,8 +189,14 @@ class ManejadorErroresTest {
 
     @GetMapping("/prueba/integridad")
     void integridad() {
-      throw new DataIntegrityViolationException(
-          "duplicate key value violates unique constraint \"uq_usuario_correo\"");
+      String detalle = "duplicate key value violates unique constraint \"uq_usuario_correo\"";
+      throw new DataIntegrityViolationException(detalle, new SQLException(detalle, "23505"));
+    }
+
+    @GetMapping("/prueba/restriccion")
+    void restriccion() {
+      String detalle = "new row violates check constraint \"prueba_ck\"";
+      throw new DataIntegrityViolationException(detalle, new SQLException(detalle, "23514"));
     }
 
     @GetMapping("/prueba/negocio")
