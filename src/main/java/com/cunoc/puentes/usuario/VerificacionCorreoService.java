@@ -69,7 +69,9 @@ public class VerificacionCorreoService {
         .ifPresent(this::emitir);
   }
 
-  /** Marca el correo como verificado y activa la cuenta pendiente para permitir el inicio de sesión. */
+  /**
+   * Marca el correo como verificado y activa la cuenta pendiente para permitir el inicio de sesión.
+   */
   @Transactional
   public void verificar(String token) {
     Instant ahora = Instant.now();

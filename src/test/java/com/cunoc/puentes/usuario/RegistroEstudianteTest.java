@@ -243,7 +243,7 @@ class RegistroEstudianteTest extends PruebaIntegracion {
   }
 
   @Test
-  void verificarMarcaElCorreoYElTokenPeroNoActivaLaCuenta() throws Exception {
+  void verificarMarcaElCorreoElTokenYActivaLaCuenta() throws Exception {
     registrar(CORREO, CONTRASENA).andExpect(status().isCreated());
     String token = tokenDelCorreo();
 
@@ -251,7 +251,7 @@ class RegistroEstudianteTest extends PruebaIntegracion {
 
     Usuario ana = cuenta(CORREO);
     assertThat(ana.getCorreoVerificadoEn()).isNotNull();
-    assertThat(ana.getEstado()).isEqualTo(EstadoUsuario.PENDIENTE);
+    assertThat(ana.getEstado()).isEqualTo(EstadoUsuario.ACTIVO);
     assertThat(
             jdbc.queryForObject(
                 "SELECT usado_en FROM token_verificacion WHERE usuario_id = ?",
@@ -261,7 +261,8 @@ class RegistroEstudianteTest extends PruebaIntegracion {
   }
 
   @Test
-  void unTokenVencidoYaUsadoOInexistenteSeRechazanConElMismoMensaje() throws Exception {
+  void unTokenVencidoOInexistenteSeRechazanConElMismoMensajeYUnoUsadoEsIdempotente()
+      throws Exception {
     registrar(CORREO, CONTRASENA).andExpect(status().isCreated());
     String vencido = tokenDelCorreo();
     jdbc.update(
@@ -272,17 +273,17 @@ class RegistroEstudianteTest extends PruebaIntegracion {
     registrar("otra" + DOMINIO, CONTRASENA).andExpect(status().isCreated());
     String usado = tokenDelCorreo();
     verificar(usado).andExpect(status().isNoContent());
+    verificar(usado).andExpect(status().isNoContent());
 
     List<String> detalles =
         List.of(
             cuerpoDeRechazo(vencido),
-            cuerpoDeRechazo(usado),
             cuerpoDeRechazo("token-que-nunca-existio"));
-    // Mismo cuerpo completo (tipo, título, detalle): no se distingue por qué falló
-    assertThat(detalles).hasSize(3).containsOnly(detalles.getFirst());
+    // Mismo cuerpo completo (tipo, título, detalle): no se distingue por qué falló.
+    assertThat(detalles).hasSize(2).containsOnly(detalles.getFirst());
   }
 
-  /** Verifica que sea 422 token-invalido y devuelve el mensaje; los tres casos deben coincidir. */
+  /** Verifica que sea 422 token-invalido y devuelve el mensaje; ambos casos deben coincidir. */
   private String cuerpoDeRechazo(String token) throws Exception {
     String cuerpo =
         verificar(token)
