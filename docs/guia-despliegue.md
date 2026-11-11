@@ -85,6 +85,8 @@ cd ~/puentes/stage/pf-puentes-backend
 docker compose exec -T postgres psql -U puentes_migrador -d puentes -v ON_ERROR_STOP=1 < scripts/datos-demo.sql
 ```
 
+En **dev** el pipeline corre este script en cada despliegue (si `ADMIN_INICIAL_CORREO` está definido) y después `scripts/claves-dev.sql`, que deja al primer administrador activo y a las tres cuentas de demostración con la contraseña `password123456`. Esa clave es pública: `claves-dev.sql` no se ejecuta en stage ni en prod.
+
 ## Usuarios reales en producción
 
 1. Configurar `CORREO_MODO=smtp`, remitente autorizado y `SMTP_*` en el Environment

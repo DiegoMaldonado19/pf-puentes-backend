@@ -9,6 +9,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.testcontainers.utility.MountableFile;
 
 /** scripts/datos-demo.sql corre con psql sobre el esquema real, dos veces sin duplicar. */
@@ -23,6 +24,7 @@ class DatosDemoTest extends PruebaIntegracion {
 
   @Autowired JdbcTemplate jdbc;
   @Autowired MetadatosDanoFormulario metadatos;
+  @Autowired PasswordEncoder codificador;
 
   @AfterEach
   void limpiar() {
@@ -55,23 +57,8 @@ class DatosDemoTest extends PruebaIntegracion {
             + " correo_verificado_en, creado_en) VALUES (?, 'admin.demo@sgp.gt', 'Admin',"
             + " 'hash-admin', 'ADMINISTRADOR', 'ACTIVO', now(), '2000-01-01')",
         ADMIN);
-    POSTGRES.copyFileToContainer(
-        MountableFile.forHostPath("scripts/datos-demo.sql"), "/tmp/datos-demo.sql");
-
     for (int corrida = 0; corrida < 2; corrida++) {
-      var resultado =
-          POSTGRES.execInContainer(
-              "psql",
-              "-U",
-              POSTGRES.getUsername(),
-              "-d",
-              POSTGRES.getDatabaseName(),
-              "-v",
-              "ON_ERROR_STOP=1",
-              "-q",
-              "-f",
-              "/tmp/datos-demo.sql");
-      assertThat(resultado.getExitCode()).as(resultado.getStderr()).isZero();
+      correr("datos-demo.sql");
     }
 
     assertThat(
@@ -114,5 +101,45 @@ class DatosDemoTest extends PruebaIntegracion {
             jdbc.queryForList(
                 "SELECT estado FROM orden_mantenimiento WHERE id::text LIKE ?", String.class, DEMO))
         .containsExactlyInAnyOrder("PROPUESTA", "PROGRAMADA", "EJECUTADA", "DESCARTADA");
+  }
+
+  @Test
+  void enDevElAdministradorYLasCuentasDeDemostracionEntranConLaClaveConocida() throws Exception {
+    jdbc.update(
+        "INSERT INTO usuario (id, correo, nombre, contrasena_hash, rol, estado,"
+            + " correo_verificado_en, creado_en, intentos_fallidos, bloqueado_hasta) VALUES"
+            + " (?, 'admin.demo@sgp.gt', 'Admin', 'hash-admin', 'ADMINISTRADOR', 'ACTIVO', now(),"
+            + " '2000-01-01', 5, now() + interval '1 hour')",
+        ADMIN);
+
+    correr("datos-demo.sql");
+    correr("claves-dev.sql");
+
+    assertThat(
+            jdbc.queryForList(
+                "SELECT contrasena_hash FROM usuario WHERE (id::text LIKE ? OR id = ?)"
+                    + " AND intentos_fallidos = 0 AND bloqueado_hasta IS NULL",
+                String.class,
+                DEMO,
+                ADMIN))
+        .hasSize(4)
+        .allMatch(hash -> codificador.matches("password123456", hash));
+  }
+
+  private void correr(String script) throws Exception {
+    POSTGRES.copyFileToContainer(MountableFile.forHostPath("scripts/" + script), "/tmp/" + script);
+    var resultado =
+        POSTGRES.execInContainer(
+            "psql",
+            "-U",
+            POSTGRES.getUsername(),
+            "-d",
+            POSTGRES.getDatabaseName(),
+            "-v",
+            "ON_ERROR_STOP=1",
+            "-q",
+            "-f",
+            "/tmp/" + script);
+    assertThat(resultado.getExitCode()).as(resultado.getStderr()).isZero();
   }
 }

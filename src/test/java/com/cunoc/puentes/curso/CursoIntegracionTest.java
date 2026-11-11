@@ -25,6 +25,7 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -65,6 +66,18 @@ class CursoIntegracionTest extends PruebaIntegracion {
 
   @Value("${sgp.jwt.secreto}")
   String secretoJwt;
+
+  // Otras clases de la suite dejan filas en la bitácora: se compara contra las que ya había
+  long auditoriaPrevia;
+
+  @BeforeEach
+  void contarAuditoriaPrevia() {
+    auditoriaPrevia = filasDeAuditoria();
+  }
+
+  long filasDeAuditoria() {
+    return jdbc.sql("select count(*) from auditoria").query(Long.class).single();
+  }
 
   @Test
   void creaEditaYAuditaSinExponerDatosPersonales() throws Exception {
@@ -135,7 +148,7 @@ class CursoIntegracionTest extends PruebaIntegracion {
     assertThat(servicio.listar(DOCENTE, PageRequest.of(0, 200)).getSize()).isEqualTo(100);
     assertThat(servicio.listar(DOCENTE, PageRequest.of(0, 20)).getContent())
         .allMatch(c -> c.catedraticoId().equals(DOCENTE));
-    assertThat(jdbc.sql("select count(*) from auditoria").query(Long.class).single()).isZero();
+    assertThat(filasDeAuditoria()).isEqualTo(auditoriaPrevia);
   }
 
   @Test
@@ -254,7 +267,7 @@ class CursoIntegracionTest extends PruebaIntegracion {
                 .query(Long.class)
                 .single())
         .isZero();
-    assertThat(jdbc.sql("select count(*) from auditoria").query(Long.class).single()).isZero();
+    assertThat(filasDeAuditoria()).isEqualTo(auditoriaPrevia);
   }
 
   @Test
@@ -550,7 +563,7 @@ class CursoIntegracionTest extends PruebaIntegracion {
                   .query(Long.class)
                   .single())
           .isZero();
-      assertThat(jdbc.sql("select count(*) from auditoria").query(Long.class).single()).isZero();
+      assertThat(filasDeAuditoria()).isEqualTo(auditoriaPrevia);
     } finally {
       jdbc.sql("alter table auditoria drop constraint prueba_p7_fallo_check").update();
     }
