@@ -17,10 +17,14 @@ class MarcadorDeCorreoVerificado {
     this.repositorio = repositorio;
   }
 
-  /** No cambia el estado: activar la cuenta es un acto del catedrático (RN-USR-02). */
+  /** Marca el correo como verificado y activa cuentas pendientes al confirmar su correo. */
   @Transactional
   @Auditable(accion = Acciones.MODIFICAR, entidad = "usuario", entidadId = "#usuarioId")
   public void marcar(UUID usuarioId) {
-    repositorio.findById(usuarioId).orElseThrow().setCorreoVerificadoEn(Instant.now());
+    Usuario usuario = repositorio.findById(usuarioId).orElseThrow();
+    usuario.setCorreoVerificadoEn(Instant.now());
+    if (usuario.getEstado() == EstadoUsuario.PENDIENTE) {
+      usuario.setEstado(EstadoUsuario.ACTIVO);
+    }
   }
 }
