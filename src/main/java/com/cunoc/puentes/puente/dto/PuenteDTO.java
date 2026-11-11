@@ -22,6 +22,11 @@ public record PuenteDTO(
     @JsonProperty("anio_construccion") Integer anioConstruccion,
     boolean activo,
     @JsonProperty("motivo_baja") String motivoBaja,
+    @JsonProperty("baja_en")
+        @Schema(description = "null si la baja es anterior al registro de fechas")
+        Instant bajaEn,
+    @JsonProperty("baja_por") @Schema(description = "Administrador que dio de baja el puente")
+        UUID bajaPor,
     @JsonProperty("estado_actual")
         @Schema(description = "null = Sin evaluar: no hay inspección publicada (RN-INV-10)")
         EstadoCondicion estadoActual,

@@ -42,6 +42,8 @@ class PuenteIntegracionTest extends PruebaIntegracion {
     jdbc.update(
         "DELETE FROM auditoria WHERE entidad = 'puente' AND entidad_id IN"
             + " (SELECT id FROM puente WHERE municipio_codigo IN ('0913', '1701'))");
+    jdbc.update(
+        "DELETE FROM orden_mantenimiento WHERE puente_id IN (SELECT id FROM puente WHERE municipio_codigo IN ('0913', '1701'))");
     jdbc.update("DELETE FROM puente WHERE municipio_codigo IN ('0913', '1701')");
     jdbc.update("DELETE FROM correlativo_puente WHERE municipio_codigo IN ('0913', '1701')");
   }
@@ -162,21 +164,34 @@ class PuenteIntegracionTest extends PruebaIntegracion {
         "UPDATE puente SET estado_actual = 'MALO', indice_condicion_actual = 30,"
             + " fecha_ultima_inspeccion = DATE '2026-10-01' WHERE nombre = 'Puente viejo'");
 
-    assertThat(servicio.listar("09", "0913", null, null, false, 0, 20).totalElementos())
+    assertThat(
+            servicio
+                .listar("09", "0913", null, null, SituacionPuente.ACTIVOS, 0, 20)
+                .totalElementos())
         .isEqualTo(2);
-    assertThat(servicio.listar("17", null, null, null, false, 0, 20).contenido())
+    assertThat(servicio.listar("17", null, null, null, SituacionPuente.ACTIVOS, 0, 20).contenido())
         .noneMatch(p -> p.municipio().codigo().equals("0913"));
     assertThat(
-            servicio.listar(null, "0913", EstadoFiltro.SIN_EVALUAR, null, false, 0, 20).contenido())
+            servicio
+                .listar(
+                    null, "0913", EstadoFiltro.SIN_EVALUAR, null, SituacionPuente.ACTIVOS, 0, 20)
+                .contenido())
         .extracting(PuenteDTO::nombre)
         .containsExactly("Puente 100% nuevo");
-    assertThat(servicio.listar(null, "0913", EstadoFiltro.MALO, null, false, 0, 20).contenido())
+    assertThat(
+            servicio
+                .listar(null, "0913", EstadoFiltro.MALO, null, SituacionPuente.ACTIVOS, 0, 20)
+                .contenido())
         .extracting(PuenteDTO::nombre)
         .containsExactly("Puente viejo");
-    assertThat(servicio.listar(null, "0913", null, "100%", false, 0, 20).contenido())
+    assertThat(
+            servicio.listar(null, "0913", null, "100%", SituacionPuente.ACTIVOS, 0, 20).contenido())
         .extracting(PuenteDTO::nombre)
         .containsExactly("Puente 100% nuevo");
-    assertThat(servicio.listar(null, "0913", null, "gt-09-0913", false, 0, 20).totalElementos())
+    assertThat(
+            servicio
+                .listar(null, "0913", null, "gt-09-0913", SituacionPuente.ACTIVOS, 0, 20)
+                .totalElementos())
         .isEqualTo(2);
   }
 }
