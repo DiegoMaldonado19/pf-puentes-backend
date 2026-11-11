@@ -13,6 +13,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.cunoc.puentes.common.seguridad.SeguridadDePrueba;
 import com.cunoc.puentes.usuario.dto.CuentaRegistradaDTO;
 import com.cunoc.puentes.usuario.dto.RegistrarEstudianteDTO;
+import com.cunoc.puentes.usuario.dto.ResultadoVerificacionDTO;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -150,7 +151,12 @@ class RegistroControllerTest {
 
   @Test
   void verificaYReenviaSinSesion() throws Exception {
-    mvc.perform(json(VERIFICAR, "{\"token\": \"abc\"}")).andExpect(status().isNoContent());
+    when(verificacion.verificar("abc"))
+        .thenReturn(new ResultadoVerificacionDTO(ResultadoVerificacionDTO.Resultado.ACTIVADA));
+
+    mvc.perform(json(VERIFICAR, "{\"token\": \"abc\"}"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.resultado").value("ACTIVADA"));
     mvc.perform(json(REENVIAR, "{\"correo\": \" ANA@correo.com\"}"))
         .andExpect(status().isAccepted());
 

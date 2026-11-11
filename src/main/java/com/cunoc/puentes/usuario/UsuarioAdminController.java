@@ -1,5 +1,7 @@
 package com.cunoc.puentes.usuario;
 
+import com.cunoc.puentes.usuario.dto.ActualizarUsuarioDTO;
+import com.cunoc.puentes.usuario.dto.CrearUsuarioDTO;
 import com.cunoc.puentes.usuario.dto.MotivoDTO;
 import com.cunoc.puentes.usuario.dto.PaginaDTO;
 import com.cunoc.puentes.usuario.dto.UsuarioAdminDTO;
@@ -10,13 +12,16 @@ import jakarta.validation.Valid;
 import java.security.Principal;
 import java.util.UUID;
 import org.springframework.data.domain.Pageable;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
@@ -110,5 +115,64 @@ class UsuarioAdminController {
   @PostMapping("/{id}/reactivacion")
   UsuarioAdminDTO reactivar(@PathVariable UUID id) {
     return cuentas.reactivar(id);
+  }
+
+  @Operation(
+      summary = "Activa una cuenta pendiente con el correo verificado",
+      description = "Idempotente: una cuenta ya activa responde 200 sin cambios (RN-USR-02).")
+  @ApiResponse(responseCode = "200", description = "Cuenta activa")
+  @ApiResponse(responseCode = "404", description = "No existe la cuenta")
+  @ApiResponse(responseCode = "409", description = "La cuenta está dada de baja")
+  @ApiResponse(
+      responseCode = "422",
+      description = "Falta verificar el correo o, si es profesional, el colegiado")
+  @PostMapping("/{id}/activacion")
+  UsuarioAdminDTO activar(@PathVariable UUID id) {
+    return cuentas.activar(id);
+  }
+
+  @Operation(
+      summary = "Da de alta una cuenta y envía el enlace para fijar su contraseña",
+      description =
+          "La cuenta queda activa con el correo verificado. La contraseña provisional es"
+              + " inutilizable: el enlace por correo es la única vía de entrada (B5).")
+  @ApiResponse(responseCode = "201", description = "Cuenta creada")
+  @ApiResponse(responseCode = "409", description = "Ya existe una cuenta con ese correo")
+  @PostMapping
+  @ResponseStatus(HttpStatus.CREATED)
+  UsuarioAdminDTO crear(@Valid @RequestBody CrearUsuarioDTO datos) {
+    return cuentas.crear(datos);
+  }
+
+  @Operation(
+      summary = "Edita nombre, correo o rol de una cuenta",
+      description =
+          "El rol solo cambia entre CATEDRATICO y ADMINISTRADOR; nadie cambia su propio rol ni"
+              + " se quita el rol al último administrador.")
+  @ApiResponse(responseCode = "200", description = "Cuenta actualizada")
+  @ApiResponse(responseCode = "409", description = "Correo en uso o último administrador")
+  @ApiResponse(responseCode = "422", description = "Cambio de rol no permitido o rol propio")
+  @PutMapping("/{id}")
+  UsuarioAdminDTO actualizar(
+      Principal usuario, @PathVariable UUID id, @Valid @RequestBody ActualizarUsuarioDTO datos) {
+    return cuentas.actualizar(UUID.fromString(usuario.getName()), id, datos);
+  }
+
+  @Operation(summary = "Quita el bloqueo por intentos fallidos")
+  @ApiResponse(responseCode = "200", description = "Cuenta desbloqueada")
+  @PostMapping("/{id}/desbloqueo")
+  UsuarioAdminDTO desbloquear(@PathVariable UUID id) {
+    return cuentas.desbloquear(id);
+  }
+
+  @Operation(
+      summary = "Reenvía el enlace de verificación",
+      description = "Solo para cuentas pendientes con el correo sin verificar.")
+  @ApiResponse(responseCode = "202", description = "Enlace reenviado")
+  @ApiResponse(responseCode = "409", description = "No hay verificación pendiente")
+  @PostMapping("/{id}/reenvio-verificacion")
+  @ResponseStatus(HttpStatus.ACCEPTED)
+  void reenviarVerificacion(@PathVariable UUID id) {
+    cuentas.reenviarVerificacion(id);
   }
 }

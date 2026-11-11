@@ -3,6 +3,7 @@ package com.cunoc.puentes.usuario;
 import com.cunoc.puentes.usuario.dto.CuentaRegistradaDTO;
 import com.cunoc.puentes.usuario.dto.ReenviarVerificacionDTO;
 import com.cunoc.puentes.usuario.dto.RegistrarEstudianteDTO;
+import com.cunoc.puentes.usuario.dto.ResultadoVerificacionDTO;
 import com.cunoc.puentes.usuario.dto.VerificarCorreoDTO;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -45,15 +46,16 @@ class RegistroController {
 
   @Operation(
       summary = "Verifica el correo con el token del enlace",
-      description = "No activa la cuenta: la activación es del catedrático (RN-USR-02).")
-  @ApiResponse(responseCode = "204", description = "Correo verificado")
+      description =
+          "Verifica el correo y activa la cuenta del estudiante (RN-USR-01, RN-USR-02). Un enlace"
+              + " ya usado de una cuenta activa responde YA_ACTIVA en lugar de error.")
+  @ApiResponse(responseCode = "200", description = "Correo verificado: ACTIVADA o YA_ACTIVA")
   @ApiResponse(
       responseCode = "422",
-      description = "El token venció, ya se usó o no existe (token-invalido)")
+      description = "El token venció, no existe o la cuenta no puede activarse (token-invalido)")
   @PostMapping("/verificar-correo")
-  @ResponseStatus(HttpStatus.NO_CONTENT)
-  void verificarCorreo(@Valid @RequestBody VerificarCorreoDTO datos) {
-    verificacion.verificar(datos.token());
+  ResultadoVerificacionDTO verificarCorreo(@Valid @RequestBody VerificarCorreoDTO datos) {
+    return verificacion.verificar(datos.token());
   }
 
   @Operation(
