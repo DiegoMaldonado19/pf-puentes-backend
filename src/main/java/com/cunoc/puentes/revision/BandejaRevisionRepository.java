@@ -27,6 +27,14 @@ class BandejaRevisionRepository {
     this.jdbc = jdbc;
   }
 
+  /** Quien envió la inspección; a esa persona se le avisa del veredicto. */
+  Optional<UUID> autorDeInspeccion(UUID inspeccionId) {
+    return jdbc.sql("select autor_id from inspeccion where id = :id")
+        .param("id", inspeccionId)
+        .query(UUID.class)
+        .optional();
+  }
+
   Page<BandejaRevisionDTO> pendientes(UUID actor, String estado, Pageable pagina) {
     String filtro =
         CONTEXTO

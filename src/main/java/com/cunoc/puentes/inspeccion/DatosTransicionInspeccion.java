@@ -10,8 +10,18 @@ import java.util.UUID;
 public record DatosTransicionInspeccion(
     Instant ocurridaEn, String motivo, UUID revisionId, Publicacion publicacion) {
 
+  /** La columna motivo guarda 500 caracteres: una observación más larga se recorta, no falla. */
+  public static final int MAXIMO_MOTIVO = 500;
+
   public static DatosTransicionInspeccion de(String motivo, UUID revisionId) {
-    return new DatosTransicionInspeccion(Instant.now(), motivo, revisionId, null);
+    return new DatosTransicionInspeccion(Instant.now(), recortar(motivo), revisionId, null);
+  }
+
+  static String recortar(String motivo) {
+    if (motivo == null || motivo.codePointCount(0, motivo.length()) <= MAXIMO_MOTIVO) {
+      return motivo;
+    }
+    return motivo.substring(0, motivo.offsetByCodePoints(0, MAXIMO_MOTIVO));
   }
 
   public static DatosTransicionInspeccion en(Instant ocurridaEn) {

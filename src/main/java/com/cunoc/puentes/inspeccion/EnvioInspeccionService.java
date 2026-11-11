@@ -6,6 +6,7 @@ import com.cunoc.puentes.common.NegocioException;
 import com.cunoc.puentes.inspeccion.dto.EnviarInspeccionDTO;
 import com.cunoc.puentes.inspeccion.dto.InspeccionDTO;
 import com.cunoc.puentes.inspeccion.puerto.ConsultaFormulario;
+import com.cunoc.puentes.inspeccion.puerto.ConsultaRevision;
 import com.cunoc.puentes.inspeccion.puerto.RutasDatos;
 import com.cunoc.puentes.sync.IdempotenciaService;
 import com.cunoc.puentes.sync.RespuestaIdempotente;
@@ -41,6 +42,9 @@ class EnvioInspeccionService {
   private final IdempotenciaService idempotencia;
   private final JsonMapper json;
 
+  // Las observaciones del revisor que siguen abiertas impiden reenviar (ADR 0057)
+  private final ConsultaRevision revisiones;
+
   EnvioInspeccionService(
       InspeccionService contrato,
       InspeccionRepository inspecciones,
@@ -52,6 +56,7 @@ class EnvioInspeccionService {
       ConsultaInspeccionService consultas,
       AvisoInspeccionEnviada avisos,
       PublicacionInspeccionService publicacion,
+      ConsultaRevision revisiones,
       IdempotenciaService idempotencia,
       JsonMapper json) {
     this.contrato = contrato;
@@ -64,6 +69,7 @@ class EnvioInspeccionService {
     this.consultas = consultas;
     this.avisos = avisos;
     this.publicacion = publicacion;
+    this.revisiones = revisiones;
     this.idempotencia = idempotencia;
     this.json = json;
   }
@@ -187,6 +193,13 @@ class EnvioInspeccionService {
       errores.add(
           new ErrorCampo(
               "fotos", "Se requieren al menos 4 fotografías vigentes; hay %d.".formatted(fotos)));
+    }
+    int pendientes = revisiones.observacionesPendientes(inspeccion.getId());
+    if (pendientes > 0) {
+      errores.add(
+          new ErrorCampo(
+              "observaciones-pendientes",
+              "Quedan %d observaciones del revisor sin resolver.".formatted(pendientes)));
     }
     if (errores.isEmpty()) {
       return;
