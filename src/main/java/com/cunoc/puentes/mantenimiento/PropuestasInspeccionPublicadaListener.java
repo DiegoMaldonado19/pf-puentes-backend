@@ -24,5 +24,7 @@ class PropuestasInspeccionPublicadaListener {
   @Transactional(propagation = Propagation.MANDATORY)
   public void alPublicar(InspeccionPublicada evento) {
     generador.generarDesdeInspeccionPublicada(evento);
+    // La propuesta rutinaria anual se asegura al publicar; antes nadie la llamaba (B9)
+    generador.asegurarPropuestaRutinariaAnual(evento.puenteId());
   }
 }

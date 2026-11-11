@@ -139,20 +139,39 @@ class GeneracionPropuestasMantenimientoTest extends PruebaIntegracion {
     // (EMERGENCIA)
     assertThat(totalPropuestas).isEqualTo(4);
 
+    // Solo las de esta inspección: al publicar se asegura además la propuesta rutinaria anual (B9)
     Integer totalAuditadas =
         jdbc.queryForObject(
-            "SELECT count(*) FROM auditoria WHERE entidad = 'orden_mantenimiento' AND accion = 'CREAR'",
-            Integer.class);
+            "SELECT count(*) FROM auditoria WHERE entidad = 'orden_mantenimiento'"
+                + " AND accion = 'CREAR' AND entidad_id IN"
+                + " (SELECT id FROM orden_mantenimiento WHERE puente_id = ? AND inspeccion_id = ?)",
+            Integer.class,
+            PUENTE,
+            INSPECCION_PUB);
     assertThat(totalAuditadas).isEqualTo(4);
+
+    Integer rutinarias =
+        jdbc.queryForObject(
+            "SELECT count(*) FROM orden_mantenimiento WHERE puente_id = ?"
+                + " AND tipo = 'RUTINARIO' AND inspeccion_id IS NULL",
+            Integer.class,
+            PUENTE);
+    assertThat(rutinarias).isEqualTo(1);
 
     mvc.perform(
             get("/api/v1/puentes/{puenteId}/ordenes-mantenimiento/propuestas", PUENTE)
                 .with(como(Rol.CATEDRATICO, AUTOR)))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.total_elements").value(4))
-        .andExpect(jsonPath("$.content[0].estado").value("PROPUESTA"))
-        .andExpect(jsonPath("$.content[0].inspeccion_id").value(INSPECCION_PUB.toString()))
-        .andExpect(jsonPath("$.content[0].fecha_programada").isEmpty());
+        // Cuatro de la inspección y la rutinaria anual que se asegura al publicar (B9)
+        .andExpect(jsonPath("$.total_elements").value(5))
+        .andExpect(
+            jsonPath(
+                "$.content[?(@.inspeccion_id == '" + INSPECCION_PUB + "')].estado",
+                org.hamcrest.Matchers.everyItem(org.hamcrest.Matchers.is("PROPUESTA"))))
+        .andExpect(
+            jsonPath(
+                "$.content[?(@.inspeccion_id == '" + INSPECCION_PUB + "')].fecha_programada",
+                org.hamcrest.Matchers.everyItem(org.hamcrest.Matchers.nullValue())));
   }
 
   @Test

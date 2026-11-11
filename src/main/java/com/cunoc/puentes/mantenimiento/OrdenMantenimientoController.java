@@ -1,6 +1,8 @@
 package com.cunoc.puentes.mantenimiento;
 
 import com.cunoc.puentes.mantenimiento.dto.AjustarPrioridadDTO;
+import com.cunoc.puentes.mantenimiento.dto.CrearOrdenDTO;
+import com.cunoc.puentes.mantenimiento.dto.EditarOrdenDTO;
 import com.cunoc.puentes.mantenimiento.dto.MotivoOrdenDTO;
 import com.cunoc.puentes.mantenimiento.dto.OrdenMantenimientoDTO;
 import com.cunoc.puentes.mantenimiento.dto.PaginaOrdenesDTO;
@@ -12,6 +14,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import java.util.UUID;
 import org.springdoc.core.annotations.ParameterObject;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
@@ -20,6 +23,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
@@ -39,6 +43,35 @@ class OrdenMantenimientoController {
     this.servicio = servicio;
     this.consulta = consulta;
     this.historial = historial;
+  }
+
+  @Operation(
+      summary = "Alta manual de una orden",
+      description =
+          "Entra como PROPUESTA, igual que las que genera un daño publicado; el catedrático la"
+              + " acepta después (RN-MTO-02).")
+  @ApiResponse(responseCode = "201", description = "Orden creada como PROPUESTA")
+  @ApiResponse(responseCode = "404", description = "El puente o la inspección no existen")
+  @PostMapping(consumes = "application/json")
+  @PreAuthorize("hasAnyRole('CATEDRATICO', 'ADMINISTRADOR')")
+  @ResponseStatus(HttpStatus.CREATED)
+  OrdenMantenimientoDTO crear(
+      @PathVariable UUID puenteId, @Valid @RequestBody CrearOrdenDTO datos) {
+    return servicio.crear(puenteId, datos);
+  }
+
+  @Operation(
+      summary = "Corrige el tipo o la descripción de una orden abierta",
+      description = "Una orden ejecutada, descartada o cancelada ya no se edita.")
+  @ApiResponse(responseCode = "200", description = "Orden actualizada")
+  @ApiResponse(responseCode = "409", description = "La orden ya está cerrada")
+  @PatchMapping(path = "/{ordenId}", consumes = "application/json")
+  @PreAuthorize("hasAnyRole('CATEDRATICO', 'ADMINISTRADOR')")
+  OrdenMantenimientoDTO editar(
+      @PathVariable UUID puenteId,
+      @PathVariable UUID ordenId,
+      @Valid @RequestBody EditarOrdenDTO datos) {
+    return servicio.editar(puenteId, ordenId, datos);
   }
 
   @GetMapping
