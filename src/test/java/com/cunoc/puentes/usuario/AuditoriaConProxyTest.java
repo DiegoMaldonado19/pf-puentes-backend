@@ -36,6 +36,9 @@ class AuditoriaConProxyTest extends PruebaIntegracion {
   @AfterEach
   void limpiar() {
     jdbc.update("DELETE FROM auditoria WHERE entidad_id = ?", cuenta);
+    jdbc.update(
+        "DELETE FROM notificacion WHERE usuario_id IN (SELECT id FROM usuario WHERE id = ?)",
+        cuenta);
     jdbc.update("DELETE FROM usuario WHERE id = ?", cuenta);
   }
 

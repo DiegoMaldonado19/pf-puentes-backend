@@ -64,9 +64,21 @@ class CambioEstadoInspeccionServiceTest extends PruebaIntegracion {
         PUENTE);
     jdbc.update("DELETE FROM inspeccion WHERE puente_id = ?", PUENTE);
     jdbc.update("DELETE FROM formulario_version WHERE id = ?", FORMULARIO);
+    jdbc.update(
+        "DELETE FROM notificacion WHERE usuario_id IN (SELECT id FROM usuario WHERE id = ?)",
+        PROFESIONAL);
     jdbc.update("DELETE FROM usuario WHERE id = ?", PROFESIONAL);
     jdbc.update(
+        "DELETE FROM notificacion WHERE usuario_id IN (?, ?, ?, ?)",
+        ESTUDIANTE,
+        REVISOR,
+        CATEDRATICO,
+        OTRO);
+    jdbc.update(
         "DELETE FROM usuario WHERE id IN (?, ?, ?, ?)", ESTUDIANTE, REVISOR, CATEDRATICO, OTRO);
+    jdbc.update(
+        "DELETE FROM orden_mantenimiento WHERE puente_id IN (SELECT id FROM puente WHERE id = ?)",
+        PUENTE);
     jdbc.update("DELETE FROM puente WHERE id = ?", PUENTE);
   }
 

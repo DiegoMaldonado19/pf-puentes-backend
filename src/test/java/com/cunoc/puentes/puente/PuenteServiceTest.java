@@ -15,6 +15,7 @@ import com.cunoc.puentes.puente.dto.DarDeBajaPuenteDTO;
 import com.cunoc.puentes.puente.dto.EditarPuenteDTO;
 import com.cunoc.puentes.puente.dto.PuenteCercanoDTO;
 import com.cunoc.puentes.puente.dto.PuenteDTO;
+import com.cunoc.puentes.puente.dto.ReactivarPuenteDTO;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
@@ -37,8 +38,9 @@ import org.springframework.test.util.ReflectionTestUtils;
 class PuenteServiceTest {
 
   private static final UUID ID = UUID.fromString("0192f5a0-0000-7000-8000-000000000301");
+  private static final UUID ADMIN = UUID.fromString("0192f5a0-0000-7000-8000-0000000000a1");
   private static final PuenteCercanoDTO CERCANO =
-      new PuenteCercanoDTO(ID, "GT-09-0901-0001", "Las Rosas", 42.5);
+      new PuenteCercanoDTO(ID, "GT-09-0901-0001", "Las Rosas", 14.6, -90.5, 42.5);
 
   @Mock PuenteRepository puentes;
   @Mock MunicipioRepository municipios;
@@ -212,7 +214,7 @@ class PuenteServiceTest {
     void marcaInactivoConElMotivoSinBorrar() {
       when(puentes.findConCatalogoById(ID)).thenReturn(Optional.of(puente(true)));
 
-      PuenteDTO baja = servicio().darDeBaja(ID, new DarDeBajaPuenteDTO("  Demolido  "));
+      PuenteDTO baja = servicio().darDeBaja(ADMIN, ID, new DarDeBajaPuenteDTO("  Demolido  "));
 
       assertThat(baja.activo()).isFalse();
       assertThat(baja.motivoBaja()).isEqualTo("Demolido");
@@ -225,9 +227,48 @@ class PuenteServiceTest {
       when(puentes.findConCatalogoById(ID)).thenReturn(Optional.of(puente(false)));
 
       esError(
-          () -> servicio().darDeBaja(ID, new DarDeBajaPuenteDTO("Otra vez")),
+          () -> servicio().darDeBaja(ADMIN, ID, new DarDeBajaPuenteDTO("Otra vez")),
           HttpStatus.CONFLICT,
           "puente-dado-de-baja");
+    }
+
+    @Test
+    void registraCuandoYQuienLaDioDeBaja() {
+      when(puentes.findConCatalogoById(ID)).thenReturn(Optional.of(puente(true)));
+
+      PuenteDTO baja = servicio().darDeBaja(ADMIN, ID, new DarDeBajaPuenteDTO("Demolido"));
+
+      assertThat(baja.bajaEn()).isNotNull();
+      assertThat(baja.bajaPor()).isEqualTo(ADMIN);
+    }
+  }
+
+  @Nested
+  class Reactivar {
+
+    @Test
+    void devuelveElPuenteAServicioYLimpiaLaBaja() {
+      Puente dado = puente(false);
+      dado.setBajaEn(java.time.Instant.parse("2026-10-01T00:00:00Z"));
+      dado.setBajaPor(ADMIN);
+      when(puentes.findConCatalogoById(ID)).thenReturn(Optional.of(dado));
+
+      PuenteDTO reactivado = servicio().reactivar(ID, new ReactivarPuenteDTO("Reparado"));
+
+      assertThat(reactivado.activo()).isTrue();
+      assertThat(reactivado.motivoBaja()).isNull();
+      assertThat(reactivado.bajaEn()).isNull();
+      assertThat(reactivado.bajaPor()).isNull();
+    }
+
+    @Test
+    void unPuenteEnServicioNoSeReactivaConUn409() {
+      when(puentes.findConCatalogoById(ID)).thenReturn(Optional.of(puente(true)));
+
+      esError(
+          () -> servicio().reactivar(ID, new ReactivarPuenteDTO("Sin efecto")),
+          HttpStatus.CONFLICT,
+          "puente-activo");
     }
   }
 
@@ -248,7 +289,9 @@ class PuenteServiceTest {
       when(puentes.findAll(any(Specification.class), pagina.capture()))
           .thenReturn(new PageImpl<>(List.of(puente(true)), PageRequest.of(1, 5), 6));
 
-      var resultado = servicio().listar("09", null, EstadoFiltro.SIN_EVALUAR, "rosas", false, 1, 5);
+      var resultado =
+          servicio()
+              .listar("09", null, EstadoFiltro.SIN_EVALUAR, "rosas", SituacionPuente.ACTIVOS, 1, 5);
 
       assertThat(pagina.getValue().getSort().getOrderFor("codigo")).isNotNull();
       assertThat(resultado.contenido())
@@ -263,19 +306,19 @@ class PuenteServiceTest {
     void rechazaPaginacionYBusquedaInvalidas() {
       PuenteService servicio = servicio();
       esError(
-          () -> servicio.listar(null, null, null, null, false, -1, 20),
+          () -> servicio.listar(null, null, null, null, SituacionPuente.ACTIVOS, -1, 20),
           HttpStatus.BAD_REQUEST,
           "paginacion-invalida");
       esError(
-          () -> servicio.listar(null, null, null, null, false, 0, 101),
+          () -> servicio.listar(null, null, null, null, SituacionPuente.ACTIVOS, 0, 101),
           HttpStatus.BAD_REQUEST,
           "paginacion-invalida");
       esError(
-          () -> servicio.listar(null, null, null, null, false, 0, 0),
+          () -> servicio.listar(null, null, null, null, SituacionPuente.ACTIVOS, 0, 0),
           HttpStatus.BAD_REQUEST,
           "paginacion-invalida");
       esError(
-          () -> servicio.listar(null, null, null, "x".repeat(121), false, 0, 20),
+          () -> servicio.listar(null, null, null, "x".repeat(121), SituacionPuente.ACTIVOS, 0, 20),
           HttpStatus.BAD_REQUEST,
           "busqueda-muy-larga");
     }

@@ -1,5 +1,6 @@
 package com.cunoc.puentes.indice;
 
+import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -36,4 +37,10 @@ interface VersionPesosRepository extends JpaRepository<VersionPesos, UUID> {
       value = "SELECT EXISTS (SELECT 1 FROM formulario_version WHERE id = :id)",
       nativeQuery = true)
   boolean existeFormulario(UUID id);
+
+  // B2: el juego vigente es el más reciente por vigente_desde, igual que el cálculo de IC.
+  Optional<VersionPesos> findFirstByFormularioVersionIdOrderByVigenteDesdeDescIdDesc(
+      UUID formularioVersionId);
+
+  boolean existsByFormularioVersionId(UUID formularioVersionId);
 }

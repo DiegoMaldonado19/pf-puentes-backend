@@ -70,6 +70,9 @@ class ConfiguracionPesosServiceTest extends PruebaIntegracion {
         FORMULARIO_A,
         FORMULARIO_B);
     jdbc.update("DELETE FROM formulario_version WHERE id IN (?, ?)", FORMULARIO_A, FORMULARIO_B);
+    jdbc.update(
+        "DELETE FROM notificacion WHERE usuario_id IN (SELECT id FROM usuario WHERE id = ?)",
+        ADMIN);
     jdbc.update("DELETE FROM usuario WHERE id = ?", ADMIN);
   }
 

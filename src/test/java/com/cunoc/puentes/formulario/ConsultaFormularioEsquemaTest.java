@@ -102,7 +102,9 @@ class ConsultaFormularioEsquemaTest extends PruebaIntegracion {
                           assertThat(campo.campo())
                               .isEqualTo("subestructura.estribo_entrada_grietas");
                           assertThat(campo.mensaje())
-                              .isEqualTo("El valor está fuera del rango permitido.");
+                              .isEqualTo(
+                                  "Estribo de Entrada: Fisuras o grietas en cortina y aleros"
+                                      + " supera el máximo permitido.");
                         }));
   }
 

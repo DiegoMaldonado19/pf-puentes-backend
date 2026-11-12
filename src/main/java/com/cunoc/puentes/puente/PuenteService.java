@@ -9,6 +9,8 @@ import com.cunoc.puentes.puente.dto.EditarPuenteDTO;
 import com.cunoc.puentes.puente.dto.PaginaPuentesDTO;
 import com.cunoc.puentes.puente.dto.PuenteCercanoDTO;
 import com.cunoc.puentes.puente.dto.PuenteDTO;
+import com.cunoc.puentes.puente.dto.ReactivarPuenteDTO;
+import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 import org.locationtech.jts.geom.Coordinate;
@@ -88,7 +90,7 @@ public class PuenteService {
       entidad = "puente",
       entidadId = "#id",
       motivo = "#datos.motivo()")
-  public PuenteDTO darDeBaja(UUID id, DarDeBajaPuenteDTO datos) {
+  public PuenteDTO darDeBaja(UUID administradorId, UUID id, DarDeBajaPuenteDTO datos) {
     Puente puente = existente(id, true);
     if (!puente.isActivo()) {
       throw new NegocioException(
@@ -99,6 +101,30 @@ public class PuenteService {
     }
     puente.setActivo(false);
     puente.setMotivoBaja(datos.motivo().strip());
+    puente.setBajaEn(Instant.now());
+    puente.setBajaPor(administradorId);
+    return mapper.aDTO(puente);
+  }
+
+  /** Vuelve a poner en servicio un puente dado de baja; el motivo queda en la auditoría. */
+  @Auditable(
+      accion = Acciones.REACTIVAR,
+      entidad = "puente",
+      entidadId = "#id",
+      motivo = "#datos.motivo()")
+  public PuenteDTO reactivar(UUID id, ReactivarPuenteDTO datos) {
+    Puente puente = existente(id, true);
+    if (puente.isActivo()) {
+      throw new NegocioException(
+          HttpStatus.CONFLICT,
+          "puente-activo",
+          "Puente en servicio",
+          "El puente ya está en servicio; no hay nada que reactivar.");
+    }
+    puente.setActivo(true);
+    puente.setMotivoBaja(null);
+    puente.setBajaEn(null);
+    puente.setBajaPor(null);
     return mapper.aDTO(puente);
   }
 
@@ -114,7 +140,7 @@ public class PuenteService {
       String municipio,
       EstadoFiltro estado,
       String texto,
-      boolean incluirBajas,
+      SituacionPuente situacion,
       int pagina,
       int tamano) {
     if (pagina < 0 || tamano < 1 || tamano > MAX_TAMANO_PAGINA) {
@@ -133,7 +159,7 @@ public class PuenteService {
     }
     Page<Puente> resultado =
         puentes.findAll(
-            FiltrosPuente.de(departamento, municipio, estado, texto, incluirBajas),
+            FiltrosPuente.de(departamento, municipio, estado, texto, situacion),
             PageRequest.of(pagina, tamano, Sort.by("codigo")));
     return new PaginaPuentesDTO(
         resultado.getContent().stream().map(mapper::aDTO).toList(),

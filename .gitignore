@@ -67,6 +67,7 @@ scripts/*
 !scripts/restaurar.sh
 !scripts/minio-cuenta-servicio.sh
 !scripts/datos-demo.sql
+!scripts/claves-dev.sql
 
 # El .env.example si se versiona.
 !.env.example

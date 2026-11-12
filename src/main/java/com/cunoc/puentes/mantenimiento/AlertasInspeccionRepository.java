@@ -38,7 +38,7 @@ class AlertasInspeccionRepository {
     return jdbc.queryForList(
         "SELECT p.id "
             + REFERENCIA
-            + " WHERE (?::uuid IS NULL OR p.id > ?::uuid) AND "
+            + " WHERE p.activo AND (?::uuid IS NULL OR p.id > ?::uuid) AND "
             + VENCIDA
             + " ORDER BY p.id LIMIT "
             + LOTE,
@@ -58,7 +58,7 @@ class AlertasInspeccionRepository {
         jdbc.query(
             "SELECT i.id, p.codigo, p.nombre, coalesce(i.publicada_en, p.creado_en) AS referencia "
                 + REFERENCIA
-                + " WHERE p.id = ? AND "
+                + " WHERE p.activo AND p.id = ? AND "
                 + VENCIDA,
             (rs, n) ->
                 new Referencia(

@@ -119,8 +119,7 @@
           "x-elemento-ref": "identificacion.poblacion_posterior",
           "x-orden": 11
         }
-      },
-      "x-orden": 1
+      }
     },
     "datos_generales": {
       "type": "object",
@@ -207,8 +206,7 @@
           "x-elemento-ref": "datos_generales.material_predominante",
           "x-orden": 7
         }
-      },
-      "x-orden": 2
+      }
     },
     "tramos": {
       "type": "array",
@@ -253,8 +251,7 @@
             "x-elemento-ref": "tramos.galibo_vertical"
           }
         }
-      },
-      "x-orden": 3
+      }
     },
     "subestructura": {
       "type": "object",
@@ -347,8 +344,7 @@
           "x-anulacion-critica": "asentamiento_estructura",
           "x-orden": 7
         }
-      },
-      "x-orden": 4
+      }
     },
     "superestructura": {
       "type": "object",
@@ -427,8 +423,7 @@
           "x-elemento-ref": "superestructura.apoyos.deterioro",
           "x-orden": 6
         }
-      },
-      "x-orden": 5
+      }
     },
     "elementos_no_estructurales": {
       "type": "object",
@@ -470,8 +465,7 @@
           "x-elemento-ref": "elementos_no_estructurales.drenajes.danos",
           "x-orden": 3
         }
-      },
-      "x-orden": 6
+      }
     },
     "caracteristicas_cauce": {
       "type": "object",
@@ -514,8 +508,7 @@
           "x-elemento-ref": "caracteristicas_cauce.proteccion_margenes",
           "x-orden": 3
         }
-      },
-      "x-orden": 7
+      }
     },
     "otros": {
       "type": "object",
@@ -542,8 +535,7 @@
           "x-elemento-ref": "otros.recomendaciones",
           "x-orden": 3
         }
-      },
-      "x-orden": 8
+      }
     }
   }
 }

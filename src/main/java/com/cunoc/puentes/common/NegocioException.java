@@ -9,7 +9,7 @@ import org.springframework.web.ErrorResponseException;
 /** Error esperado que llega al cliente como RFC 7807 (DT-BE-05). {@code tipo} va en kebab-case. */
 public class NegocioException extends ErrorResponseException {
 
-  private static final String TIPO_BASE = "https://sgp.cunoc.usac.edu.gt/errores/";
+  static final String TIPO_BASE = "https://sgp.cunoc.usac.edu.gt/errores/";
 
   public NegocioException(HttpStatus estado, String tipo, String titulo, String detalle) {
     super(estado, problema(estado, tipo, titulo, detalle), null);

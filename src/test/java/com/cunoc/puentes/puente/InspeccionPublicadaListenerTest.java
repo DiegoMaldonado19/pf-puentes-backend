@@ -50,6 +50,12 @@ class InspeccionPublicadaListenerTest extends PruebaIntegracion {
     jdbc.update(
         "DELETE FROM auditoria WHERE entidad = 'puente' AND entidad_id IN"
             + " (SELECT id FROM puente WHERE municipio_codigo = '0915')");
+    // Al publicar se generan órdenes (B9): se borran antes que los puentes que las referencian
+    jdbc.update(
+        "DELETE FROM orden_mantenimiento WHERE puente_id IN"
+            + " (SELECT id FROM puente WHERE municipio_codigo = '0915')");
+    jdbc.update(
+        "DELETE FROM orden_mantenimiento WHERE puente_id IN (SELECT id FROM puente WHERE municipio_codigo = '0915')");
     jdbc.update("DELETE FROM puente WHERE municipio_codigo = '0915'");
     jdbc.update("DELETE FROM correlativo_puente WHERE municipio_codigo = '0915'");
   }
@@ -80,7 +86,9 @@ class InspeccionPublicadaListenerTest extends PruebaIntegracion {
                 puente.id()))
         .isEqualTo(1);
     assertThat(
-            puentes.listar(null, "0915", EstadoFiltro.BUENO, null, false, 0, 20).totalElementos())
+            puentes
+                .listar(null, "0915", EstadoFiltro.BUENO, null, SituacionPuente.ACTIVOS, 0, 20)
+                .totalElementos())
         .isEqualTo(1);
   }
 

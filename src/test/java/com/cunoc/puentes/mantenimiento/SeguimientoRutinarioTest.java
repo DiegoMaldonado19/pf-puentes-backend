@@ -65,8 +65,15 @@ class SeguimientoRutinarioTest extends PruebaIntegracion {
     SecurityContextHolder.clearContext();
     jdbc.update(
         "DELETE FROM orden_mantenimiento WHERE puente_id IN (SELECT id FROM puente WHERE municipio_codigo = '9191')");
+    jdbc.update(
+        "DELETE FROM orden_mantenimiento WHERE puente_id IN (SELECT id FROM puente WHERE municipio_codigo = '9191')");
     jdbc.update("DELETE FROM puente WHERE municipio_codigo = '9191'");
+    jdbc.update(
+        "DELETE FROM notificacion WHERE usuario_id IN (SELECT id FROM usuario WHERE id = ?)",
+        id(6));
     jdbc.update("DELETE FROM usuario WHERE id = ?", id(6));
+    jdbc.update(
+        "DELETE FROM notificacion WHERE usuario_id IN (SELECT id FROM usuario WHERE correo LIKE '%@anual-prueba.com')");
     jdbc.update("DELETE FROM usuario WHERE correo LIKE '%@anual-prueba.com'");
     jdbc.update("DELETE FROM municipio WHERE codigo = '9191'");
     jdbc.update("DELETE FROM departamento WHERE codigo = '91'");

@@ -65,6 +65,10 @@ class RegistroEstudianteTest extends PruebaIntegracion {
             + cuentas
             + "))");
     jdbc.update("DELETE FROM token_verificacion WHERE usuario_id IN (" + cuentas + ")");
+    jdbc.update(
+        "DELETE FROM notificacion WHERE usuario_id IN (SELECT id FROM usuario WHERE correo LIKE '%"
+            + DOMINIO
+            + "')");
     jdbc.update("DELETE FROM usuario WHERE correo LIKE '%" + DOMINIO + "'");
   }
 
@@ -243,15 +247,17 @@ class RegistroEstudianteTest extends PruebaIntegracion {
   }
 
   @Test
-  void verificarMarcaElCorreoYElTokenPeroNoActivaLaCuenta() throws Exception {
+  void verificarMarcaElCorreoYActivaLaCuentaDelEstudiante() throws Exception {
     registrar(CORREO, CONTRASENA).andExpect(status().isCreated());
     String token = tokenDelCorreo();
 
-    verificar(token).andExpect(status().isNoContent());
+    verificar(token)
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.resultado").value("ACTIVADA"));
 
     Usuario ana = cuenta(CORREO);
     assertThat(ana.getCorreoVerificadoEn()).isNotNull();
-    assertThat(ana.getEstado()).isEqualTo(EstadoUsuario.PENDIENTE);
+    assertThat(ana.getEstado()).isEqualTo(EstadoUsuario.ACTIVO);
     assertThat(
             jdbc.queryForObject(
                 "SELECT usado_en FROM token_verificacion WHERE usuario_id = ?",
@@ -261,7 +267,7 @@ class RegistroEstudianteTest extends PruebaIntegracion {
   }
 
   @Test
-  void unTokenVencidoYaUsadoOInexistenteSeRechazanConElMismoMensaje() throws Exception {
+  void unTokenVencidoOInexistenteSeRechazanConElMismoMensaje() throws Exception {
     registrar(CORREO, CONTRASENA).andExpect(status().isCreated());
     String vencido = tokenDelCorreo();
     jdbc.update(
@@ -269,17 +275,22 @@ class RegistroEstudianteTest extends PruebaIntegracion {
             + " expira_en = now() - interval '1 day' WHERE usuario_id = ?",
         cuenta(CORREO).getId());
 
-    registrar("otra" + DOMINIO, CONTRASENA).andExpect(status().isCreated());
-    String usado = tokenDelCorreo();
-    verificar(usado).andExpect(status().isNoContent());
-
     List<String> detalles =
-        List.of(
-            cuerpoDeRechazo(vencido),
-            cuerpoDeRechazo(usado),
-            cuerpoDeRechazo("token-que-nunca-existio"));
+        List.of(cuerpoDeRechazo(vencido), cuerpoDeRechazo("token-que-nunca-existio"));
     // Mismo cuerpo completo (tipo, título, detalle): no se distingue por qué falló
-    assertThat(detalles).hasSize(3).containsOnly(detalles.getFirst());
+    assertThat(detalles).hasSize(2).containsOnly(detalles.getFirst());
+  }
+
+  @Test
+  void unEnlaceYaUsadoDeUnaCuentaActivaRespondeYaActivaSinError() throws Exception {
+    registrar(CORREO, CONTRASENA).andExpect(status().isCreated());
+    String token = tokenDelCorreo();
+    verificar(token).andExpect(status().isOk());
+
+    verificar(token)
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.resultado").value("YA_ACTIVA"));
+    assertThat(cuenta(CORREO).getEstado()).isEqualTo(EstadoUsuario.ACTIVO);
   }
 
   /** Verifica que sea 422 token-invalido y devuelve el mensaje; los tres casos deben coincidir. */
@@ -305,7 +316,7 @@ class RegistroEstudianteTest extends PruebaIntegracion {
 
     assertThat(nuevo).isNotEqualTo(anterior);
     verificar(anterior).andExpect(status().isUnprocessableEntity());
-    verificar(nuevo).andExpect(status().isNoContent());
+    verificar(nuevo).andExpect(status().isOk());
   }
 
   @Test
@@ -314,7 +325,7 @@ class RegistroEstudianteTest extends PruebaIntegracion {
     assertThat(buzon.siguiente(500)).isNull();
 
     registrar(CORREO, CONTRASENA).andExpect(status().isCreated());
-    verificar(tokenDelCorreo()).andExpect(status().isNoContent());
+    verificar(tokenDelCorreo()).andExpect(status().isOk());
 
     reenviar(CORREO).andExpect(status().isAccepted());
     assertThat(buzon.siguiente(500)).isNull();
@@ -324,7 +335,7 @@ class RegistroEstudianteTest extends PruebaIntegracion {
   void auditaElRegistroYLaVerificacionSinContrasenaNiToken() throws Exception {
     registrar(CORREO, CONTRASENA).andExpect(status().isCreated());
     String token = tokenDelCorreo();
-    verificar(token).andExpect(status().isNoContent());
+    verificar(token).andExpect(status().isOk());
 
     List<Map<String, Object>> filas =
         jdbc.queryForList(
@@ -332,7 +343,9 @@ class RegistroEstudianteTest extends PruebaIntegracion {
                 + " FROM auditoria WHERE entidad = 'usuario' AND entidad_id = ? ORDER BY creado_en",
             cuenta(CORREO).getId());
 
-    assertThat(filas).extracting(f -> f.get("accion")).containsExactly("CREAR", "MODIFICAR");
+    assertThat(filas)
+        .extracting(f -> f.get("accion"))
+        .containsExactly("CREAR", "MODIFICAR", "CAMBIAR_ESTADO");
     assertThat(filas).allSatisfy(f -> assertThat(f.get("usuario_id")).isNull());
     String hash = cuenta(CORREO).getContrasenaHash();
     assertThat(filas)

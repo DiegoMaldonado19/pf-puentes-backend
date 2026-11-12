@@ -12,10 +12,14 @@ final class FiltrosPuente {
   private FiltrosPuente() {}
 
   static Specification<Puente> de(
-      String departamento, String municipio, EstadoFiltro estado, String texto, boolean bajas) {
+      String departamento,
+      String municipio,
+      EstadoFiltro estado,
+      String texto,
+      SituacionPuente situacion) {
     List<Specification<Puente>> filtros = new ArrayList<>();
-    if (!bajas) {
-      filtros.add(activos());
+    if (situacion != SituacionPuente.TODOS) {
+      filtros.add(activo(situacion == SituacionPuente.ACTIVOS));
     }
     if (departamento != null) {
       filtros.add(departamento(departamento));
@@ -32,8 +36,8 @@ final class FiltrosPuente {
     return Specification.allOf(filtros);
   }
 
-  private static Specification<Puente> activos() {
-    return (raiz, consulta, cb) -> cb.isTrue(raiz.get("activo"));
+  private static Specification<Puente> activo(boolean activo) {
+    return (raiz, consulta, cb) -> cb.equal(raiz.get("activo"), activo);
   }
 
   private static Specification<Puente> departamento(String codigo) {

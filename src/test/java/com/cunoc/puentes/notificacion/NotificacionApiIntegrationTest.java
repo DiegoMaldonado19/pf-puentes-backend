@@ -77,6 +77,10 @@ class NotificacionApiIntegrationTest extends PruebaIntegracion {
   @AfterEach
   void limpiarDatos() {
     jdbc.update("DELETE FROM notificacion WHERE usuario_id IN (?, ?)", USUARIO_A, USUARIO_B);
+    jdbc.update(
+        "DELETE FROM notificacion WHERE usuario_id IN (SELECT id FROM usuario WHERE id IN (?, ?))",
+        USUARIO_A,
+        USUARIO_B);
     jdbc.update("DELETE FROM usuario WHERE id IN (?, ?)", USUARIO_A, USUARIO_B);
   }
 

@@ -9,6 +9,7 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -40,6 +41,7 @@ class UsuarioAdminControllerTest {
   private static final String RECHAZAR = BASE + "/" + PROFESIONAL + "/colegiado/rechazo";
   private static final String BAJA = BASE + "/" + PROFESIONAL + "/baja";
   private static final String REACTIVAR = BASE + "/" + PROFESIONAL + "/reactivacion";
+  private static final String ACTIVAR = BASE + "/" + PROFESIONAL + "/activacion";
 
   @Autowired MockMvc mvc;
 
@@ -62,6 +64,7 @@ class UsuarioAdminControllerTest {
                 .content("{\"motivo\":\"Baja de prueba\"}"))
         .andExpect(status().isUnauthorized());
     mvc.perform(post(REACTIVAR)).andExpect(status().isUnauthorized());
+    mvc.perform(post(ACTIVAR)).andExpect(status().isUnauthorized());
   }
 
   @ParameterizedTest
@@ -87,6 +90,18 @@ class UsuarioAdminControllerTest {
                 .with(como(rol)))
         .andExpect(status().isForbidden());
     mvc.perform(post(REACTIVAR).with(como(rol))).andExpect(status().isForbidden());
+    mvc.perform(post(ACTIVAR).with(como(rol))).andExpect(status().isForbidden());
+  }
+
+  @Test
+  void elAdministradorActivaLaCuentaPendienteConCorreoVerificado() throws Exception {
+    when(cuentas.activar(PROFESIONAL)).thenReturn(dto(EstadoUsuario.ACTIVO, null));
+
+    mvc.perform(post(ACTIVAR).with(como(Rol.ADMINISTRADOR, ADMIN)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.estado").value("ACTIVO"));
+
+    verify(cuentas).activar(PROFESIONAL);
   }
 
   @Test
@@ -148,6 +163,72 @@ class UsuarioAdminControllerTest {
 
     verify(cuentas).darDeBaja(ADMIN, PROFESIONAL, "Ya no pertenece al curso");
     verify(cuentas).reactivar(PROFESIONAL);
+  }
+
+  @ParameterizedTest
+  @EnumSource(
+      value = Rol.class,
+      names = {"ESTUDIANTE", "PROFESIONAL_EXTERNO", "CATEDRATICO"})
+  void losNuevosEndpointsDeGestionSonSoloDelAdministrador(Rol rol) throws Exception {
+    String cuerpo = "{\"nombre\":\"Ana\",\"correo\":\"ana@usac.edu.gt\",\"rol\":\"CATEDRATICO\"}";
+    mvc.perform(post(BASE).contentType(MediaType.APPLICATION_JSON).content(cuerpo).with(como(rol)))
+        .andExpect(status().isForbidden());
+    mvc.perform(
+            put(BASE + "/" + PROFESIONAL)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(cuerpo)
+                .with(como(rol)))
+        .andExpect(status().isForbidden());
+    mvc.perform(post(BASE + "/" + PROFESIONAL + "/desbloqueo").with(como(rol)))
+        .andExpect(status().isForbidden());
+    mvc.perform(post(BASE + "/" + PROFESIONAL + "/reenvio-verificacion").with(como(rol)))
+        .andExpect(status().isForbidden());
+    verifyNoInteractions(cuentas);
+  }
+
+  @Test
+  void elAdministradorDaDeAltaEditaDesbloqueaYReenvia() throws Exception {
+    when(cuentas.crear(any())).thenReturn(dto(EstadoUsuario.ACTIVO, null));
+    when(cuentas.actualizar(eq(ADMIN), eq(PROFESIONAL), any()))
+        .thenReturn(dto(EstadoUsuario.ACTIVO, null));
+    when(cuentas.desbloquear(PROFESIONAL)).thenReturn(dto(EstadoUsuario.ACTIVO, null));
+
+    mvc.perform(
+            post(BASE)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    "{\"nombre\":\"Ana Pérez\",\"correo\":\"ana@usac.edu.gt\",\"rol\":\"CATEDRATICO\"}")
+                .with(como(Rol.ADMINISTRADOR, ADMIN)))
+        .andExpect(status().isCreated())
+        .andExpect(jsonPath("$.estado").value("ACTIVO"));
+    mvc.perform(
+            put(BASE + "/" + PROFESIONAL)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    "{\"nombre\":\"Ana\",\"correo\":\"ana@usac.edu.gt\",\"rol\":\"ADMINISTRADOR\"}")
+                .with(como(Rol.ADMINISTRADOR, ADMIN)))
+        .andExpect(status().isOk());
+    mvc.perform(post(BASE + "/" + PROFESIONAL + "/desbloqueo").with(como(Rol.ADMINISTRADOR, ADMIN)))
+        .andExpect(status().isOk());
+    mvc.perform(
+            post(BASE + "/" + PROFESIONAL + "/reenvio-verificacion")
+                .with(como(Rol.ADMINISTRADOR, ADMIN)))
+        .andExpect(status().isAccepted());
+
+    verify(cuentas).reenviarVerificacion(PROFESIONAL);
+    verify(cuentas).desbloquear(PROFESIONAL);
+  }
+
+  @Test
+  void unaAltaSinDatosValidosResponde400ConCadaCampo() throws Exception {
+    mvc.perform(
+            post(BASE)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"nombre\":\"\",\"correo\":\"no-es-correo\",\"rol\":null}")
+                .with(como(Rol.ADMINISTRADOR, ADMIN)))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.errores.length()").value(3));
+    verifyNoInteractions(cuentas);
   }
 
   @Test

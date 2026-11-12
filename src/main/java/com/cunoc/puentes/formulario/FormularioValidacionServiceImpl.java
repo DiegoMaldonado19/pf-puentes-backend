@@ -10,6 +10,7 @@ import com.networknt.schema.SchemaId;
 import com.networknt.schema.SchemaLocation;
 import com.networknt.schema.SpecVersion;
 import com.networknt.schema.ValidationMessage;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -26,7 +27,10 @@ public class FormularioValidacionServiceImpl implements FormularioValidacionServ
   private final ObjectMapper objectMapper;
   private final JsonSchemaFactory schemaFactory;
   private final JsonSchema metaesquema;
-  private final Map<UUID, JsonSchema> cacheEsquemas = new ConcurrentHashMap<>();
+  private final Map<UUID, Esquema> cacheEsquemas = new ConcurrentHashMap<>();
+
+  /** Esquema compilado con las etiquetas de sus campos para los mensajes en español (B2). */
+  private record Esquema(JsonSchema schema, Map<String, String> titulos) {}
 
   @Autowired
   public FormularioValidacionServiceImpl(FormularioVersionRepository repository) {
@@ -49,23 +53,23 @@ public class FormularioValidacionServiceImpl implements FormularioValidacionServ
 
   @Override
   public void validarConEsquema(Map<String, Object> esquema, Map<String, Object> datosPayload) {
-    JsonNode schemaNode = objectMapper.valueToTree(esquema);
-    JsonSchema schema = schemaFactory.getSchema(schemaNode);
-    ejecutarValidacion(schema, datosPayload);
+    ejecutarValidacion(preparar(esquema), datosPayload);
   }
 
   @Override
   public List<ErrorCampo> erroresDeContenido(UUID versionId, Map<String, Object> datosPayload) {
-    return mensajes(esquemaDe(versionId), datosPayload).stream()
+    Esquema esquema = esquemaDe(versionId);
+    return mensajes(esquema.schema(), datosPayload).stream()
         .filter(mensaje -> !"required".equals(mensaje.getType()))
-        .map(FormularioValidacionServiceImpl::error)
+        .map(mensaje -> error(mensaje, esquema.titulos()))
         .toList();
   }
 
   @Override
   public List<ErrorCampo> erroresCompletos(UUID versionId, Map<String, Object> datosPayload) {
-    return mensajes(esquemaDe(versionId), datosPayload).stream()
-        .map(FormularioValidacionServiceImpl::error)
+    Esquema esquema = esquemaDe(versionId);
+    return mensajes(esquema.schema(), datosPayload).stream()
+        .map(mensaje -> error(mensaje, esquema.titulos()))
         .toList();
   }
 
@@ -81,7 +85,7 @@ public class FormularioValidacionServiceImpl implements FormularioValidacionServ
     }
   }
 
-  private JsonSchema esquemaDe(UUID versionId) {
+  private Esquema esquemaDe(UUID versionId) {
     return cacheEsquemas.computeIfAbsent(
         versionId,
         id -> {
@@ -95,9 +99,13 @@ public class FormularioValidacionServiceImpl implements FormularioValidacionServ
                               "formulario-no-encontrado",
                               "Versión de formulario no encontrada",
                               "No existe una versión de formulario con id " + id));
-          JsonNode schemaNode = objectMapper.valueToTree(version.getEsquema());
-          return schemaFactory.getSchema(schemaNode);
+          return preparar(version.getEsquema());
         });
+  }
+
+  private Esquema preparar(Map<String, Object> esquema) {
+    JsonNode schemaNode = objectMapper.valueToTree(esquema);
+    return new Esquema(schemaFactory.getSchema(schemaNode), titulos(esquema));
   }
 
   private Set<ValidationMessage> mensajes(JsonSchema schema, Map<String, Object> datosPayload) {
@@ -105,10 +113,10 @@ public class FormularioValidacionServiceImpl implements FormularioValidacionServ
     return schema.validate(dataNode);
   }
 
-  private void ejecutarValidacion(JsonSchema schema, Map<String, Object> datosPayload) {
+  private void ejecutarValidacion(Esquema esquema, Map<String, Object> datosPayload) {
     List<ErrorCampo> errores =
-        mensajes(schema, datosPayload).stream()
-            .map(FormularioValidacionServiceImpl::error)
+        mensajes(esquema.schema(), datosPayload).stream()
+            .map(mensaje -> error(mensaje, esquema.titulos()))
             .toList();
 
     if (!errores.isEmpty()) {
@@ -121,7 +129,32 @@ public class FormularioValidacionServiceImpl implements FormularioValidacionServ
     }
   }
 
-  private static ErrorCampo error(ValidationMessage msg) {
+  /**
+   * Etiqueta visible por ruta: la sección ("datos_generales") y cada campo
+   * ("datos_generales.longitud_total"), tomadas de {@code title}.
+   */
+  static Map<String, String> titulos(Map<String, Object> esquema) {
+    Map<String, String> titulos = new HashMap<>();
+    for (Map.Entry<String, Object> seccion : propiedades(esquema).entrySet()) {
+      Map<String, Object> nodo = mapa(seccion.getValue());
+      titulos.put(seccion.getKey(), etiqueta(nodo, seccion.getKey()));
+      propiedades(nodo)
+          .forEach(
+              (campo, definicion) ->
+                  titulos.put(seccion.getKey() + "." + campo, etiqueta(mapa(definicion), campo)));
+    }
+    return titulos;
+  }
+
+  private static ErrorCampo error(ValidationMessage msg, Map<String, String> titulos) {
+    String ruta = rutaDe(msg);
+    String etiqueta =
+        titulos.getOrDefault(
+            ruta.replaceAll("\\[\\d+]", ""), ruta.substring(ruta.lastIndexOf('.') + 1));
+    return new ErrorCampo(ruta, mensaje(msg, etiqueta));
+  }
+
+  private static String rutaDe(ValidationMessage msg) {
     String ruta = msg.getInstanceLocation().toString();
     if (ruta.startsWith("$.") || ruta.startsWith("$[")) {
       ruta = ruta.substring(2);
@@ -132,22 +165,45 @@ public class FormularioValidacionServiceImpl implements FormularioValidacionServ
       String propiedad = String.valueOf(msg.getArguments()[0]);
       ruta = "datos".equals(ruta) ? propiedad : ruta + "." + propiedad;
     }
-    return new ErrorCampo(ruta, mensaje(msg));
+    return ruta;
   }
 
-  private static String mensaje(ValidationMessage msg) {
+  /**
+   * Mensajes en español que nombran el campo y cuentan qué pasa, p. ej. "Longitud Total del Puente
+   * (m) es obligatorio." (B2).
+   */
+  private static String mensaje(ValidationMessage msg, String etiqueta) {
     String tipo = msg.getType();
-    if (tipo == null) {
-      return msg.getMessage();
-    }
-    return switch (tipo) {
-      case "required" -> "Requerido";
-      case "type" -> "El valor no coincide con el tipo esperado.";
-      case "minimum", "maximum", "exclusiveMinimum", "exclusiveMaximum" ->
-          "El valor está fuera del rango permitido.";
-      case "enum" -> "El valor no está entre las opciones permitidas.";
-      default -> msg.getMessage();
-    };
+    String detalle =
+        tipo == null
+            ? "no es válido."
+            : switch (tipo) {
+              case "required" -> "es obligatorio.";
+              case "type" -> "no coincide con el tipo esperado.";
+              case "minimum", "exclusiveMinimum" -> "está por debajo del mínimo permitido.";
+              case "maximum", "exclusiveMaximum" -> "supera el máximo permitido.";
+              case "enum" -> "no está entre las opciones permitidas.";
+              case "maxLength" -> "supera la longitud máxima permitida.";
+              case "minLength" -> "es más corto de lo permitido.";
+              case "format", "pattern" -> "no tiene un formato válido.";
+              default -> "no es válido.";
+            };
+    return etiqueta + " " + detalle;
+  }
+
+  private static String etiqueta(Map<String, Object> nodo, String respaldo) {
+    return nodo.get("title") instanceof String titulo && !titulo.isBlank() ? titulo : respaldo;
+  }
+
+  @SuppressWarnings("unchecked")
+  private static Map<String, Object> propiedades(Map<String, Object> nodo) {
+    Object props = nodo.get("properties");
+    return props instanceof Map<?, ?> ? (Map<String, Object>) props : Map.of();
+  }
+
+  @SuppressWarnings("unchecked")
+  private static Map<String, Object> mapa(Object valor) {
+    return valor instanceof Map<?, ?> ? (Map<String, Object>) valor : Map.of();
   }
 
   public void invalidarCache(UUID versionId) {

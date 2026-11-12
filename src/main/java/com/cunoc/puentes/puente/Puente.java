@@ -9,7 +9,9 @@ import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.ManyToOne;
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.time.LocalDate;
+import java.util.UUID;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -42,6 +44,11 @@ public class Puente extends EntidadBase {
   private boolean activo = true;
 
   private String motivoBaja;
+
+  // RN-INV-08: cuándo y quién dieron de baja; NULL en bajas anteriores a V2026_11_11_1000
+  private Instant bajaEn;
+
+  private UUID bajaPor;
 
   // RN-INV-09: sin setter; solo cambian con la inspección publicada (actualizarCondicion)
   @Setter(AccessLevel.NONE)

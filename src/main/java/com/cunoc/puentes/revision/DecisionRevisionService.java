@@ -7,6 +7,7 @@ import com.cunoc.puentes.common.auditoria.Acciones;
 import com.cunoc.puentes.common.auditoria.Auditable;
 import com.cunoc.puentes.inspeccion.PublicacionInspeccionService;
 import com.cunoc.puentes.inspeccion.VeredictoRevision;
+import com.cunoc.puentes.notificacion.NotificacionService;
 import com.cunoc.puentes.usuario.EstadoCuentaService;
 import com.cunoc.puentes.usuario.Rol;
 import java.time.Instant;
@@ -29,6 +30,8 @@ public class DecisionRevisionService {
   private final ObjectMapper json;
   private final ArchivoService archivos;
 
+  private final NotificacionService notificaciones;
+
   DecisionRevisionService(
       RevisionRepository revisiones,
       ObservacionRevisionRepository observaciones,
@@ -36,7 +39,8 @@ public class DecisionRevisionService {
       EstadoCuentaService cuentas,
       PublicacionInspeccionService publicaciones,
       ObjectMapper json,
-      ArchivoService archivos) {
+      ArchivoService archivos,
+      NotificacionService notificaciones) {
     this.revisiones = revisiones;
     this.observaciones = observaciones;
     this.contexto = contexto;
@@ -44,6 +48,7 @@ public class DecisionRevisionService {
     this.publicaciones = publicaciones;
     this.json = json;
     this.archivos = archivos;
+    this.notificaciones = notificaciones;
   }
 
   @Transactional(readOnly = true)
@@ -102,7 +107,30 @@ public class DecisionRevisionService {
           null,
           null);
     }
+    avisarAlAutor(revision.getInspeccionId(), decision.veredicto());
     return detalle(actor, id);
+  }
+
+  // El autor se entera del veredicto sin tener que buscar la inspección (B3)
+  private void avisarAlAutor(UUID inspeccionId, Veredicto veredicto) {
+    contexto
+        .autorDeInspeccion(inspeccionId)
+        .ifPresent(
+            autor ->
+                notificaciones.notificar(
+                    autor,
+                    "INSPECCION_" + veredicto.name(),
+                    mensajeDelVeredicto(veredicto),
+                    "/inspecciones/" + inspeccionId));
+  }
+
+  private static String mensajeDelVeredicto(Veredicto veredicto) {
+    return switch (veredicto) {
+      case APROBADA -> "Tu inspección fue aprobada.";
+      case CAMBIOS_SOLICITADOS ->
+          "Tu inspección fue devuelta con correcciones. Revisa las observaciones.";
+      case RECHAZADA -> "Tu inspección fue rechazada. Revisa el motivo.";
+    };
   }
 
   @Transactional(readOnly = true)

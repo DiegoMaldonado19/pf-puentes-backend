@@ -39,6 +39,8 @@ Observación: `{elemento_ref, texto}`. El servicio valida la referencia contra `
 
 Las escrituras bloquean primero la inspección y luego cargan el ciclo, verifican responsable actual y revisor asignado; un ciclo cerrado no admite otro veredicto ni nuevas observaciones. Errores: 400 por cuerpo inválido, 404 por revisión ajena, 409 por ciclo/estado incompatible y 422 por referencia/observación/justificación o cálculo inválidos. Se reutiliza auditoría de revisión y observación, en la misma transacción.
 
+Envío bloqueado por observaciones ([ADR 0071](adr/0071-envio-bloqueado-por-observaciones-pendientes.md)): mientras quede una observación ancla sin resolver, `POST /inspecciones/{id}/envio` responde 422 con `errores[{campo: "observaciones-pendientes"}]`. El autor resuelve cada una con `PATCH /observaciones/{id}/resolucion`. El motivo del veredicto se trunca a 500 caracteres al copiarlo a la transición y a la auditoría, y el autor recibe un aviso con enlace a la inspección.
+
 Decisión de veredictos: [ADR 0056](adr/0056-veredictos-y-observaciones-ancladas.md).
 
 ## Seguimiento, nota privada y avisos
