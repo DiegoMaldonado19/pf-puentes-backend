@@ -67,6 +67,8 @@ class PuenteControllerTest {
           null,
           null,
           null,
+          null,
+          null,
           null);
 
   @Autowired MockMvc mvc;
@@ -74,7 +76,7 @@ class PuenteControllerTest {
 
   @Test
   void elVisitanteSinSesionVeListadoYFicha() throws Exception {
-    when(servicio.listar(any(), any(), any(), any(), eq(false), eq(0), eq(20)))
+    when(servicio.listar(any(), any(), any(), any(), eq(SituacionPuente.ACTIVOS), eq(0), eq(20)))
         .thenReturn(new PaginaPuentesDTO(List.of(PUENTE), 0, 20, 1, 1));
     when(servicio.detalle(ID, false)).thenReturn(PUENTE);
 
@@ -91,7 +93,8 @@ class PuenteControllerTest {
 
   @Test
   void pasaLosFiltrosAlServicio() throws Exception {
-    when(servicio.listar("09", "0901", EstadoFiltro.SIN_EVALUAR, "rosas", false, 2, 10))
+    when(servicio.listar(
+            "09", "0901", EstadoFiltro.SIN_EVALUAR, "rosas", SituacionPuente.ACTIVOS, 2, 10))
         .thenReturn(new PaginaPuentesDTO(List.of(), 2, 10, 0, 0));
 
     mvc.perform(
@@ -113,7 +116,7 @@ class PuenteControllerTest {
 
   @Test
   void soloElAdministradorVeBajas() throws Exception {
-    when(servicio.listar(any(), any(), any(), any(), eq(true), anyInt(), anyInt()))
+    when(servicio.listar(any(), any(), any(), any(), eq(SituacionPuente.TODOS), anyInt(), anyInt()))
         .thenReturn(new PaginaPuentesDTO(List.of(), 0, 20, 0, 0));
     when(servicio.detalle(ID, true)).thenReturn(PUENTE);
 
@@ -125,6 +128,51 @@ class PuenteControllerTest {
         .andExpect(status().isOk());
     mvc.perform(get("/api/v1/puentes/" + ID).with(como(Rol.ADMINISTRADOR)))
         .andExpect(status().isOk());
+  }
+
+  @Test
+  void situacionBajasYTodosSonDelAdministrador() throws Exception {
+    when(servicio.listar(any(), any(), any(), any(), eq(SituacionPuente.BAJAS), anyInt(), anyInt()))
+        .thenReturn(new PaginaPuentesDTO(List.of(), 0, 20, 0, 0));
+
+    mvc.perform(get("/api/v1/puentes").param("situacion", "BAJAS").with(como(Rol.CATEDRATICO)))
+        .andExpect(status().isForbidden());
+    mvc.perform(get("/api/v1/puentes").param("situacion", "TODOS"))
+        .andExpect(status().isForbidden());
+    mvc.perform(get("/api/v1/puentes").param("situacion", "BAJAS").with(como(Rol.ADMINISTRADOR)))
+        .andExpect(status().isOk());
+    mvc.perform(get("/api/v1/puentes").param("situacion", "ACTIVOS")).andExpect(status().isOk());
+    mvc.perform(get("/api/v1/puentes").param("situacion", "EN_OBRA"))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.errores[0].campo").value("situacion"))
+        .andExpect(
+            jsonPath("$.errores[0].mensaje")
+                .value("Valor no permitido. Usa uno de: ACTIVOS, BAJAS, TODOS."));
+  }
+
+  @Test
+  void elAdministradorReactivaUnPuenteDadoDeBaja() throws Exception {
+    when(servicio.reactivar(eq(ID), any())).thenReturn(PUENTE);
+
+    mvc.perform(
+            post("/api/v1/puentes/" + ID + "/reactivacion")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"motivo\": \"Reparado tras la crecida\"}")
+                .with(como(Rol.ADMINISTRADOR)))
+        .andExpect(status().isOk());
+    mvc.perform(
+            post("/api/v1/puentes/" + ID + "/reactivacion")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"motivo\": \"Reparado\"}")
+                .with(como(Rol.CATEDRATICO)))
+        .andExpect(status().isForbidden());
+    mvc.perform(
+            post("/api/v1/puentes/" + ID + "/reactivacion")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"motivo\": \" \"}")
+                .with(como(Rol.ADMINISTRADOR)))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.errores[0].campo").value("motivo"));
   }
 
   @Test
@@ -242,7 +290,7 @@ class PuenteControllerTest {
 
   @Test
   void elAdministradorDaDeBajaConMotivoObligatorio() throws Exception {
-    when(servicio.darDeBaja(eq(ID), any())).thenReturn(PUENTE);
+    when(servicio.darDeBaja(any(), eq(ID), any())).thenReturn(PUENTE);
 
     mvc.perform(
             post("/api/v1/puentes/" + ID + "/baja")

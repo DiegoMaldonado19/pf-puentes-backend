@@ -38,6 +38,8 @@ class AdministradorInicialTest extends PruebaIntegracion {
   void limpiar() {
     // Las pruebas de otras clases comparten la base: no deben ver administradores de esta
     jdbc.update("DELETE FROM auditoria WHERE entidad = 'usuario' AND usuario_id IS NULL");
+    jdbc.update(
+        "DELETE FROM notificacion WHERE usuario_id IN (SELECT id FROM usuario WHERE rol = 'ADMINISTRADOR')");
     jdbc.update("DELETE FROM usuario WHERE rol = 'ADMINISTRADOR'");
   }
 

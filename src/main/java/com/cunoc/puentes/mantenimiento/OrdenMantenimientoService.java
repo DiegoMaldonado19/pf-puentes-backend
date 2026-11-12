@@ -1,7 +1,11 @@
 package com.cunoc.puentes.mantenimiento;
 
 import com.cunoc.puentes.common.NegocioException;
+import com.cunoc.puentes.common.auditoria.Acciones;
+import com.cunoc.puentes.common.auditoria.Auditable;
 import com.cunoc.puentes.mantenimiento.dto.CierreOrdenDTO;
+import com.cunoc.puentes.mantenimiento.dto.CrearOrdenDTO;
+import com.cunoc.puentes.mantenimiento.dto.EditarOrdenDTO;
 import com.cunoc.puentes.mantenimiento.dto.OrdenMantenimientoDTO;
 import java.time.LocalDate;
 import java.util.UUID;
@@ -22,6 +26,7 @@ public class OrdenMantenimientoService {
   private final AjustePrioridadOrdenService prioridades;
   private final ProgramacionOrdenService programacion;
   private final OrdenMantenimientoMapper mapper;
+  private final CreacionPropuestaOrdenService creacion;
 
   OrdenMantenimientoService(
       OrdenMantenimientoRepository ordenes,
@@ -32,7 +37,8 @@ public class OrdenMantenimientoService {
       DecisionConMotivoOrdenService decisiones,
       AjustePrioridadOrdenService prioridades,
       ProgramacionOrdenService programacion,
-      OrdenMantenimientoMapper mapper) {
+      OrdenMantenimientoMapper mapper,
+      CreacionPropuestaOrdenService creacion) {
     this.ordenes = ordenes;
     this.origen = origen;
     this.aceptacion = aceptacion;
@@ -42,6 +48,69 @@ public class OrdenMantenimientoService {
     this.prioridades = prioridades;
     this.programacion = programacion;
     this.mapper = mapper;
+    this.creacion = creacion;
+  }
+
+  /** Alta manual (B9): entra como PROPUESTA; el catedrático la acepta después (RN-MTO-02). */
+  @Transactional
+  @PreAuthorize("hasAnyRole('CATEDRATICO', 'ADMINISTRADOR')")
+  public OrdenMantenimientoDTO crear(UUID puenteId, CrearOrdenDTO datos) {
+    origen.validar(puenteId, datos.inspeccionId());
+    return mapper.aDTO(
+        creacion.crearManual(
+            puenteId,
+            datos.inspeccionId(),
+            datos.tipo(),
+            datos.descripcion().strip(),
+            datos.elementoRef(),
+            datos.prioridad()));
+  }
+
+  /**
+   * Corrige el tipo o la descripción mientras la orden no esté cerrada: ejecutada, descartada o
+   * cancelada no se tocan (B9).
+   */
+  @Transactional
+  @PreAuthorize("hasAnyRole('CATEDRATICO', 'ADMINISTRADOR')")
+  @Auditable(accion = Acciones.MODIFICAR, entidad = "orden_mantenimiento", entidadId = "#ordenId")
+  public OrdenMantenimientoDTO editar(UUID puenteId, UUID ordenId, EditarOrdenDTO datos) {
+    OrdenMantenimiento orden =
+        ordenes
+            .bloquear(puenteId, ordenId)
+            .orElseThrow(
+                () ->
+                    new NegocioException(
+                        HttpStatus.NOT_FOUND,
+                        "orden-no-encontrada",
+                        "Orden no encontrada",
+                        "No existe una orden con ese id en el puente."));
+    if (cerrada(orden.getEstado())) {
+      throw new NegocioException(
+          HttpStatus.CONFLICT,
+          "orden-cerrada",
+          "Orden cerrada",
+          "Una orden ejecutada, descartada o cancelada ya no se edita.");
+    }
+    if (datos.descripcion() != null) {
+      if (datos.descripcion().isBlank()) {
+        throw new NegocioException(
+            HttpStatus.UNPROCESSABLE_CONTENT,
+            "descripcion-requerida",
+            "Descripción requerida",
+            "La descripción no puede quedar vacía.");
+      }
+      orden.setDescripcion(datos.descripcion().strip());
+    }
+    if (datos.tipo() != null) {
+      orden.setTipo(datos.tipo());
+    }
+    return mapper.aDTO(orden);
+  }
+
+  private static boolean cerrada(EstadoOrden estado) {
+    return estado == EstadoOrden.EJECUTADA
+        || estado == EstadoOrden.DESCARTADA
+        || estado == EstadoOrden.CANCELADA;
   }
 
   /** RN-MTO-02: acepta una propuesta existente; conserva su información de programación. */

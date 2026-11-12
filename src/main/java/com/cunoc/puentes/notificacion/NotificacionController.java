@@ -2,6 +2,7 @@ package com.cunoc.puentes.notificacion;
 
 import com.cunoc.puentes.common.NegocioException;
 import com.cunoc.puentes.notificacion.dto.ConteoNoLeidasDTO;
+import com.cunoc.puentes.notificacion.dto.LecturaMasivaDTO;
 import com.cunoc.puentes.notificacion.dto.NotificacionDTO;
 import com.cunoc.puentes.notificacion.dto.PaginaNotificacionesDTO;
 import io.swagger.v3.oas.annotations.Operation;
@@ -205,6 +206,15 @@ class NotificacionController {
   @PatchMapping("/{id}/lectura")
   NotificacionDTO marcarComoLeida(@PathVariable UUID id, Principal usuario) {
     return servicio.marcarComoLeida(id, extraerUsuarioId(usuario));
+  }
+
+  @Operation(
+      summary = "Marca todas las notificaciones no leídas como leídas",
+      description = "Devuelve cuántas se marcaron. Las ya leídas conservan su fecha de lectura.")
+  @ApiResponse(responseCode = "200", description = "Lectura registrada")
+  @PatchMapping("/lectura")
+  LecturaMasivaDTO marcarTodasComoLeidas(Principal usuario) {
+    return servicio.marcarTodasComoLeidas(extraerUsuarioId(usuario));
   }
 
   private static UUID extraerUsuarioId(Principal usuario) {

@@ -59,6 +59,10 @@ class RenovacionDeSesionTest extends PruebaIntegracion {
     String cuentas = "SELECT id FROM usuario WHERE correo LIKE '%" + DOMINIO + "'";
     jdbc.update("DELETE FROM auditoria WHERE entidad_id IN (" + cuentas + ")");
     jdbc.update("DELETE FROM token_renovacion WHERE usuario_id IN (" + cuentas + ")");
+    jdbc.update(
+        "DELETE FROM notificacion WHERE usuario_id IN (SELECT id FROM usuario WHERE correo LIKE '%"
+            + DOMINIO
+            + "')");
     jdbc.update("DELETE FROM usuario WHERE correo LIKE '%" + DOMINIO + "'");
   }
 

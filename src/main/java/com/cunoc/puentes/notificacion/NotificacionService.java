@@ -2,6 +2,7 @@ package com.cunoc.puentes.notificacion;
 
 import com.cunoc.puentes.common.NegocioException;
 import com.cunoc.puentes.notificacion.dto.ConteoNoLeidasDTO;
+import com.cunoc.puentes.notificacion.dto.LecturaMasivaDTO;
 import com.cunoc.puentes.notificacion.dto.NotificacionDTO;
 import com.cunoc.puentes.notificacion.dto.PaginaNotificacionesDTO;
 import java.time.Instant;
@@ -109,6 +110,14 @@ public class NotificacionService {
     }
 
     return mapper.aDTO(notificacion);
+  }
+
+  /** Marca todas las no leídas del usuario; las ya leídas conservan su primera fecha. */
+  @Transactional
+  public LecturaMasivaDTO marcarTodasComoLeidas(UUID usuarioId) {
+    int marcadas =
+        repositorio.marcarTodasComoLeidas(usuarioId, Instant.now().truncatedTo(ChronoUnit.MICROS));
+    return new LecturaMasivaDTO(marcadas);
   }
 
   private static void validarNotificacion(

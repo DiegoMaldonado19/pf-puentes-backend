@@ -5,6 +5,8 @@ import com.cunoc.puentes.inspeccion.dto.FormularioResumenDTO;
 import com.cunoc.puentes.inspeccion.dto.InspeccionDTO;
 import com.cunoc.puentes.inspeccion.dto.InspeccionResumenDTO;
 import com.cunoc.puentes.inspeccion.dto.PuenteResumenDTO;
+import com.cunoc.puentes.inspeccion.dto.RevisionResumenDTO;
+import com.cunoc.puentes.inspeccion.puerto.ResumenRevision;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
@@ -24,7 +26,10 @@ class InspeccionEnsamblador {
   }
 
   InspeccionResumenDTO resumen(
-      Inspeccion inspeccion, ReferenciasInspeccion.PuenteVista puente, UUID superadaPor) {
+      Inspeccion inspeccion,
+      ReferenciasInspeccion.PuenteVista puente,
+      UUID superadaPor,
+      ResumenRevision revision) {
     return new InspeccionResumenDTO(
         inspeccion.getId(),
         puente(puente, inspeccion.getPuenteId()),
@@ -33,7 +38,8 @@ class InspeccionEnsamblador {
         inspeccion.getCursoId(),
         inspeccion.getCreadoEn(),
         superadaPor != null,
-        superadaPor);
+        superadaPor,
+        revision(revision));
   }
 
   InspeccionDTO detalle(
@@ -42,7 +48,8 @@ class InspeccionEnsamblador {
       String codigoFormulario,
       List<AcompananteDTO> acompanantes,
       UUID superadaPor,
-      List<String> advertencias) {
+      List<String> advertencias,
+      ResumenRevision revision) {
     boolean publicada = inspeccion.getEstado() == EstadoInspeccion.PUBLICADA;
     Gps gps = gps(inspeccion);
     return new InspeccionDTO(
@@ -77,7 +84,12 @@ class InspeccionEnsamblador {
         superadaPor,
         inspeccion.getSupersedeA() == null ? null : inspeccion.getSupersedeA().getId(),
         inspeccion.getMotivoCorreccion(),
-        List.copyOf(advertencias == null ? List.of() : advertencias));
+        List.copyOf(advertencias == null ? List.of() : advertencias),
+        revision(revision));
+  }
+
+  private static RevisionResumenDTO revision(ResumenRevision revision) {
+    return revision == null ? null : RevisionResumenDTO.de(revision);
   }
 
   private PuenteResumenDTO puente(ReferenciasInspeccion.PuenteVista puente, UUID puenteId) {

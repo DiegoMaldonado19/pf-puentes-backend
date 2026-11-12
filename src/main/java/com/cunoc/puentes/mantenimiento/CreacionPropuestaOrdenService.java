@@ -46,4 +46,25 @@ class CreacionPropuestaOrdenService {
     orden.setPrioridad(Prioridad.MEDIA);
     return ordenes.save(orden);
   }
+
+  /** Alta manual (B9): misma forma y misma auditoría que las generadas por daños. */
+  @Transactional(propagation = Propagation.MANDATORY)
+  @Auditable(accion = Acciones.CREAR, entidad = "orden_mantenimiento", entidadId = "#result.id")
+  public OrdenMantenimiento crearManual(
+      UUID puenteId,
+      UUID inspeccionId,
+      TipoOrden tipo,
+      String descripcion,
+      String elementoRef,
+      Prioridad prioridad) {
+    OrdenMantenimiento orden = new OrdenMantenimiento();
+    orden.setPuenteId(puenteId);
+    orden.setInspeccionId(inspeccionId);
+    orden.setTipo(tipo);
+    orden.setDescripcion(descripcion);
+    orden.setElementoRef(elementoRef);
+    orden.setPrioridadSugerida(prioridad);
+    orden.setPrioridad(prioridad);
+    return ordenes.save(orden);
+  }
 }

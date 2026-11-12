@@ -70,3 +70,9 @@
 | 0064 | El mapeo entre versiones se aplica en la precarga | [0064-mapeo-entre-versiones-en-la-precarga.md](0064-mapeo-entre-versiones-en-la-precarga.md) |
 | 0065 | Edición, borrado y moderación también en hilos de inspección; menciones por id | [0065-edicion-y-moderacion-en-hilos-de-inspeccion.md](0065-edicion-y-moderacion-en-hilos-de-inspeccion.md) |
 | 0066 | Bitácora append-only también en Hibernate | [0066-bitacora-append-only-en-hibernate.md](0066-bitacora-append-only-en-hibernate.md) |
+| 0067 | El enlace de verificación activa al estudiante | [0067-activacion-al-verificar-el-correo.md](0067-activacion-al-verificar-el-correo.md) |
+| 0068 | Esquema base en código y campos adicionales compuestos sobre él | [0068-esquema-base-y-composicion-de-campos-adicionales.md](0068-esquema-base-y-composicion-de-campos-adicionales.md) |
+| 0069 | Alta, edición y listado global de órdenes de mantenimiento | [0069-alta-edicion-y-listado-global-de-ordenes.md](0069-alta-edicion-y-listado-global-de-ordenes.md) |
+| 0070 | Ejecución manual de procesos con el bloqueo de ShedLock | [0070-ejecucion-manual-de-procesos-con-el-bloqueo-de-shedlock.md](0070-ejecucion-manual-de-procesos-con-el-bloqueo-de-shedlock.md) |
+| 0071 | El envío queda bloqueado mientras haya observaciones sin resolver | [0071-envio-bloqueado-por-observaciones-pendientes.md](0071-envio-bloqueado-por-observaciones-pendientes.md) |
+| 0072 | Bajas de puentes con fecha y autor; gestión administrativa de usuarios | [0072-bajas-de-puentes-y-gestion-de-usuarios.md](0072-bajas-de-puentes-y-gestion-de-usuarios.md) |

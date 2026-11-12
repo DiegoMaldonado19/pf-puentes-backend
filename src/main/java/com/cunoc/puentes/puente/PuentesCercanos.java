@@ -14,7 +14,9 @@ class PuentesCercanos {
 
   private static final String CONSULTA =
       """
-      SELECT id, codigo, nombre, round(ST_Distance(ubicacion, punto)::NUMERIC, 1) AS distancia_metros
+      SELECT id, codigo, nombre, ST_Y(ubicacion::geometry) AS latitud,
+             ST_X(ubicacion::geometry) AS longitud,
+             round(ST_Distance(ubicacion, punto)::NUMERIC, 1) AS distancia_metros
       FROM puente, (SELECT ST_SetSRID(ST_MakePoint(:longitud, :latitud), 4326)::geography AS punto) p
       WHERE activo
         AND ST_DWithin(ubicacion, punto, :radio)

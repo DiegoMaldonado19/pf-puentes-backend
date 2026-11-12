@@ -10,6 +10,7 @@ import com.cunoc.puentes.puente.dto.CrearPuenteDTO;
 import com.cunoc.puentes.puente.dto.CrearSolicitudPuenteDTO;
 import com.cunoc.puentes.puente.dto.DarDeBajaPuenteDTO;
 import com.cunoc.puentes.puente.dto.PuenteDTO;
+import com.cunoc.puentes.puente.dto.ReactivarPuenteDTO;
 import com.cunoc.puentes.puente.dto.RechazarSolicitudDTO;
 import com.cunoc.puentes.puente.dto.SolicitudPuenteDTO;
 import java.util.ArrayList;
@@ -58,8 +59,14 @@ class SolicitudPuenteIntegracionTest extends PruebaIntegracion {
             + " (SELECT id FROM puente WHERE municipio_codigo = '0914') OR entidad_id IN"
             + " (SELECT id FROM solicitud_puente WHERE municipio_codigo = '0914'))");
     jdbc.update("DELETE FROM solicitud_puente WHERE municipio_codigo = '0914'");
+    jdbc.update(
+        "DELETE FROM orden_mantenimiento WHERE puente_id IN (SELECT id FROM puente WHERE municipio_codigo = '0914')");
     jdbc.update("DELETE FROM puente WHERE municipio_codigo = '0914'");
     jdbc.update("DELETE FROM correlativo_puente WHERE municipio_codigo = '0914'");
+    jdbc.update(
+        "DELETE FROM notificacion WHERE usuario_id IN (SELECT id FROM usuario WHERE id IN (?, ?))",
+        CATEDRATICO,
+        ADMIN);
     jdbc.update("DELETE FROM usuario WHERE id IN (?, ?)", CATEDRATICO, ADMIN);
   }
 
@@ -156,13 +163,26 @@ class SolicitudPuenteIntegracionTest extends PruebaIntegracion {
   @Test
   void laBajaEsLogicaAuditadaYNoLiberaElCodigo() {
     PuenteDTO puente =
-        puentes.crear(new CrearPuenteDTO("Viejo", "09", "0914", "RD-1", LAT, LON, 1950, null));
+        // El duplicado no es lo que se prueba aquí: la base compartida puede tener puentes cercanos
+        puentes.crear(new CrearPuenteDTO("Viejo", "09", "0914", "RD-1", LAT, LON, 1950, true));
 
-    PuenteDTO baja = puentes.darDeBaja(puente.id(), new DarDeBajaPuenteDTO("Sustituido"));
+    PuenteDTO baja = puentes.darDeBaja(ADMIN, puente.id(), new DarDeBajaPuenteDTO("Sustituido"));
 
     assertThat(baja.activo()).isFalse();
-    assertThat(puentes.listar(null, "0914", null, null, false, 0, 20).totalElementos()).isZero();
-    assertThat(puentes.listar(null, "0914", null, null, true, 0, 20).totalElementos()).isEqualTo(1);
+    assertThat(baja.bajaEn()).isNotNull();
+    assertThat(baja.bajaPor()).isEqualTo(ADMIN);
+    assertThat(
+            puentes
+                .listar(null, "0914", null, null, SituacionPuente.ACTIVOS, 0, 20)
+                .totalElementos())
+        .isZero();
+    assertThat(
+            puentes.listar(null, "0914", null, null, SituacionPuente.BAJAS, 0, 20).totalElementos())
+        .isEqualTo(1);
+    assertThat(
+            puentes.listar(null, "0914", null, null, SituacionPuente.TODOS, 0, 20).totalElementos())
+        .isEqualTo(1);
+
     assertThat(
             jdbc.queryForObject(
                 "SELECT motivo FROM auditoria WHERE entidad = 'puente' AND accion = 'DAR_DE_BAJA'"
@@ -174,5 +194,12 @@ class SolicitudPuenteIntegracionTest extends PruebaIntegracion {
     PuenteDTO nuevo =
         puentes.crear(new CrearPuenteDTO("Nuevo", "09", "0914", "RD-1", LAT, LON, 2026, null));
     assertThat(nuevo.codigo()).isEqualTo("GT-09-0914-0002");
+
+    // Reactivar limpia la baja y no pide confirmar duplicados (la advertencia es solo al dar de
+    // alta)
+    PuenteDTO reactivado = puentes.reactivar(puente.id(), new ReactivarPuenteDTO("Reparado"));
+    assertThat(reactivado.activo()).isTrue();
+    assertThat(reactivado.bajaEn()).isNull();
+    assertThat(reactivado.bajaPor()).isNull();
   }
 }

@@ -14,4 +14,5 @@ public record InspeccionResumenDTO(
     @JsonProperty("curso_id") UUID cursoId,
     @JsonProperty("creado_en") Instant creadoEn,
     @JsonProperty("superada") boolean superada,
-    @JsonProperty("superada_por") UUID superadaPor) {}
+    @JsonProperty("superada_por") UUID superadaPor,
+    RevisionResumenDTO revision) {}

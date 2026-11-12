@@ -7,6 +7,7 @@ import com.cunoc.puentes.puente.dto.EditarPuenteDTO;
 import com.cunoc.puentes.puente.dto.PaginaPuentesDTO;
 import com.cunoc.puentes.puente.dto.PuenteCercanoDTO;
 import com.cunoc.puentes.puente.dto.PuenteDTO;
+import com.cunoc.puentes.puente.dto.ReactivarPuenteDTO;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.ArraySchema;
@@ -16,6 +17,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import java.net.URI;
+import java.security.Principal;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.http.HttpStatus;
@@ -81,18 +83,29 @@ class PuenteController {
       @Parameter(description = "Texto en nombre, código o ruta (máximo 120)")
           @RequestParam(required = false)
           String q,
-      @RequestParam(name = "incluir_bajas", defaultValue = "false") boolean incluirBajas,
+      @Parameter(
+              description =
+                  "ACTIVOS (por defecto), BAJAS o TODOS; BAJAS y TODOS son del Administrador")
+          @RequestParam(required = false)
+          SituacionPuente situacion,
+      @Parameter(deprecated = true, description = "Alias antiguo de situacion=TODOS")
+          @RequestParam(name = "incluir_bajas", defaultValue = "false")
+          boolean incluirBajas,
       @RequestParam(defaultValue = "0") int page,
       @RequestParam(defaultValue = "20") int size,
       Authentication usuario) {
-    if (incluirBajas && !esAdministrador(usuario)) {
+    SituacionPuente efectiva =
+        situacion != null
+            ? situacion
+            : incluirBajas ? SituacionPuente.TODOS : SituacionPuente.ACTIVOS;
+    if (efectiva != SituacionPuente.ACTIVOS && !esAdministrador(usuario)) {
       throw new NegocioException(
           HttpStatus.FORBIDDEN,
           "acceso-denegado",
           "Acceso denegado",
           "Solo el Administrador puede ver los puentes dados de baja.");
     }
-    return servicio.listar(departamento, municipio, estado, q, incluirBajas, page, size);
+    return servicio.listar(departamento, municipio, estado, q, efectiva, page, size);
   }
 
   @Operation(
@@ -243,8 +256,32 @@ class PuenteController {
       content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
   @PostMapping(path = "/{id}/baja", consumes = MediaType.APPLICATION_JSON_VALUE)
   @PreAuthorize("hasRole('ADMINISTRADOR')")
-  PuenteDTO darDeBaja(@PathVariable UUID id, @Valid @RequestBody DarDeBajaPuenteDTO datos) {
-    return servicio.darDeBaja(id, datos);
+  PuenteDTO darDeBaja(
+      Principal administrador,
+      @PathVariable UUID id,
+      @Valid @RequestBody DarDeBajaPuenteDTO datos) {
+    return servicio.darDeBaja(UUID.fromString(administrador.getName()), id, datos);
+  }
+
+  @Operation(
+      summary = "Reactiva un puente dado de baja",
+      description = "Vuelve a ponerlo en servicio. El motivo queda en la auditoría (RN-INV-08).")
+  @ApiResponse(
+      responseCode = "200",
+      description = "Puente reactivado",
+      content = @Content(schema = @Schema(implementation = PuenteDTO.class)))
+  @ApiResponse(
+      responseCode = "404",
+      description = "El puente no existe",
+      content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
+  @ApiResponse(
+      responseCode = "409",
+      description = "El puente ya está en servicio",
+      content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
+  @PostMapping(path = "/{id}/reactivacion", consumes = MediaType.APPLICATION_JSON_VALUE)
+  @PreAuthorize("hasRole('ADMINISTRADOR')")
+  PuenteDTO reactivar(@PathVariable UUID id, @Valid @RequestBody ReactivarPuenteDTO datos) {
+    return servicio.reactivar(id, datos);
   }
 
   private static boolean esAdministrador(Authentication usuario) {

@@ -21,6 +21,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mapstruct.factory.Mappers;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.HttpStatus;
 
 @ExtendWith(MockitoExtension.class)
@@ -28,6 +29,7 @@ class FormularioVersionServiceTest {
 
   @Mock private FormularioVersionRepository repository;
   @Mock private FormularioValidacionServiceImpl validacionService;
+  @Mock private ApplicationEventPublisher publicador;
 
   private final FormularioVersionMapper mapper = Mappers.getMapper(FormularioVersionMapper.class);
   private FormularioVersionService service;
@@ -37,7 +39,9 @@ class FormularioVersionServiceTest {
 
   @BeforeEach
   void setUp() {
-    service = new FormularioVersionService(repository, mapper, validacionService);
+    service =
+        new FormularioVersionService(
+            repository, mapper, validacionService, new ComposicionEsquemaService(), publicador);
   }
 
   @Test

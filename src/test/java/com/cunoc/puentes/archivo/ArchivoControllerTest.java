@@ -75,7 +75,7 @@ class ArchivoControllerTest {
                 .with(csrf())
                 .with(como(Rol.ESTUDIANTE, USUARIO)))
         .andExpect(status().isBadRequest())
-        .andExpect(jsonPath("$.errores[0].campo").value("capturadaEn"));
+        .andExpect(jsonPath("$.errores[0].campo").value("capturada_en"));
   }
 
   private static AbstractMockHttpServletRequestBuilder<?> subirFoto() {

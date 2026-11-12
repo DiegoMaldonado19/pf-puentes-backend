@@ -62,6 +62,7 @@ class IdempotenciaServiceTest extends PruebaIntegracion {
   @AfterEach
   void limpiarUsuarios() {
     usuarios.forEach(id -> jdbc.update("DELETE FROM idempotencia WHERE usuario_id = ?", id));
+    usuarios.forEach(id -> jdbc.update("DELETE FROM notificacion WHERE usuario_id = ?", id));
     usuarios.forEach(id -> jdbc.update("DELETE FROM usuario WHERE id = ?", id));
   }
 

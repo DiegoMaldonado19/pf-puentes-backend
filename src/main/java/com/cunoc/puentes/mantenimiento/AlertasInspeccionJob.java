@@ -31,9 +31,20 @@ public class AlertasInspeccionJob {
     this.reloj = reloj;
   }
 
-  @Scheduled(cron = "0 0 6 * * *", zone = "America/Guatemala")
+  // Horario configurable (sgp.procesos.*); por defecto 06:00 de Guatemala, como antes
+  @Scheduled(
+      cron = "${sgp.procesos.alertas-inspeccion.cron:0 0 6 * * *}",
+      zone = "${sgp.procesos.zona:America/Guatemala}")
   @SchedulerLock(name = "alertas-inspeccion-vencida")
   public void ejecutar() {
+    ejecutarSinBloqueo();
+  }
+
+  /**
+   * Cuerpo del proceso sin bloqueo. Lo usa el disparo manual (B10), que toma el mismo bloqueo de
+   * ShedLock por su cuenta; así no se anidan dos bloqueos con el mismo nombre.
+   */
+  public void ejecutarSinBloqueo() {
     var ahora = reloj.instant();
     UUID despues = null;
     var puentes = repositorio.siguientes(despues, ahora);

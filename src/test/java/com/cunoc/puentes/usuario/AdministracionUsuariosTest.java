@@ -2,6 +2,7 @@ package com.cunoc.puentes.usuario;
 
 import static com.cunoc.puentes.common.seguridad.AutenticacionDePrueba.como;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.hamcrest.Matchers.endsWith;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -9,6 +10,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.cunoc.puentes.PruebaIntegracion;
+import com.cunoc.puentes.common.NegocioException;
+import com.cunoc.puentes.usuario.dto.ActualizarUsuarioDTO;
+import com.cunoc.puentes.usuario.dto.CrearUsuarioDTO;
 import com.jayway.jsonpath.JsonPath;
 import jakarta.servlet.http.Cookie;
 import java.time.Instant;
@@ -42,6 +46,7 @@ class AdministracionUsuariosTest extends PruebaIntegracion {
   @Autowired JdbcTemplate jdbc;
   @Autowired UsuarioRepository usuarios;
   @Autowired PasswordEncoder codificador;
+  @Autowired AdministracionUsuariosService cuentas;
 
   private Usuario admin;
 
@@ -65,6 +70,11 @@ class AdministracionUsuariosTest extends PruebaIntegracion {
             + cuentas
             + ")");
     jdbc.update("DELETE FROM token_renovacion WHERE usuario_id IN (" + cuentas + ")");
+    jdbc.update("DELETE FROM token_verificacion WHERE usuario_id IN (" + cuentas + ")");
+    jdbc.update(
+        "DELETE FROM notificacion WHERE usuario_id IN (SELECT id FROM usuario WHERE correo LIKE '%"
+            + DOMINIO
+            + "')");
     jdbc.update("DELETE FROM usuario WHERE correo LIKE '%" + DOMINIO + "'");
   }
 
@@ -104,6 +114,61 @@ class AdministracionUsuariosTest extends PruebaIntegracion {
                 .content("{\"correo\":\"%s\",\"contrasena\":\"%s\"}".formatted(correo, CONTRASENA)))
         .andExpect(status().isOk())
         .andReturn();
+  }
+
+  @Test
+  void crearDaDeAltaUnaCuentaActivaYEnviaElEnlaceParaFijarLaContrasena() {
+    var creada = cuentas.crear(new CrearUsuarioDTO("Ana Pérez", "ana" + DOMINIO, Rol.CATEDRATICO));
+
+    Usuario cuenta = usuarios.buscarPorCorreo("ana" + DOMINIO).orElseThrow();
+    assertThat(creada.estado()).isEqualTo(EstadoUsuario.ACTIVO);
+    assertThat(cuenta.getCorreoVerificadoEn()).isNotNull();
+    assertThat(cuenta.getRol()).isEqualTo(Rol.CATEDRATICO);
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT count(*) FROM token_verificacion WHERE usuario_id = ?"
+                    + " AND tipo = 'RECUPERACION_CONTRASENA' AND usado_en IS NULL",
+                Integer.class,
+                cuenta.getId()))
+        .isEqualTo(1);
+  }
+
+  @Test
+  void elRolSoloCambiaEntreCatedraticoYAdministradorYNadieCambiaElPropio() {
+    Usuario catedratico = Cuentas.administrador("cat" + DOMINIO);
+    catedratico.setRol(Rol.CATEDRATICO);
+    guardar(catedratico);
+
+    var ascendida =
+        cuentas.actualizar(
+            admin.getId(),
+            catedratico.getId(),
+            new ActualizarUsuarioDTO("Catedrático", catedratico.getCorreo(), Rol.ADMINISTRADOR));
+    assertThat(ascendida.rol()).isEqualTo(Rol.ADMINISTRADOR);
+
+    Usuario estudiante = guardar(Cuentas.estudiante("est" + DOMINIO));
+    assertThatThrownBy(
+            () ->
+                cuentas.actualizar(
+                    admin.getId(),
+                    estudiante.getId(),
+                    new ActualizarUsuarioDTO(
+                        estudiante.getNombre(), estudiante.getCorreo(), Rol.CATEDRATICO)))
+        .isInstanceOfSatisfying(
+            NegocioException.class,
+            e ->
+                assertThat(e.getBody().getType().getPath())
+                    .endsWith("/cambio-de-rol-no-permitido"));
+    assertThatThrownBy(
+            () ->
+                cuentas.actualizar(
+                    admin.getId(),
+                    admin.getId(),
+                    new ActualizarUsuarioDTO(
+                        admin.getNombre(), admin.getCorreo(), Rol.CATEDRATICO)))
+        .isInstanceOfSatisfying(
+            NegocioException.class,
+            e -> assertThat(e.getBody().getType().getPath()).endsWith("/rol-propio-no-permitido"));
   }
 
   @Test

@@ -159,6 +159,12 @@ jobs:
             ./scripts/minio-cuenta-servicio.sh "$2"
           fi
           docker compose up -d --remove-orphans --wait
+          # Solo dev: cuentas de demostración y contraseña conocida (docs/guia-despliegue.md)
+          if [ "$2" = dev ] && [ -n "${ADMIN_INICIAL_CORREO:-}" ]; then
+            for script in datos-demo claves-dev; do
+              docker compose exec -T postgres psql -U puentes_migrador -d puentes -v ON_ERROR_STOP=1 -q < "scripts/$script.sql"
+            done
+          fi
           docker image prune -f
           SH
           }

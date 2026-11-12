@@ -590,11 +590,14 @@ Inventario permanente: un registro por puente, nunca por visita (RN-INV-01)
 | `fecha_ultima_inspeccion` | date | Sí |  |  | Fecha de la última inspección publicada (RN-INV-09) |
 | `creado_en` | timestamp with time zone | No | now() |  | Fecha de alta, en UTC |
 | `actualizado_en` | timestamp with time zone | No | now() |  | Última modificación, en UTC |
+| `baja_en` | timestamp with time zone | Sí |  |  | Cuándo se dio de baja el puente (RN-INV-08); NULL en bajas anteriores a esta columna |
+| `baja_por` | uuid | Sí |  | FK → usuario | Administrador que dio de baja el puente (RN-INV-08) |
 
 **Restricciones**
 
 - `UNIQUE (codigo)`
 - `CHECK (((anio_construccion >= 1800) AND (anio_construccion <= 2100)))`
+- `CHECK (((NOT activo) OR ((baja_en IS NULL) AND (baja_por IS NULL))))`
 - `CHECK ((activo OR (motivo_baja IS NOT NULL)))`
 - `CHECK ((num_nulls(estado_actual, indice_condicion_actual, fecha_ultima_inspeccion) = ANY (ARRAY[0, 3])))`
 - `CHECK (((codigo)::text ~ '^GT-[0-9]{2}-[0-9]{2,4}-[0-9]{4}$'::text))`

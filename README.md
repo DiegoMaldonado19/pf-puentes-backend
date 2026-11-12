@@ -92,7 +92,7 @@ Verificación: **1105 pruebas backend aprobadas**, 16 nuevas, PostgreSQL/reloj c
 
 API REST del Sistema de Gestión de Puentes (SGP).
 
-## Estado (20/10/2026)
+## Estado Activo (20/10/2026)
 
 | Paquete | Qué hay | Responsable |
 |---|---|---|
@@ -227,6 +227,7 @@ Al arrancar, si no existe ninguna cuenta con rol `ADMINISTRADOR`, la app crea un
 
 - **Endpoints públicos** (`/api/v1/auth/`, declarados en `sgp.seguridad.rutas-publicas`): `POST /registro` (201, 409 si el correo ya existe), `POST /verificar-correo` con `{"token": "..."}` (204; 422 `token-invalido` si venció, ya se usó o no existe) y `POST /reenviar-verificacion` con `{"correo": "..."}` (202 siempre). El registro ignora cualquier `rol` del cuerpo: la cuenta nace `ESTUDIANTE` y `PENDIENTE`. Verificar el correo no la activa (US-P2-14).
 - **Token:** 256 bits aleatorios, vigencia `sgp.verificacion-correo.vigencia` (24 h); en la base solo queda su SHA-256. El enlace es `FRONTEND_URL/verificar-correo?token=...`.
+- **Activación (RN-USR-02, [ADR 0067](docs/adr/0067-activacion-al-verificar-el-correo.md)):** verificar el correo activa la cuenta del estudiante (`ACTIVA`). Un enlace ya usado de una cuenta verificada responde `YA_ACTIVA`. El administrador puede activar cuentas `PENDIENTE` con correo verificado con `POST /api/v1/usuarios/{id}/activacion`.
 - **Correo:** `EnviadorDeCorreo` (`common/correo/`) tiene dos implementaciones según `CORREO_MODO`. `smtp` usa `SMTP_HOST`, `SMTP_PORT`, `SMTP_USUARIO`, `SMTP_CLAVE` y `CORREO_REMITENTE`. `consola` (por defecto) imprime el correo, enlace incluido, en el log: es solo para desarrollo y la app no arranca con `APP_ENV=prod`. Se envía de forma asíncrona tras el commit: si el SMTP falla, la cuenta queda creada y se pide el reenvío.
 - Otros flujos con correo (invitaciones, recuperación) inyectan `EnviadorDeCorreo`; no uses `JavaMailSender` directamente.
 

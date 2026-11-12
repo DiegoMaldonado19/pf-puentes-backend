@@ -97,7 +97,9 @@ public class AutenticacionService {
           throw cuentaNoHabilitada(
               "cuenta-pendiente",
               "Cuenta pendiente de activación",
-              "Tu cuenta aún no está activa.");
+              cuenta.getCorreoVerificadoEn() == null
+                  ? "Verifica tu correo con el enlace que te enviamos: así se activa tu cuenta."
+                  : "Tu cuenta aún no está activa. Pide a un administrador que la active.");
       case INACTIVO ->
           throw cuentaNoHabilitada(
               "cuenta-inactiva", "Cuenta inactiva", "Tu cuenta fue dada de baja.");
